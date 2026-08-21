@@ -1,6 +1,7 @@
 export const TILE_RISE_MS = 520
 export const SHIP_TURN_MS = 420
 export const SHIP_FLIGHT_MS = 780
+export const SHIP_SLIDE_MS = 420
 
 export function clamp01(t: number): number {
   return Math.min(1, Math.max(0, t))

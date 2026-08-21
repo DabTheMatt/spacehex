@@ -2,8 +2,8 @@ import * as THREE from 'three'
 import { HEX_SIZE } from '../../game/board/hexMath'
 
 export const TILE_THICKNESS = 0.1
-/** Incoming tiles start below the board floor, then rise to y = 0. */
-export const TILE_SLOT_Y = -0.42
+/** Incoming tile sits just under the board: its top face is the placed-hex floor (y = 0). */
+export const TILE_SLOT_Y = -TILE_THICKNESS
 export const TILE_SETTLED_Y = 0
 
 function hexShape(radius: number): THREE.Shape {
@@ -25,6 +25,7 @@ export function createHexMesh(options: {
   opacity?: number
   y?: number
   radius?: number
+  dashed?: boolean
 }): THREE.Group {
   const group = new THREE.Group()
   const radius = options.radius ?? HEX_SIZE * 0.96
@@ -37,8 +38,8 @@ export function createHexMesh(options: {
   })
   const mat = new THREE.MeshBasicMaterial({
     color: options.fill,
-    transparent: opacity < 1,
-    opacity,
+    transparent: opacity < 1 || Boolean(options.dashed),
+    opacity: options.dashed ? Math.min(opacity, 0.2) : opacity,
     side: THREE.DoubleSide,
   })
   const mesh = new THREE.Mesh(geom, mat)
@@ -48,42 +49,58 @@ export function createHexMesh(options: {
 
   const topY = (options.y ?? 0) + TILE_THICKNESS + 0.002
   const botY = options.y ?? 0
-  const ring = (yy: number) => {
-    const pts: THREE.Vector3[] = []
-    for (let i = 0; i <= 6; i++) {
-      const angle = (Math.PI / 3) * (i % 6)
-      pts.push(new THREE.Vector3(radius * Math.cos(angle), yy, radius * Math.sin(angle)))
-    }
-    return new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({
-        color: options.stroke,
-        transparent: opacity < 1,
-        opacity: Math.min(1, opacity + 0.2),
-      }),
-    )
-  }
-  group.add(ring(topY))
-  group.add(ring(botY))
+  const strokeOpacity = options.dashed ? 0.95 : Math.min(1, opacity + 0.2)
+  group.add(hexRing(radius, topY, options.stroke, strokeOpacity, options.dashed))
+  group.add(hexRing(radius, botY, options.stroke, strokeOpacity, options.dashed))
   for (let i = 0; i < 6; i++) {
     const angle = (Math.PI / 3) * i
     const x = radius * Math.cos(angle)
     const z = radius * Math.sin(angle)
     group.add(
-      new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(x, botY, z),
-          new THREE.Vector3(x, topY, z),
-        ]),
-        new THREE.LineBasicMaterial({
-          color: options.stroke,
-          transparent: opacity < 1,
-          opacity: Math.min(1, opacity + 0.15),
-        }),
+      hexLine(
+        [new THREE.Vector3(x, botY, z), new THREE.Vector3(x, topY, z)],
+        options.stroke,
+        options.dashed ? 0.85 : Math.min(1, opacity + 0.15),
+        options.dashed,
       ),
     )
   }
   return group
+}
+
+function hexRing(
+  radius: number,
+  y: number,
+  color: number,
+  opacity: number,
+  dashed?: boolean,
+): THREE.Line {
+  const pts: THREE.Vector3[] = []
+  for (let i = 0; i <= 6; i++) {
+    const angle = (Math.PI / 3) * (i % 6)
+    pts.push(new THREE.Vector3(radius * Math.cos(angle), y, radius * Math.sin(angle)))
+  }
+  return hexLine(pts, color, opacity, dashed)
+}
+
+function hexLine(points: THREE.Vector3[], color: number, opacity: number, dashed?: boolean): THREE.Line {
+  const geom = new THREE.BufferGeometry().setFromPoints(points)
+  const mat = dashed
+    ? new THREE.LineDashedMaterial({
+        color,
+        dashSize: 0.07,
+        gapSize: 0.055,
+        transparent: true,
+        opacity,
+      })
+    : new THREE.LineBasicMaterial({
+        color,
+        transparent: opacity < 1,
+        opacity,
+      })
+  const line = new THREE.Line(geom, mat)
+  if (dashed) line.computeLineDistances()
+  return line
 }
 
 export function makeDebugSprite(lines: string[]): THREE.Sprite {

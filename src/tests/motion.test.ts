@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { clamp01, easeInOutCubic, easeOutCubic, lerp, lerpAngle } from '../renderer/motion'
-import { TILE_SETTLED_Y, TILE_SLOT_Y } from '../renderer/board/TileRenderer'
+import { TILE_SETTLED_Y, TILE_SLOT_Y, TILE_THICKNESS } from '../renderer/board/TileRenderer'
 
 describe('placement motion', () => {
   it('eases a tile from below the floor up to settled height', () => {
+    expect(TILE_SLOT_Y + TILE_THICKNESS).toBe(TILE_SETTLED_Y)
     expect(TILE_SLOT_Y).toBeLessThan(TILE_SETTLED_Y)
     expect(easeOutCubic(0)).toBe(0)
     expect(easeOutCubic(1)).toBe(1)
