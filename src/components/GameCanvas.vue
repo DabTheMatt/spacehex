@@ -17,6 +17,7 @@ import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { getNeighbor } from '@/game/board/hexMath'
 import { coordKey } from '@/game/board/HexCoord'
+import type { HexActionId } from '@/renderer/entities/HexActionRenderer'
 
 const DRAG_PX = 12
 
@@ -30,6 +31,23 @@ let dragging = false
 
 function showExploreGhosts(): boolean {
   return game.state.exploration.status === 'SELECTING_DIRECTION'
+}
+
+function runHexAction(action: HexActionId): void {
+  if (action === 'MOVE') {
+    if (game.state.movementSpent) game.dispatch({ type: 'END_TURN' })
+    else game.dispatch({ type: 'BEGIN_MOVE' })
+    return
+  }
+  if (action === 'EXPLORE') {
+    game.dispatch({ type: 'BEGIN_EXPLORATION' })
+    return
+  }
+  if (action === 'STAY') {
+    game.dispatch({ type: 'SKIP_MOVEMENT' })
+    return
+  }
+  game.dispatch({ type: 'END_TURN' })
 }
 
 function sync(): void {
@@ -86,6 +104,12 @@ function onUp(ev: PointerEvent): void {
   }
   dragging = false
   if (wasDrag) return
+
+  const hexAction = scene.pickHexAction(ev.clientX, ev.clientY)
+  if (hexAction) {
+    runHexAction(hexAction)
+    return
+  }
 
   const status = game.state.exploration.status
   if (status === 'SELECTING_MOVE') {

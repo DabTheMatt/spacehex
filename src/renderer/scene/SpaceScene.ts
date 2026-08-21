@@ -5,7 +5,9 @@ import { CameraController, makeLights } from './CameraController'
 import { BoardRenderer } from '../board/BoardRenderer'
 import { TilePreviewRenderer } from '../board/TilePreviewRenderer'
 import { ShipRenderer } from '../entities/ShipRenderer'
+import { HexActionRenderer, type HexActionId } from '../entities/HexActionRenderer'
 import { palette } from '../theme'
+import { activeShip } from '../../game/rules/fuel'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
 import { userDataFromHits } from './pickHelpers'
@@ -33,6 +35,7 @@ export class SpaceScene {
   readonly board: BoardRenderer
   readonly preview: TilePreviewRenderer
   readonly ships: ShipRenderer
+  readonly hexActions: HexActionRenderer
   readonly raycaster = new THREE.Raycaster()
   private disposed = false
   private lastState: GameState | null = null
@@ -56,7 +59,8 @@ export class SpaceScene {
     this.board = new BoardRenderer()
     this.preview = new TilePreviewRenderer()
     this.ships = new ShipRenderer()
-    this.scene.add(this.board.group, this.preview.group, this.ships.group)
+    this.hexActions = new HexActionRenderer()
+    this.scene.add(this.board.group, this.preview.group, this.ships.group, this.hexActions.group)
     this.loop()
   }
 
@@ -78,6 +82,11 @@ export class SpaceScene {
         this.camera.focus({ q: 0, r: 0 })
       }
     }
+  }
+
+  pickHexAction(clientX: number, clientY: number): HexActionId | null {
+    const hits = this.intersectAll(clientX, clientY, this.hexActions.pickables())
+    return userDataFromHits<HexActionId>(hits, 'hexAction') ?? null
   }
 
   pickDirection(clientX: number, clientY: number): { direction: number } | null {
@@ -148,6 +157,7 @@ export class SpaceScene {
     this.board.sync(this.lastState, { ...this.lastOptions, tileY: this.tileY })
     this.preview.sync(this.lastState)
     this.ships.sync(this.lastState)
+    this.hexActions.sync(this.lastState, this.ships.isBusy(activeShip(this.lastState).id))
   }
 
   private advanceRise(now: number): void {
@@ -193,6 +203,7 @@ export class SpaceScene {
     this.board.tick(time)
     this.preview.tick(time)
     const shipsSettled = this.ships.tick(time)
+    this.hexActions.tick(this.camera.camera)
     if (shipsSettled) this.applySync()
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)
