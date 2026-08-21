@@ -219,22 +219,24 @@ export function makeDashedHexGhost(direction: number): THREE.Group {
     }),
   )
   line.computeLineDistances()
+  const pick = { kind: 'EXPLORE', direction }
+  line.userData = pick
   g.add(line)
 
   const hit = new THREE.Mesh(
-    new THREE.CircleGeometry(radius * 0.85, 6),
+    new THREE.ShapeGeometry(hexShape(radius)),
     new THREE.MeshBasicMaterial({
       color: 0xb58a4b,
       transparent: true,
-      opacity: 0.04,
+      opacity: 0.06,
       side: THREE.DoubleSide,
       depthWrite: false,
     }),
   )
   hit.rotation.x = -Math.PI / 2
   hit.position.y = y
-  hit.userData = { kind: 'EXPLORE', direction }
+  hit.userData = pick
   g.add(hit)
-  g.userData = hit.userData
+  g.userData = pick
   return g
 }

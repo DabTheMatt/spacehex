@@ -36,6 +36,19 @@ describe('exploration engine', () => {
     expect(roundTrip.board.tiles['0,0'].coord).toEqual({ q: 0, r: 0 })
   })
 
+  it('BEGIN_EXPLORATION then START_EXPLORATION draws the pending tile', () => {
+    let state = createInitialState('ghost-click')
+    const top = state.explorationDeck.drawPile[0]
+    state = applyCommand(state, { type: 'BEGIN_EXPLORATION' }).state
+    expect(state.exploration.status).toBe('SELECTING_DIRECTION')
+    const started = applyCommand(state, { type: 'START_EXPLORATION', direction: 2 })
+    state = started.state
+    expect(started.events.some((e) => e.type === 'TILE_DRAWN' && e.tileId === top)).toBe(true)
+    expect(state.phase).toBe('TILE_PLACEMENT')
+    expect(state.exploration.pendingTileId).toBe(top)
+    expect(state.exploration.target).toEqual(getNeighbor({ q: 0, r: 0 }, 2))
+  })
+
   it('draws, rotates six times, places, and moves the ship', () => {
     let state = createInitialState('explore')
     const top = state.explorationDeck.drawPile[0]

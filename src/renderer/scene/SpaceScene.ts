@@ -7,6 +7,7 @@ import { TilePreviewRenderer } from '../board/TilePreviewRenderer'
 import { ShipRenderer } from '../entities/ShipRenderer'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
+import { userDataFromHits } from './pickHelpers'
 
 export interface SceneOptions {
   showDebug: boolean
@@ -30,6 +31,7 @@ export class SpaceScene {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.setClearColor(palette.void)
+    this.raycaster.params.Line = { threshold: 0.12 }
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color(palette.void)
     this.camera = new CameraController(canvas)
@@ -70,42 +72,30 @@ export class SpaceScene {
   }
 
   pickDirection(clientX: number, clientY: number): { direction: number } | null {
-    const hit = this.intersect(clientX, clientY, this.board.pickables())
-    if (!hit || hit.object.userData.direction === undefined) return null
-    return { direction: hit.object.userData.direction as number }
+    const hits = this.intersectAll(clientX, clientY, this.board.pickables())
+    const direction = userDataFromHits<number>(hits, 'direction')
+    return direction === undefined ? null : { direction }
   }
 
   pickShip(clientX: number, clientY: number): { shipId: string } | null {
-    const hit = this.intersect(clientX, clientY, this.ships.pickables())
-    if (!hit) return null
-    let obj: THREE.Object3D | null = hit.object
-    while (obj) {
-      if (typeof obj.userData.shipId === 'string') return { shipId: obj.userData.shipId }
-      obj = obj.parent
-    }
-    return null
+    const hits = this.intersectAll(clientX, clientY, this.ships.pickables())
+    const shipId = userDataFromHits<string>(hits, 'shipId')
+    return shipId === undefined ? null : { shipId }
   }
 
   pickTile(clientX: number, clientY: number): HexCoord | null {
-    const hit = this.intersect(clientX, clientY, this.board.tileMeshes())
-    if (!hit) return null
-    let obj: THREE.Object3D | null = hit.object
-    while (obj) {
-      if (obj.userData.tileCoord) return obj.userData.tileCoord as HexCoord
-      obj = obj.parent
-    }
-    return null
+    const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
+    return userDataFromHits<HexCoord>(hits, 'tileCoord') ?? null
   }
 
-  private intersect(clientX: number, clientY: number, objects: THREE.Object3D[]): THREE.Intersection | null {
+  private intersectAll(clientX: number, clientY: number, objects: THREE.Object3D[]): THREE.Intersection[] {
     const rect = this.canvas.getBoundingClientRect()
     const ndc = new THREE.Vector2(
       ((clientX - rect.left) / rect.width) * 2 - 1,
       -((clientY - rect.top) / rect.height) * 2 + 1,
     )
     this.raycaster.setFromCamera(ndc, this.camera.camera)
-    const hits = this.raycaster.intersectObjects(objects, true)
-    return hits[0] ?? null
+    return this.raycaster.intersectObjects(objects, true)
   }
 
   dispose(): void {

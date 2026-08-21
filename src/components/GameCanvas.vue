@@ -2,6 +2,7 @@
   <canvas
     ref="canvasEl"
     class="space-canvas"
+    tabindex="0"
     @pointerdown="onDown"
     @pointermove="onMove"
     @pointerup="onUp"
@@ -17,12 +18,15 @@ import { useUiStore } from '@/stores/uiStore'
 import { getNeighbor } from '@/game/board/hexMath'
 import { coordKey } from '@/game/board/HexCoord'
 
+const DRAG_PX = 12
+
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 const game = useGameStore()
 const ui = useUiStore()
 let scene: SpaceScene | null = null
 let downX = 0
 let downY = 0
+let dragging = false
 
 function showExploreGhosts(): boolean {
   return game.state.exploration.status === 'SELECTING_DIRECTION'
@@ -54,25 +58,34 @@ function resize(): void {
 function onDown(ev: PointerEvent): void {
   downX = ev.clientX
   downY = ev.clientY
-  if (ev.button === 0 && scene) {
-    scene.camera.beginPan(ev.clientX, ev.clientY)
+  dragging = false
+  canvasEl.value?.focus()
+  if (ev.button === 0) {
     canvasEl.value?.setPointerCapture(ev.pointerId)
   }
 }
 
 function onMove(ev: PointerEvent): void {
-  if (!scene?.camera.panning) return
-  scene.camera.updatePan(ev.clientX, ev.clientY)
+  if (!scene || (ev.buttons & 1) === 0) return
+  const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY)
+  if (!dragging && dist > DRAG_PX) {
+    dragging = true
+    scene.camera.beginPan(downX, downY)
+    scene.camera.updatePan(ev.clientX, ev.clientY)
+    return
+  }
+  if (dragging) scene.camera.updatePan(ev.clientX, ev.clientY)
 }
 
 function onUp(ev: PointerEvent): void {
   if (!scene) return
-  const dragged = Math.hypot(ev.clientX - downX, ev.clientY - downY) > 6
+  const wasDrag = dragging
   if (ev.button === 0) {
     scene.camera.endPan()
     canvasEl.value?.releasePointerCapture(ev.pointerId)
   }
-  if (dragged) return
+  dragging = false
+  if (wasDrag) return
 
   const status = game.state.exploration.status
   if (status === 'SELECTING_MOVE') {
@@ -82,8 +95,6 @@ function onUp(ev: PointerEvent): void {
       type: 'DECLARE_MOVE',
       target: getNeighbor(game.ship.coord, picked.direction),
     })
-    scene.handleEvents(game.lastEvents, game.state)
-    sync()
     return
   }
 
@@ -91,8 +102,6 @@ function onUp(ev: PointerEvent): void {
     const ghost = scene.pickDirection(ev.clientX, ev.clientY)
     if (ghost) {
       game.dispatch({ type: 'START_EXPLORATION', direction: ghost.direction })
-      scene.handleEvents(game.lastEvents, game.state)
-      sync()
       return
     }
   }
@@ -102,64 +111,12 @@ function onUp(ev: PointerEvent): void {
     ui.selectedShipId = shipHit.shipId
     ui.selectedTile = null
     focusShip(shipHit.shipId)
-    sync()
     return
   }
 
   const tile = scene.pickTile(ev.clientX, ev.clientY)
   ui.selectedTile = tile
   if (tile) ui.selectedShipId = null
-  sync()
-}
-
-function onKey(ev: KeyboardEvent): void {
-  const target = ev.target
-  if (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement
-  ) {
-    return
-  }
-
-  if (game.state.phase === 'TILE_PLACEMENT') {
-    const key = ev.key.toLowerCase()
-    if (key === 'q') {
-      game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'LEFT' })
-    } else if (key === 'e' || key === 'r') {
-      game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' })
-    } else if (key === 'f' || ev.key === 'Enter') {
-      game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
-    } else {
-      return
-    }
-    scene?.handleEvents(game.lastEvents, game.state)
-    sync()
-    return
-  }
-
-  if (ev.key === 'Escape') {
-    game.dispatch({ type: 'CANCEL_SELECTION' })
-    sync()
-    return
-  }
-  if (ev.key === '1') {
-    if (game.state.movementSpent) game.dispatch({ type: 'END_TURN' })
-    else game.dispatch({ type: 'BEGIN_MOVE' })
-    scene?.handleEvents(game.lastEvents, game.state)
-    sync()
-    return
-  }
-  if (ev.key === '2') {
-    game.dispatch({ type: 'BEGIN_EXPLORATION' })
-    sync()
-    return
-  }
-  if (ev.key === '3') {
-    game.dispatch({ type: 'SKIP_MOVEMENT' })
-    scene?.handleEvents(game.lastEvents, game.state)
-    sync()
-  }
 }
 
 onMounted(() => {
@@ -170,12 +127,10 @@ onMounted(() => {
   focusShip(game.ship.id)
   sync()
   window.addEventListener('resize', resize)
-  window.addEventListener('keydown', onKey)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', resize)
-  window.removeEventListener('keydown', onKey)
   scene?.dispose()
 })
 
@@ -183,6 +138,14 @@ watch(
   () => [game.state, ui.showDebug, ui.showCoords, ui.showEdges, ui.selectedTile, ui.selectedShipId],
   () => sync(),
   { deep: true },
+)
+
+watch(
+  () => game.lastEvents,
+  (events) => {
+    if (!scene) return
+    scene.handleEvents(events, game.state)
+  },
 )
 
 watch(

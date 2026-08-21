@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { getWorldPosition } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { palette } from '../theme'
+import { isTypingTarget } from '../../ui/actionHotkeys'
 
 const WASD_SPEED = 6
 
@@ -144,14 +145,6 @@ export class CameraController {
     if (code === 'KeyS') this.keys.s = down
     if (code === 'KeyD') this.keys.d = down
   }
-}
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement
-  )
 }
 
 export function makeLights(scene: THREE.Scene): void {

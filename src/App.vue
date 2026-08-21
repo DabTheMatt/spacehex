@@ -18,15 +18,19 @@ import ActionList from './components/hud/ActionList.vue'
 import ExplorationControls from './components/hud/ExplorationControls.vue'
 import DeveloperPanel from './components/panels/DeveloperPanel.vue'
 import { useUiStore } from './stores/uiStore'
+import { useGameHotkeys } from './ui/useGameHotkeys'
+import { isTypingTarget } from './ui/actionHotkeys'
 
 const ui = useUiStore()
+useGameHotkeys()
 
-function onKey(ev: KeyboardEvent): void {
-  if (ev.key === '`' || ev.key === 'Backquote') {
+function onDevKey(ev: KeyboardEvent): void {
+  if (isTypingTarget(ev.target)) return
+  if (ev.code === 'Backquote' || ev.key === '`') {
     ui.showDev = !ui.showDev
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKey))
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+onMounted(() => window.addEventListener('keydown', onDevKey, true))
+onUnmounted(() => window.removeEventListener('keydown', onDevKey, true))
 </script>
