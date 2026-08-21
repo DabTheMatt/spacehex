@@ -166,3 +166,34 @@ export function makeEdgeChevron(options: {
   g.userData = tri.userData
   return g
 }
+
+/** Cartographic corner ticks — does not alter hex geometry. */
+export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
+  const g = new THREE.Group()
+  const y = TILE_THICKNESS + 0.012
+  const tick = 0.11
+  const mat = new THREE.LineBasicMaterial({ color: 0xb58a4b })
+  for (let i = 0; i < 6; i++) {
+    const a0 = (Math.PI / 3) * i
+    const a1 = (Math.PI / 3) * ((i + 1) % 6)
+    const a2 = (Math.PI / 3) * ((i + 5) % 6)
+    const vx = radius * Math.cos(a0)
+    const vz = radius * Math.sin(a0)
+    const along1 = new THREE.Vector3(Math.cos(a1) * radius - vx, 0, Math.sin(a1) * radius - vz).normalize()
+    const along2 = new THREE.Vector3(Math.cos(a2) * radius - vx, 0, Math.sin(a2) * radius - vz).normalize()
+    const origin = new THREE.Vector3(vx, y, vz)
+    g.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([origin, origin.clone().addScaledVector(along1, tick)]),
+        mat,
+      ),
+    )
+    g.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([origin, origin.clone().addScaledVector(along2, tick)]),
+        mat,
+      ),
+    )
+  }
+  return g
+}

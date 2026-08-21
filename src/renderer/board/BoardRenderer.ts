@@ -4,7 +4,7 @@ import { getTileDefinition } from '../../game/definitions/tiles'
 import { getRotatedEdges } from '../../game/board/tileRotation'
 import { getWorldPosition, getNeighbor } from '../../game/board/hexMath'
 import { isTilePlaced } from '../../game/board/HexMap'
-import { createHexMesh, makeDebugSprite, makeEdgeChevron, TILE_THICKNESS } from './TileRenderer'
+import { createHexMesh, makeDebugSprite, makeEdgeChevron, makeSelectionMarks, TILE_THICKNESS } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
 import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
@@ -43,16 +43,7 @@ export class BoardRenderer {
       glyph.position.y = TILE_THICKNESS
       mesh.add(glyph)
       if (options.selectedKey === coordKey(tile.coord)) {
-        const rim = createHexMesh({
-          fill: palette.tileFill,
-          stroke: palette.ochre,
-          y: 0,
-          radius: 1.02,
-        })
-        rim.children.forEach((child) => {
-          if (child instanceof THREE.Mesh) child.visible = false
-        })
-        mesh.add(rim)
+        mesh.add(makeSelectionMarks())
       }
       if (options.showDebug || options.showCoords || options.showEdges) {
         const edges = getRotatedEdges(def, tile.rotation)

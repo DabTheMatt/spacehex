@@ -8,7 +8,8 @@ import { palette, css } from '../theme'
 import { TILE_THICKNESS } from '../board/TileRenderer'
 
 const SHIP_SPACING = 0.46
-const BASE_HOVER = TILE_THICKNESS + 0.2
+const HULL_HEIGHT = 0.055
+const BASE_HOVER = TILE_THICKNESS + 0.12
 
 export class ShipRenderer {
   readonly group = new THREE.Group()
@@ -34,8 +35,7 @@ export class ShipRenderer {
         const wrapper = new THREE.Group()
         const playerNo = Number(ship.playerId.replace(/\D/g, '')) || index + 1
         const active = state.players[state.activePlayerId]?.shipId === ship.id
-        wrapper.add(createShipMesh(ship.class, active))
-        wrapper.add(createHullNumber(String(playerNo)))
+        wrapper.add(createNavMarker(ship.class, active, String(playerNo)))
         wrapper.rotation.y = yaw
         wrapper.position.set(
           pos.x + px * side * SHIP_SPACING,
@@ -52,10 +52,13 @@ export class ShipRenderer {
   }
 
   tick(time: number): void {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     for (const child of this.group.children) {
       const bob = child.userData.bob as { baseY: number; phase: number } | undefined
       if (!bob) continue
-      child.position.y = bob.baseY + Math.sin(time * 0.4 + bob.phase) * 0.028
+      child.position.y = reduce
+        ? bob.baseY
+        : bob.baseY + Math.sin(time * 0.4 + bob.phase) * 0.028
     }
   }
 }
@@ -73,55 +76,59 @@ function lastMoveYaw(log: GameEvent[], shipId: string): number {
   return Math.atan2(east.x, east.z)
 }
 
-function createShipMesh(shipClass: keyof typeof SHIP_DEFINITIONS, active: boolean): THREE.Mesh {
+function createNavMarker(
+  shipClass: keyof typeof SHIP_DEFINITIONS,
+  active: boolean,
+  label: string,
+): THREE.Group {
   const color = active ? palette.ochre : palette.ivory
-  if (shipClass === 'MEWA') {
-    const geom = new THREE.ConeGeometry(0.14, 0.42, 3)
-    const mesh = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ color }))
-    mesh.rotation.x = Math.PI / 2
-    mesh.rotation.z = Math.PI / 3
-    return mesh
-  }
-  if (shipClass === 'CIERN') {
-    return new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.16),
-      new THREE.MeshBasicMaterial({ color }),
-    )
-  }
-  const mesh = new THREE.Mesh(
-    new THREE.ConeGeometry(0.12, 0.34, 3),
+  const g = new THREE.Group()
+  const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
+  const half = shipClass === 'DRZAZGA' ? 0.1 : 0.12
+  const shape = new THREE.Shape()
+  shape.moveTo(0, -length * 0.5)
+  shape.lineTo(-half, length * 0.5)
+  shape.lineTo(half, length * 0.5)
+  shape.closePath()
+  const hull = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(shape, { depth: HULL_HEIGHT, bevelEnabled: false, steps: 1 }),
     new THREE.MeshBasicMaterial({ color }),
   )
-  mesh.rotation.x = Math.PI / 2
-  mesh.rotation.z = Math.PI / 3
-  return mesh
+  hull.rotation.x = -Math.PI / 2
+  g.add(hull)
+
+  const number = createDeckNumber(label)
+  number.position.set(0, HULL_HEIGHT + 0.0015, 0.02)
+  g.add(number)
+  return g
 }
 
-function createHullNumber(label: string): THREE.Mesh {
+function createDeckNumber(label: string): THREE.Mesh {
   const canvas = document.createElement('canvas')
-  canvas.width = 128
-  canvas.height = 128
+  canvas.width = 64
+  canvas.height = 64
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.clearRect(0, 0, 128, 128)
-    ctx.fillStyle = css.paper
-    ctx.font = 'bold 92px Palatino, Times New Roman, serif'
+    ctx.clearRect(0, 0, 64, 64)
+    ctx.fillStyle = css.ink
+    ctx.font = '600 48px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(label, 64, 72)
+    ctx.fillText(label, 32, 36)
   }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.needsUpdate = true
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.12, 0.12),
+    new THREE.PlaneGeometry(0.09, 0.09),
     new THREE.MeshBasicMaterial({
-      map: new THREE.CanvasTexture(canvas),
+      map: tex,
       transparent: true,
-      side: THREE.DoubleSide,
-      depthTest: true,
+      depthWrite: false,
       polygonOffset: true,
-      polygonOffsetFactor: -2,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -4,
     }),
   )
   mesh.rotation.x = -Math.PI / 2
-  mesh.position.set(0, 0.072, 0)
   return mesh
 }

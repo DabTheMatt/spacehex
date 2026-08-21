@@ -4,6 +4,8 @@ Interaktywny przestrzenny prototyp przeglądarkowej strategicznej gry planszowej
 
 Źródło prawdy dla implementacji. Zmiana zasad wymaga zgody (Maciej). Brak parametru → `TODO RULE CLARIFICATION`. Konflikt zasad → `RULE CONFLICT`.
 
+UI i typografia: [`interface.md`](./interface.md) — MAP FIRST, UI SECOND.
+
 ---
 
 ## Proces developerski

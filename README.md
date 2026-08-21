@@ -1,6 +1,6 @@
 # SPACE HEX
 
-Przeglądarkowy prototyp 3D strategicznej gry planszowej. Specyfikacja: [`project.md`](./project.md).
+Przeglądarkowy prototyp 3D strategicznej gry planszowej. Specyfikacja: [`project.md`](./project.md). UI: [`interface.md`](./interface.md).
 
 ## Prototype v0.1
 
@@ -27,5 +27,6 @@ Po włączeniu GitHub Pages (Actions → workflow *Deploy GitHub Pages*) aplikac
 ## Sterowanie
 
 - Kamera: LPM przeciągnij mapę (punkt pod kursorem jedzie z myszą) · WASD · scroll zoom · PPM orbit
+- Dev panel: `` ` ``
 - Eksploracja: **EKSPLORACJA** → klik znacznika przy krawędzi
 - Obrót kafla: **Q** / **E** (lub **R**), **Enter** zatwierdza

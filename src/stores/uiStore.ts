@@ -6,7 +6,7 @@ export const useUiStore = defineStore('ui', () => {
   const showDebug = ref(false)
   const showCoords = ref(false)
   const showEdges = ref(false)
-  const showDev = ref(true)
+  const showDev = ref(false)
   const seedInput = ref('spacehex-v0.1')
   const selectedTile = ref<HexCoord | null>(null)
 
