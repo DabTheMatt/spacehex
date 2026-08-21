@@ -64,9 +64,9 @@ function evaGlyph(color: number): THREE.Group {
   light.position.set(0.4, Y + 0.004, 0)
   light.userData.animate = 'pulse'
   g.add(light)
-  g.add(circle(0.055, color, 18))
-  const ring = g.children[g.children.length - 1]
+  const ring = circle(0.055, color, 18)
   ring.position.set(0.4, 0, 0)
+  g.add(ring)
   return g
 }
 
@@ -78,58 +78,90 @@ function voidGlyph(color: number): THREE.Group {
   return g
 }
 
-function planetGlyph(color: number, radius: number): THREE.Group {
+function planetGlyph(color: number, size: 'L' | 'M' | 'S'): THREE.Group {
   const spin = new THREE.Group()
   spin.userData.animate = 'spin'
-  spin.add(circle(radius, color))
-  spin.add(arc(radius * 0.55, -0.4, 2.4, color))
-  spin.add(circle(radius * 0.18, color, 16))
-  const moon = circle(radius * 0.22, color, 18)
-  moon.position.set(radius * 0.85, 0, -radius * 0.35)
-  spin.add(moon)
-  spin.add(poly([[radius * 0.15, 0], [radius * 0.7, 0.08]], color))
+  if (size === 'L') {
+    spin.add(circle(0.46, color, 48))
+    spin.add(ellipse(0.68, 0.2, color))
+    spin.add(ellipse(0.62, 0.16, color))
+    spin.add(arc(0.28, -0.5, 2.5, color))
+    const moon = circle(0.12, color, 20)
+    moon.position.set(0.62, 0, 0.38)
+    spin.add(moon)
+    spin.add(poly([[-0.2, -0.08], [0.22, 0.12]], color))
+    spin.add(poly([[-0.12, 0.18], [0.18, 0.28]], color))
+  } else if (size === 'M') {
+    spin.add(circle(0.3, color, 40))
+    spin.add(arc(0.18, 0.2, 3.4, color))
+    spin.add(circle(0.07, color, 14))
+    const crater = circle(0.05, color, 12)
+    crater.position.set(-0.12, 0, 0.1)
+    spin.add(crater)
+  } else {
+    spin.add(circle(0.15, color, 28))
+    spin.add(circle(0.045, color, 12))
+  }
   return spin
+}
+
+function ellipse(rx: number, rz: number, color: number, segments = 48): THREE.Line {
+  const pts: THREE.Vector3[] = []
+  for (let i = 0; i <= segments; i++) {
+    const a = (i / segments) * Math.PI * 2
+    pts.push(new THREE.Vector3(Math.cos(a) * rx, Y, Math.sin(a) * rz))
+  }
+  return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat(color))
 }
 
 function asteroidGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
-  g.add(
-    poly(
-      [
-        [0.28, -0.08],
-        [0.48, 0.04],
-        [0.3, 0.22],
-        [0.12, 0.1],
-      ],
-      color,
-      true,
-    ),
-  )
-  g.add(
-    poly(
-      [
-        [-0.08, 0.18],
-        [0.1, 0.32],
-        [-0.02, 0.42],
-        [-0.2, 0.28],
-      ],
-      color,
-      true,
-    ),
-  )
-  g.add(
-    poly(
-      [
-        [-0.32, -0.28],
-        [-0.08, -0.22],
-        [-0.14, -0.02],
-        [-0.38, -0.1],
-      ],
-      color,
-      true,
-    ),
-  )
-  g.add(poly([[0.05, -0.05], [0.22, 0.02]], color))
+  const rocks: Array<Array<[number, number]>> = [
+    [
+      [0.38, 0.02],
+      [0.55, 0.14],
+      [0.42, 0.32],
+      [0.22, 0.22],
+      [0.2, 0.06],
+    ],
+    [
+      [0.08, 0.28],
+      [0.22, 0.42],
+      [0.02, 0.52],
+      [-0.16, 0.4],
+      [-0.1, 0.24],
+    ],
+    [
+      [-0.28, 0.08],
+      [-0.12, 0.18],
+      [-0.22, 0.32],
+      [-0.42, 0.2],
+      [-0.4, 0.04],
+    ],
+    [
+      [-0.48, -0.22],
+      [-0.28, -0.12],
+      [-0.32, 0.02],
+      [-0.55, -0.08],
+    ],
+    [
+      [-0.08, -0.38],
+      [0.14, -0.32],
+      [0.18, -0.14],
+      [-0.02, -0.18],
+      [-0.16, -0.28],
+    ],
+    [
+      [0.28, -0.28],
+      [0.42, -0.22],
+      [0.36, -0.08],
+      [0.18, -0.16],
+    ],
+  ]
+  for (const rock of rocks) g.add(poly(rock, color, true))
+  g.add(poly([[0.02, 0.02], [0.12, 0.1]], color))
+  g.add(poly([[-0.18, -0.06], [-0.08, 0.04]], color))
+  g.add(poly([[0.2, -0.06], [0.3, 0]], color))
   return g
 }
 
@@ -151,9 +183,14 @@ function tankerGlyph(color: number): THREE.Group {
 
 function transportGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
-  g.add(poly([[-0.45, -0.16], [-0.05, -0.1], [-0.08, 0.14], [-0.42, 0.1]], color, true))
-  g.add(poly([[0.08, -0.18], [0.42, -0.06], [0.5, 0.08], [0.12, 0.16]], color, true))
-  g.add(poly([[-0.02, 0], [0.1, -0.04]], color))
+  g.add(poly([[-0.18, -0.28], [0.18, -0.28], [0.18, 0.08], [-0.18, 0.08]], color, true))
+  g.add(poly([[-0.1, -0.18], [0.1, -0.18], [0.1, -0.02], [-0.1, -0.02]], color, true))
+  g.add(poly([[-0.48, 0.08], [-0.18, 0.08], [-0.18, 0.28], [-0.48, 0.22]], color, true))
+  g.add(poly([[0.18, 0.08], [0.5, 0.14], [0.48, 0.3], [0.18, 0.28]], color, true))
+  g.add(poly([[-0.08, 0.08], [-0.02, 0.22]], color))
+  g.add(poly([[0.06, 0.08], [0.14, 0.2]], color))
+  g.add(poly([[-0.12, -0.28], [-0.2, -0.42]], color))
+  g.add(poly([[0.12, -0.28], [0.22, -0.4]], color))
   return g
 }
 
@@ -183,13 +220,13 @@ export function createTileGlyph(def: TileDefinition, color = palette.paper): THR
       root.add(voidGlyph(color))
       break
     case 'PLANET_LARGE':
-      root.add(planetGlyph(color, 0.4))
+      root.add(planetGlyph(color, 'L'))
       break
     case 'PLANET_MEDIUM':
-      root.add(planetGlyph(color, 0.3))
+      root.add(planetGlyph(color, 'M'))
       break
     case 'PLANET_SMALL':
-      root.add(planetGlyph(color, 0.2))
+      root.add(planetGlyph(color, 'S'))
       break
     case 'ASTEROID':
       root.add(asteroidGlyph(color))

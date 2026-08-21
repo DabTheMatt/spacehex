@@ -146,6 +146,51 @@ button:disabled {
   right: 1.25rem;
 }
 
+.tile-info {
+  position: absolute;
+  z-index: 2;
+  top: 5rem;
+  right: 18rem;
+  width: 16rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: rgba(11, 11, 10, 0.86);
+  font-size: 0.8rem;
+}
+
+.tile-info h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  font-weight: normal;
+}
+
+.tile-info dl {
+  margin: 0;
+}
+
+.tile-info dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+  padding: 0.28rem 0;
+}
+
+.tile-info dt {
+  opacity: 0.65;
+}
+
+.tile-info dd {
+  margin: 0;
+  text-align: right;
+}
+
+.tile-info button {
+  width: 100%;
+  margin-top: 0.75rem;
+}
+
 .dev {
   left: 1.25rem;
   top: auto;

@@ -6,11 +6,13 @@ import { BoardRenderer } from '../board/BoardRenderer'
 import { TilePreviewRenderer } from '../board/TilePreviewRenderer'
 import { ShipRenderer } from '../entities/ShipRenderer'
 import { palette } from '../theme'
+import type { HexCoord } from '../../game/board/HexCoord'
 
 export interface SceneOptions {
   showDebug: boolean
   showCoords: boolean
   showEdges: boolean
+  selectedKey?: string | null
 }
 
 export class SpaceScene {
@@ -67,16 +69,31 @@ export class SpaceScene {
   }
 
   pickDirection(clientX: number, clientY: number): { direction: number } | null {
+    const hit = this.intersect(clientX, clientY, this.board.pickables())
+    if (!hit || hit.object.userData.direction === undefined) return null
+    return { direction: hit.object.userData.direction as number }
+  }
+
+  pickTile(clientX: number, clientY: number): HexCoord | null {
+    const hit = this.intersect(clientX, clientY, this.board.tileMeshes())
+    if (!hit) return null
+    let obj: THREE.Object3D | null = hit.object
+    while (obj) {
+      if (obj.userData.tileCoord) return obj.userData.tileCoord as HexCoord
+      obj = obj.parent
+    }
+    return null
+  }
+
+  private intersect(clientX: number, clientY: number, objects: THREE.Object3D[]): THREE.Intersection | null {
     const rect = this.canvas.getBoundingClientRect()
     const ndc = new THREE.Vector2(
       ((clientX - rect.left) / rect.width) * 2 - 1,
       -((clientY - rect.top) / rect.height) * 2 + 1,
     )
     this.raycaster.setFromCamera(ndc, this.camera.camera)
-    const hits = this.raycaster.intersectObjects(this.board.pickables(), true)
-    const hit = hits.find((h) => h.object.userData.direction !== undefined)
-    if (!hit) return null
-    return { direction: hit.object.userData.direction as number }
+    const hits = this.raycaster.intersectObjects(objects, true)
+    return hits[0] ?? null
   }
 
   dispose(): void {
@@ -91,6 +108,7 @@ export class SpaceScene {
     const time = performance.now() / 1000
     this.board.tick(time)
     this.preview.tick(time)
+    this.ships.tick(time)
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)
   }

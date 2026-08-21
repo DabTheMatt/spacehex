@@ -19,7 +19,15 @@ export class BoardRenderer {
     this.group.add(this.markers)
   }
 
-  sync(state: GameState, options: { showDebug: boolean; showCoords: boolean; showEdges: boolean }): void {
+  sync(
+    state: GameState,
+    options: {
+      showDebug: boolean
+      showCoords: boolean
+      showEdges: boolean
+      selectedKey?: string | null
+    },
+  ): void {
     this.tiles.clear()
     this.markers.clear()
 
@@ -29,9 +37,23 @@ export class BoardRenderer {
       const mesh = createHexMesh({ fill: palette.tileFill, stroke: palette.ivory, y: 0 })
       mesh.position.set(pos.x, 0, pos.z)
       mesh.rotation.y = tile.rotation * (Math.PI / 3)
+      mesh.userData.tileCoord = tile.coord
+      mesh.userData.tileKey = coordKey(tile.coord)
       const glyph = createTileGlyph(def)
       glyph.position.y = TILE_THICKNESS
       mesh.add(glyph)
+      if (options.selectedKey === coordKey(tile.coord)) {
+        const rim = createHexMesh({
+          fill: palette.tileFill,
+          stroke: palette.ochre,
+          y: 0,
+          radius: 1.02,
+        })
+        rim.children.forEach((child) => {
+          if (child instanceof THREE.Mesh) child.visible = false
+        })
+        mesh.add(rim)
+      }
       if (options.showDebug || options.showCoords || options.showEdges) {
         const edges = getRotatedEdges(def, tile.rotation)
         const lines = [
@@ -78,5 +100,9 @@ export class BoardRenderer {
 
   pickables(): THREE.Object3D[] {
     return this.markers.children
+  }
+
+  tileMeshes(): THREE.Object3D[] {
+    return this.tiles.children
   }
 }
