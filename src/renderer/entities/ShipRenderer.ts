@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 import type { GameState } from '../../game/state/GameState'
+import type { GameEvent } from '../../game/engine/events'
 import { getWorldPosition } from '../../game/board/hexMath'
 import { SHIP_DEFINITIONS } from '../../game/definitions/ships'
 import { palette } from '../theme'
+import { TILE_THICKNESS } from '../board/TileRenderer'
 
 export class ShipRenderer {
   readonly group = new THREE.Group()
@@ -17,12 +19,27 @@ export class ShipRenderer {
       occupants.set(key, index + 1)
       const pos = getWorldPosition(ship.coord)
       const active = state.players[state.activePlayerId]?.shipId === ship.id
-      const mesh = createShipMesh(ship.class, active)
+      const wrapper = new THREE.Group()
+      wrapper.add(createShipMesh(ship.class, active))
+      wrapper.rotation.y = lastMoveYaw(state.log, ship.id)
       const offset = (index - 0.5) * 0.28
-      mesh.position.set(pos.x + offset, 0.22, pos.z + offset * 0.4)
-      this.group.add(mesh)
+      wrapper.position.set(pos.x + offset, TILE_THICKNESS + 0.12, pos.z + offset * 0.4)
+      this.group.add(wrapper)
     }
   }
+}
+
+function lastMoveYaw(log: GameEvent[], shipId: string): number {
+  for (let i = log.length - 1; i >= 0; i--) {
+    const event = log[i]
+    if (event.type === 'SHIP_MOVED' && event.shipId === shipId) {
+      const from = getWorldPosition(event.from)
+      const to = getWorldPosition(event.to)
+      return Math.atan2(to.x - from.x, to.z - from.z)
+    }
+  }
+  const east = getWorldPosition({ q: 1, r: 0 })
+  return Math.atan2(east.x, east.z)
 }
 
 function createShipMesh(shipClass: keyof typeof SHIP_DEFINITIONS, active: boolean): THREE.Mesh {
@@ -39,8 +56,10 @@ function createShipMesh(shipClass: keyof typeof SHIP_DEFINITIONS, active: boolea
       new THREE.MeshBasicMaterial({ color }),
     )
   }
-  return new THREE.Mesh(
+  const mesh = new THREE.Mesh(
     new THREE.ConeGeometry(0.12, 0.34, 3),
     new THREE.MeshBasicMaterial({ color }),
   )
+  mesh.rotation.x = Math.PI / 2
+  return mesh
 }

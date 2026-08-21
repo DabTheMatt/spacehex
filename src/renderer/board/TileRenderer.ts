@@ -1,6 +1,21 @@
 import * as THREE from 'three'
 import { HEX_SIZE } from '../../game/board/hexMath'
 
+export const TILE_THICKNESS = 0.1
+
+function hexShape(radius: number): THREE.Shape {
+  const shape = new THREE.Shape()
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i
+    const x = radius * Math.cos(angle)
+    const y = -radius * Math.sin(angle)
+    if (i === 0) shape.moveTo(x, y)
+    else shape.lineTo(x, y)
+  }
+  shape.closePath()
+  return shape
+}
+
 export function createHexMesh(options: {
   fill: number
   stroke: number
@@ -10,21 +25,17 @@ export function createHexMesh(options: {
 }): THREE.Group {
   const group = new THREE.Group()
   const radius = options.radius ?? HEX_SIZE * 0.96
-  const shape = new THREE.Shape()
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i
-    const x = radius * Math.cos(angle)
-    const z = radius * Math.sin(angle)
-    if (i === 0) shape.moveTo(x, -z)
-    else shape.lineTo(x, -z)
-  }
-  shape.closePath()
-
-  const geom = new THREE.ShapeGeometry(shape)
+  const opacity = options.opacity ?? 1
+  const shape = hexShape(radius)
+  const geom = new THREE.ExtrudeGeometry(shape, {
+    depth: TILE_THICKNESS,
+    bevelEnabled: false,
+    steps: 1,
+  })
   const mat = new THREE.MeshBasicMaterial({
     color: options.fill,
-    transparent: (options.opacity ?? 1) < 1,
-    opacity: options.opacity ?? 1,
+    transparent: opacity < 1,
+    opacity,
     side: THREE.DoubleSide,
   })
   const mesh = new THREE.Mesh(geom, mat)
@@ -32,46 +43,44 @@ export function createHexMesh(options: {
   mesh.position.y = options.y ?? 0
   group.add(mesh)
 
-  const points: THREE.Vector3[] = []
-  for (let i = 0; i <= 6; i++) {
-    const angle = (Math.PI / 3) * (i % 6)
-    points.push(
-      new THREE.Vector3(radius * Math.cos(angle), options.y ?? 0.01, radius * Math.sin(angle)),
+  const topY = (options.y ?? 0) + TILE_THICKNESS + 0.002
+  const botY = options.y ?? 0
+  const ring = (yy: number) => {
+    const pts: THREE.Vector3[] = []
+    for (let i = 0; i <= 6; i++) {
+      const angle = (Math.PI / 3) * (i % 6)
+      pts.push(new THREE.Vector3(radius * Math.cos(angle), yy, radius * Math.sin(angle)))
+    }
+    return new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({
+        color: options.stroke,
+        transparent: opacity < 1,
+        opacity: Math.min(1, opacity + 0.2),
+      }),
     )
   }
-  const line = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(points),
-    new THREE.LineBasicMaterial({
-      color: options.stroke,
-      transparent: (options.opacity ?? 1) < 1,
-      opacity: Math.min(1, (options.opacity ?? 1) + 0.25),
-    }),
-  )
-  group.add(line)
-  return group
-}
-
-export function makeSymbolSprite(text: string, color: string): THREE.Sprite {
-  const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 256
-  const ctx = canvas.getContext('2d')
-  if (ctx) {
-    ctx.clearRect(0, 0, 256, 256)
-    ctx.fillStyle = color
-    ctx.font = '48px Palatino, Times New Roman, serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(text, 128, 128)
+  group.add(ring(topY))
+  group.add(ring(botY))
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i
+    const x = radius * Math.cos(angle)
+    const z = radius * Math.sin(angle)
+    group.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(x, botY, z),
+          new THREE.Vector3(x, topY, z),
+        ]),
+        new THREE.LineBasicMaterial({
+          color: options.stroke,
+          transparent: opacity < 1,
+          opacity: Math.min(1, opacity + 0.15),
+        }),
+      ),
+    )
   }
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.needsUpdate = true
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })
-  const sprite = new THREE.Sprite(mat)
-  sprite.scale.set(1.6, 1.6, 1)
-  sprite.position.y = 0.12
-  sprite.userData.isSymbol = true
-  return sprite
+  return group
 }
 
 export function makeDebugSprite(lines: string[]): THREE.Sprite {
@@ -90,7 +99,70 @@ export function makeDebugSprite(lines: string[]): THREE.Sprite {
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })
   const sprite = new THREE.Sprite(mat)
   sprite.scale.set(2.2, 2.2, 1)
-  sprite.position.y = 0.8
+  sprite.position.y = 0.95
   sprite.userData.isDebug = true
   return sprite
+}
+
+export function makeEdgeChevron(options: {
+  origin: { x: number; z: number }
+  target: { x: number; z: number }
+  color: number
+  kind: 'EXPLORE' | 'MOVE'
+  direction: number
+}): THREE.Group {
+  const g = new THREE.Group()
+  const dx = options.target.x - options.origin.x
+  const dz = options.target.z - options.origin.z
+  const len = Math.hypot(dx, dz) || 1
+  const ux = dx / len
+  const uz = dz / len
+  const px = -uz
+  const pz = ux
+  const dist = HEX_SIZE * 0.82
+  const cx = options.origin.x + ux * dist
+  const cz = options.origin.z + uz * dist
+  const y = TILE_THICKNESS + 0.04
+  const tip = new THREE.Vector3(cx + ux * 0.18, y, cz + uz * 0.18)
+  const left = new THREE.Vector3(cx - ux * 0.1 + px * 0.13, y, cz - uz * 0.1 + pz * 0.13)
+  const right = new THREE.Vector3(cx - ux * 0.1 - px * 0.13, y, cz - uz * 0.1 - pz * 0.13)
+
+  const shape = new THREE.Shape()
+  shape.moveTo(left.x, -left.z)
+  shape.lineTo(tip.x, -tip.z)
+  shape.lineTo(right.x, -right.z)
+  shape.closePath()
+  const tri = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape),
+    new THREE.MeshBasicMaterial({
+      color: options.color,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  )
+  tri.rotation.x = -Math.PI / 2
+  tri.position.y = y
+  tri.userData = {
+    kind: options.kind,
+    direction: options.direction,
+    target: options.target,
+  }
+  g.add(tri)
+
+  const hit = new THREE.Mesh(
+    new THREE.CircleGeometry(0.24, 20),
+    new THREE.MeshBasicMaterial({
+      color: options.color,
+      transparent: true,
+      opacity: 0.08,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  )
+  hit.rotation.x = -Math.PI / 2
+  hit.position.set(cx, y, cz)
+  hit.userData = tri.userData
+  g.add(hit)
+  g.userData = tri.userData
+  return g
 }
