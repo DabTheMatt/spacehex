@@ -3,7 +3,7 @@ import type { GameState } from '../../game/state/GameState'
 import { getTileDefinition } from '../../game/definitions/tiles'
 import { getWorldPosition } from '../../game/board/hexMath'
 import { createHexMesh, TILE_THICKNESS } from './TileRenderer'
-import { createTileGlyph } from './tileGlyphs'
+import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
 import { palette } from '../theme'
 
 export class TilePreviewRenderer {
@@ -27,5 +27,9 @@ export class TilePreviewRenderer {
     glyph.position.y = 0.28 + TILE_THICKNESS
     mesh.add(glyph)
     this.group.add(mesh)
+  }
+
+  tick(time: number): void {
+    tickTileGlyphs(this.group, time)
   }
 }

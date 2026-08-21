@@ -88,6 +88,9 @@ export class SpaceScene {
   private loop = (): void => {
     if (this.disposed) return
     requestAnimationFrame(this.loop)
+    const time = performance.now() / 1000
+    this.board.tick(time)
+    this.preview.tick(time)
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)
   }

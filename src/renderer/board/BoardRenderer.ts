@@ -5,7 +5,7 @@ import { getRotatedEdges } from '../../game/board/tileRotation'
 import { getWorldPosition, getNeighbor } from '../../game/board/hexMath'
 import { isTilePlaced } from '../../game/board/HexMap'
 import { createHexMesh, makeDebugSprite, makeEdgeChevron, TILE_THICKNESS } from './TileRenderer'
-import { createTileGlyph } from './tileGlyphs'
+import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
 import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
 
@@ -46,6 +46,10 @@ export class BoardRenderer {
     }
 
     this.drawActionMarkers(state)
+  }
+
+  tick(time: number): void {
+    tickTileGlyphs(this.tiles, time)
   }
 
   private drawActionMarkers(state: GameState): void {

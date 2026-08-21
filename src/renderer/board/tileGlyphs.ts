@@ -49,29 +49,46 @@ function evaGlyph(color: number): THREE.Group {
   g.add(poly([[-0.42, -0.28], [0.38, -0.28], [0.52, 0], [0.38, 0.28], [-0.42, 0.28]], color, true))
   g.add(poly([[-0.22, -0.16], [-0.22, 0.16]], color))
   g.add(poly([[-0.22, 0], [0.18, 0]], color))
-  g.add(poly([[0.28, -0.12], [0.48, 0], [0.28, 0.12]], color))
+
+  const light = new THREE.Mesh(
+    new THREE.CircleGeometry(0.035, 16),
+    new THREE.MeshBasicMaterial({
+      color: palette.ochre,
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  )
+  light.rotation.x = -Math.PI / 2
+  light.position.set(0.4, Y + 0.004, 0)
+  light.userData.animate = 'pulse'
+  g.add(light)
+  g.add(circle(0.055, color, 18))
+  const ring = g.children[g.children.length - 1]
+  ring.position.set(0.4, 0, 0)
   return g
 }
 
 function voidGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
-  g.add(poly([[-0.35, 0], [0.55, 0]], color))
-  g.add(poly([[0, -0.28], [0, 0.28]], color))
-  g.add(poly([[0.42, -0.1], [0.58, 0], [0.42, 0.1]], color))
+  g.add(poly([[-0.32, 0], [0.32, 0]], color))
+  g.add(poly([[0, -0.32], [0, 0.32]], color))
   g.add(circle(0.08, color, 16))
   return g
 }
 
 function planetGlyph(color: number, radius: number): THREE.Group {
-  const g = new THREE.Group()
-  g.add(circle(radius, color))
-  g.add(arc(radius * 0.55, -0.4, 2.4, color))
-  g.add(circle(radius * 0.18, color, 16))
+  const spin = new THREE.Group()
+  spin.userData.animate = 'spin'
+  spin.add(circle(radius, color))
+  spin.add(arc(radius * 0.55, -0.4, 2.4, color))
+  spin.add(circle(radius * 0.18, color, 16))
   const moon = circle(radius * 0.22, color, 18)
   moon.position.set(radius * 0.85, 0, -radius * 0.35)
-  g.add(moon)
-  g.add(poly([[radius * 0.15, 0], [radius * 0.7, 0.08]], color))
-  return g
+  spin.add(moon)
+  spin.add(poly([[radius * 0.15, 0], [radius * 0.7, 0.08]], color))
+  return spin
 }
 
 function asteroidGlyph(color: number): THREE.Group {
@@ -193,4 +210,19 @@ export function createTileGlyph(def: TileDefinition, color = palette.paper): THR
       root.add(voidGlyph(color))
   }
   return root
+}
+
+export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
+  root.traverse((obj) => {
+    if (obj.userData.animate === 'spin') {
+      obj.rotation.y = time * 0.12
+    }
+    if (obj.userData.animate === 'pulse' && obj instanceof THREE.Mesh) {
+      const mat = obj.material
+      if (!Array.isArray(mat) && 'opacity' in mat) {
+        mat.transparent = true
+        mat.opacity = 0.2 + 0.6 * (0.5 + 0.5 * Math.sin(time * 1.35))
+      }
+    }
+  })
 }
