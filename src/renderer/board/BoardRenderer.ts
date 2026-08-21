@@ -4,10 +4,12 @@ import { getTileDefinition } from '../../game/definitions/tiles'
 import { getRotatedEdges } from '../../game/board/tileRotation'
 import { getWorldPosition, getNeighbor } from '../../game/board/hexMath'
 import { isTilePlaced } from '../../game/board/HexMap'
-import { createHexMesh, makeDebugSprite, makeEdgeChevron, makeSelectionMarks, TILE_THICKNESS } from './TileRenderer'
+import { createHexMesh, makeDebugSprite, makeEdgeChevron, makeSelectionMarks, makeDashedHexGhost, TILE_THICKNESS } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
 import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
+import { canExploreDirection } from '../../game/rules/exploration'
+import { activeShip } from '../../game/rules/fuel'
 
 export class BoardRenderer {
   readonly group = new THREE.Group()
@@ -26,6 +28,7 @@ export class BoardRenderer {
       showCoords: boolean
       showEdges: boolean
       selectedKey?: string | null
+      showExploreGhosts?: boolean
     },
   ): void {
     this.tiles.clear()
@@ -59,6 +62,7 @@ export class BoardRenderer {
     }
 
     this.drawActionMarkers(state)
+    if (options.showExploreGhosts) this.drawExploreGhosts(state)
   }
 
   tick(time: number): void {
@@ -67,25 +71,33 @@ export class BoardRenderer {
 
   private drawActionMarkers(state: GameState): void {
     const origin = state.exploration.origin
-    if (!origin) return
-    const selectingExplore = state.exploration.status === 'SELECTING_DIRECTION'
-    const selectingMove = state.exploration.status === 'SELECTING_MOVE'
-    if (!selectingExplore && !selectingMove) return
+    if (!origin || state.exploration.status !== 'SELECTING_MOVE') return
 
     for (let dir = 0; dir < 6; dir++) {
       const target = getNeighbor(origin, dir)
-      const occupied = isTilePlaced(state.board, target)
-      if (selectingExplore && occupied) continue
-      if (selectingMove && !occupied) continue
+      if (!isTilePlaced(state.board, target)) continue
       this.markers.add(
         makeEdgeChevron({
           origin: getWorldPosition(origin),
           target: getWorldPosition(target),
-          color: occupied ? palette.dusk : palette.ochre,
-          kind: occupied ? 'MOVE' : 'EXPLORE',
+          color: palette.dusk,
+          kind: 'MOVE',
           direction: dir,
         }),
       )
+    }
+  }
+
+  private drawExploreGhosts(state: GameState): void {
+    if (state.phase === 'TILE_PLACEMENT' || state.movementSpent) return
+    const origin = activeShip(state).coord
+    for (let dir = 0; dir < 6; dir++) {
+      if (!canExploreDirection(state, dir)) continue
+      const target = getNeighbor(origin, dir)
+      const ghost = makeDashedHexGhost(dir)
+      const pos = getWorldPosition(target)
+      ghost.position.set(pos.x, 0, pos.z)
+      this.markers.add(ghost)
     }
   }
 

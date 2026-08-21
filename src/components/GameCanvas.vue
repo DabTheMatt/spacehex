@@ -24,6 +24,14 @@ let scene: SpaceScene | null = null
 let downX = 0
 let downY = 0
 
+function showExploreGhosts(): boolean {
+  return (
+    ui.selectedShipId === game.ship.id &&
+    !game.state.movementSpent &&
+    game.state.phase === 'PLAYER_TURN'
+  )
+}
+
 function sync(): void {
   if (!scene) return
   scene.sync(game.state, {
@@ -31,7 +39,14 @@ function sync(): void {
     showCoords: ui.showCoords,
     showEdges: ui.showEdges,
     selectedKey: ui.selectedTile ? coordKey(ui.selectedTile) : null,
+    showExploreGhosts: showExploreGhosts(),
   })
+}
+
+function focusShip(shipId: string): void {
+  const ship = game.state.ships[shipId]
+  if (!ship || !scene) return
+  scene.camera.focus(ship.coord)
 }
 
 function resize(): void {
@@ -64,34 +79,51 @@ function onUp(ev: PointerEvent): void {
   if (dragged) return
 
   const status = game.state.exploration.status
-  if (status === 'SELECTING_DIRECTION' || status === 'SELECTING_MOVE') {
+  if (status === 'SELECTING_MOVE') {
     const picked = scene.pickDirection(ev.clientX, ev.clientY)
     if (!picked) return
-    if (status === 'SELECTING_DIRECTION') {
-      game.dispatch({ type: 'START_EXPLORATION', direction: picked.direction })
-    } else {
-      game.dispatch({
-        type: 'DECLARE_MOVE',
-        target: getNeighbor(game.ship.coord, picked.direction),
-      })
-    }
+    game.dispatch({
+      type: 'DECLARE_MOVE',
+      target: getNeighbor(game.ship.coord, picked.direction),
+    })
     scene.handleEvents(game.lastEvents, game.state)
+    sync()
+    return
+  }
+
+  if (showExploreGhosts() || status === 'SELECTING_DIRECTION') {
+    const ghost = scene.pickDirection(ev.clientX, ev.clientY)
+    if (ghost) {
+      game.dispatch({ type: 'START_EXPLORATION', direction: ghost.direction })
+      scene.handleEvents(game.lastEvents, game.state)
+      sync()
+      return
+    }
+  }
+
+  const shipHit = scene.pickShip(ev.clientX, ev.clientY)
+  if (shipHit) {
+    ui.selectedShipId = shipHit.shipId
+    ui.selectedTile = null
+    focusShip(shipHit.shipId)
     sync()
     return
   }
 
   const tile = scene.pickTile(ev.clientX, ev.clientY)
   ui.selectedTile = tile
+  if (tile) ui.selectedShipId = null
   sync()
 }
 
 function onKey(ev: KeyboardEvent): void {
   if (game.state.phase !== 'TILE_PLACEMENT') return
-  if (ev.key === 'q' || ev.key === 'Q') {
+  const key = ev.key.toLowerCase()
+  if (key === 'q') {
     game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'LEFT' })
-  } else if (ev.key === 'e' || ev.key === 'E' || ev.key === 'r' || ev.key === 'R') {
+  } else if (key === 'e' || key === 'r') {
     game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' })
-  } else if (ev.key === 'Enter') {
+  } else if (key === 'f' || ev.key === 'Enter') {
     game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
   } else {
     return
@@ -104,8 +136,9 @@ onMounted(() => {
   if (!canvasEl.value) return
   scene = new SpaceScene(canvasEl.value)
   resize()
+  ui.selectedShipId = game.ship.id
+  focusShip(game.ship.id)
   sync()
-  scene.camera.focus({ q: 0, r: 0 })
   window.addEventListener('resize', resize)
   window.addEventListener('keydown', onKey)
 })
@@ -117,8 +150,18 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [game.state, ui.showDebug, ui.showCoords, ui.showEdges, ui.selectedTile],
+  () => [game.state, ui.showDebug, ui.showCoords, ui.showEdges, ui.selectedTile, ui.selectedShipId],
   () => sync(),
   { deep: true },
+)
+
+watch(
+  () => game.state.activePlayerId,
+  () => {
+    ui.selectedShipId = game.ship.id
+    ui.selectedTile = null
+    focusShip(game.ship.id)
+    sync()
+  },
 )
 </script>

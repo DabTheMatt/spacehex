@@ -13,6 +13,7 @@ export interface SceneOptions {
   showCoords: boolean
   showEdges: boolean
   selectedKey?: string | null
+  showExploreGhosts?: boolean
 }
 
 export class SpaceScene {
@@ -72,6 +73,17 @@ export class SpaceScene {
     const hit = this.intersect(clientX, clientY, this.board.pickables())
     if (!hit || hit.object.userData.direction === undefined) return null
     return { direction: hit.object.userData.direction as number }
+  }
+
+  pickShip(clientX: number, clientY: number): { shipId: string } | null {
+    const hit = this.intersect(clientX, clientY, this.ships.pickables())
+    if (!hit) return null
+    let obj: THREE.Object3D | null = hit.object
+    while (obj) {
+      if (typeof obj.userData.shipId === 'string') return { shipId: obj.userData.shipId }
+      obj = obj.parent
+    }
+    return null
   }
 
   pickTile(clientX: number, clientY: number): HexCoord | null {

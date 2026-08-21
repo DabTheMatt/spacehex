@@ -197,3 +197,44 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
   }
   return g
 }
+
+/** Empty-neighbor ghost — dashed outline only, not a placed tile. */
+export function makeDashedHexGhost(direction: number): THREE.Group {
+  const g = new THREE.Group()
+  const radius = HEX_SIZE * 0.96
+  const y = 0.02
+  const pts: THREE.Vector3[] = []
+  for (let i = 0; i <= 6; i++) {
+    const angle = (Math.PI / 3) * (i % 6)
+    pts.push(new THREE.Vector3(radius * Math.cos(angle), y, radius * Math.sin(angle)))
+  }
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineDashedMaterial({
+      color: 0xb58a4b,
+      dashSize: 0.07,
+      gapSize: 0.055,
+      transparent: true,
+      opacity: 0.9,
+    }),
+  )
+  line.computeLineDistances()
+  g.add(line)
+
+  const hit = new THREE.Mesh(
+    new THREE.CircleGeometry(radius * 0.85, 6),
+    new THREE.MeshBasicMaterial({
+      color: 0xb58a4b,
+      transparent: true,
+      opacity: 0.04,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  )
+  hit.rotation.x = -Math.PI / 2
+  hit.position.y = y
+  hit.userData = { kind: 'EXPLORE', direction }
+  g.add(hit)
+  g.userData = hit.userData
+  return g
+}

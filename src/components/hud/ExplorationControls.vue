@@ -5,7 +5,7 @@
     <div class="rule" />
     <button type="button" class="action" @click="rotate('LEFT')"><span class="num">Q</span> ROTATE LEFT</button>
     <button type="button" class="action" @click="rotate('RIGHT')"><span class="num">E</span> ROTATE RIGHT</button>
-    <button type="button" class="action accent" @click="confirm"><span class="num">↵</span> CONFIRM</button>
+    <button type="button" class="action accent" @click="confirm"><span class="num">F</span> CONFIRM</button>
   </section>
 </template>
 

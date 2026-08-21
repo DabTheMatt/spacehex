@@ -10,5 +10,7 @@ export const useUiStore = defineStore('ui', () => {
   const seedInput = ref('spacehex-v0.1')
   const selectedTile = ref<HexCoord | null>(null)
 
-  return { showDebug, showCoords, showEdges, showDev, seedInput, selectedTile }
+  const selectedShipId = ref<string | null>('mewa-1')
+
+  return { showDebug, showCoords, showEdges, showDev, seedInput, selectedTile, selectedShipId }
 })

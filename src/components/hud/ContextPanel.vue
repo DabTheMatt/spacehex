@@ -21,31 +21,36 @@ const game = useGameStore()
 const ui = useUiStore()
 
 const block = computed(() => {
-  const coord = ui.selectedTile
-  if (coord) {
-    const tile = game.state.board.tiles[coordKey(coord)]
-    if (!tile) return null
-    const def = getTileDefinition(tile.definitionId)
-    const ships = Object.values(game.state.ships).filter(
-      (s) => s.coord.q === coord.q && s.coord.r === coord.r,
-    )
+  if (ui.selectedShipId) {
+    const ship = game.state.ships[ui.selectedShipId]
+    if (!ship) return null
+    const player = game.state.players[ship.playerId]
+    const n = ship.playerId.replace(/\D/g, '') || '1'
     return {
-      title: def.label.toUpperCase(),
-      kicker: `${coordKey(coord)}  ·  ${tile.rotation * 60}°`,
+      title: ship.class,
+      kicker: `P${n}  ·  ${ship.coord.q},${ship.coord.r}`,
       rows: [
-        { label: 'TYPE', value: def.type.replace(/_/g, ' ') },
-        { label: 'SHIPS', value: ships.length ? ships.map((s) => s.playerId.replace(/\D/g, '')).join(' ') : '—' },
-        { label: 'SCAN', value: '—' },
+        { label: 'HULL', value: `${pad(ship.hull)} / ${pad(ship.maxHull)}` },
+        { label: 'FUEL', value: pad(player?.fuel ?? 0) },
+        { label: 'PCH', value: pad(player?.glory ?? 0) },
       ],
     }
   }
+  const coord = ui.selectedTile
+  if (!coord) return null
+  const tile = game.state.board.tiles[coordKey(coord)]
+  if (!tile) return null
+  const def = getTileDefinition(tile.definitionId)
+  const ships = Object.values(game.state.ships).filter(
+    (s) => s.coord.q === coord.q && s.coord.r === coord.r,
+  )
   return {
-    title: 'MEWA',
-    kicker: `${game.player.name.toUpperCase()}  ·  ${game.ship.coord.q},${game.ship.coord.r}`,
+    title: def.label.toUpperCase(),
+    kicker: `${coordKey(coord)}  ·  ${tile.rotation * 60}°`,
     rows: [
-      { label: 'HULL', value: `${pad(game.ship.hull)} / ${pad(game.ship.maxHull)}` },
-      { label: 'FUEL', value: pad(game.player.fuel) },
-      { label: 'PCH', value: pad(game.player.glory) },
+      { label: 'TYPE', value: def.type.replace(/_/g, ' ') },
+      { label: 'SHIPS', value: ships.length ? ships.map((s) => s.playerId.replace(/\D/g, '')).join(' ') : '—' },
+      { label: 'SCAN', value: '—' },
     ],
   }
 })

@@ -46,6 +46,8 @@ export class ShipRenderer {
           baseY: BASE_HOVER,
           phase: playerNo * 1.7 + index,
         }
+        wrapper.userData.shipId = ship.id
+        wrapper.userData.shipCoord = ship.coord
         this.group.add(wrapper)
       })
     }
@@ -60,6 +62,10 @@ export class ShipRenderer {
         ? bob.baseY
         : bob.baseY + Math.sin(time * 0.4 + bob.phase) * 0.028
     }
+  }
+
+  pickables(): THREE.Object3D[] {
+    return this.group.children
   }
 }
 
