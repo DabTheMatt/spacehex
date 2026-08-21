@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { GameState } from '../../game/state/GameState'
 import { getTileDefinition } from '../../game/definitions/tiles'
 import { getWorldPosition } from '../../game/board/hexMath'
-import { createHexMesh, TILE_THICKNESS } from './TileRenderer'
+import { createHexMesh, TILE_SETTLED_Y, TILE_SLOT_Y, TILE_THICKNESS } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
 import { palette } from '../theme'
 
@@ -16,15 +16,14 @@ export class TilePreviewRenderer {
     const def = getTileDefinition(exp.pendingTileId)
     const pos = getWorldPosition(exp.target)
     const mesh = createHexMesh({
-      fill: palette.graphite,
-      stroke: palette.paper,
-      opacity: 0.55,
-      y: 0.28,
+      fill: palette.tileFill,
+      stroke: palette.ivory,
+      y: TILE_SETTLED_Y,
     })
-    mesh.position.set(pos.x, 0, pos.z)
+    mesh.position.set(pos.x, TILE_SLOT_Y, pos.z)
     mesh.rotation.y = (exp.rotation ?? 0) * (Math.PI / 3)
-    const glyph = createTileGlyph(def, palette.paper)
-    glyph.position.y = 0.28 + TILE_THICKNESS
+    const glyph = createTileGlyph(def)
+    glyph.position.y = TILE_THICKNESS
     mesh.add(glyph)
     this.group.add(mesh)
   }

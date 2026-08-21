@@ -3,22 +3,57 @@ import type { GameState } from '../../game/state/GameState'
 import type { GameEvent } from '../../game/engine/events'
 import type { ShipState } from '../../game/state/GameState'
 import { getWorldPosition } from '../../game/board/hexMath'
+import type { HexCoord } from '../../game/board/HexCoord'
 import { SHIP_DEFINITIONS } from '../../game/definitions/ships'
 import { palette, css } from '../theme'
 import { TILE_THICKNESS } from '../board/TileRenderer'
+import {
+  clamp01,
+  easeInOutCubic,
+  lerp,
+  prefersReducedMotion,
+  SHIP_FLIGHT_ARC,
+  SHIP_FLIGHT_MS,
+} from '../motion'
 
 const SHIP_SPACING = 0.46
 const HULL_HEIGHT = 0.055
 const BASE_HOVER = TILE_THICKNESS + 0.12
 
+type HoldMotion = { kind: 'hold'; coord: HexCoord }
+type FlyMotion = {
+  kind: 'fly'
+  from: HexCoord
+  to: HexCoord
+  start: number
+  duration: number
+}
+type ShipMotion = HoldMotion | FlyMotion
+
 export class ShipRenderer {
   readonly group = new THREE.Group()
+  private motion = new Map<string, ShipMotion>()
+
+  hold(shipId: string, coord: HexCoord): void {
+    this.motion.set(shipId, { kind: 'hold', coord })
+  }
+
+  fly(shipId: string, from: HexCoord, to: HexCoord): void {
+    this.motion.set(shipId, {
+      kind: 'fly',
+      from,
+      to,
+      start: performance.now(),
+      duration: prefersReducedMotion() ? 0 : SHIP_FLIGHT_MS,
+    })
+  }
 
   sync(state: GameState): void {
     this.group.clear()
     const byTile = new Map<string, ShipState[]>()
     for (const ship of Object.values(state.ships)) {
-      const key = `${ship.coord.q},${ship.coord.r}`
+      const coord = this.layoutCoord(ship)
+      const key = `${coord.q},${coord.r}`
       const list = byTile.get(key) ?? []
       list.push(ship)
       byTile.set(key, list)
@@ -27,8 +62,9 @@ export class ShipRenderer {
     for (const group of byTile.values()) {
       const n = group.length
       group.forEach((ship, index) => {
-        const pos = getWorldPosition(ship.coord)
-        const yaw = lastMoveYaw(state.log, ship.id)
+        const coord = this.layoutCoord(ship)
+        const pos = getWorldPosition(coord)
+        const yaw = this.visualYaw(state.log, ship.id, coord)
         const side = index - (n - 1) / 2
         const px = -Math.sin(yaw)
         const pz = Math.cos(yaw)
@@ -47,29 +83,75 @@ export class ShipRenderer {
           phase: playerNo * 1.7 + index,
         }
         wrapper.userData.shipId = ship.id
-        wrapper.userData.shipCoord = ship.coord
+        wrapper.userData.shipCoord = coord
         this.group.add(wrapper)
       })
     }
+    this.applyMotion(performance.now())
   }
 
-  tick(time: number): void {
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  tick(time: number): boolean {
+    const settled = this.applyMotion(performance.now())
+    const reduce = prefersReducedMotion()
     for (const child of this.group.children) {
+      const flying = this.motion.get(child.userData.shipId as string)?.kind === 'fly'
+      if (flying) continue
       const bob = child.userData.bob as { baseY: number; phase: number } | undefined
       if (!bob) continue
-      child.position.y = reduce
-        ? bob.baseY
-        : bob.baseY + Math.sin(time * 0.4 + bob.phase) * 0.028
+      child.position.y = reduce ? bob.baseY : bob.baseY + Math.sin(time * 0.4 + bob.phase) * 0.028
     }
+    return settled
   }
 
   pickables(): THREE.Object3D[] {
     return this.group.children
   }
+
+  private layoutCoord(ship: ShipState): HexCoord {
+    const motion = this.motion.get(ship.id)
+    if (motion?.kind === 'hold') return motion.coord
+    if (motion?.kind === 'fly') return motion.from
+    return ship.coord
+  }
+
+  private visualYaw(log: GameEvent[], shipId: string, fallbackCoord: HexCoord): number {
+    const motion = this.motion.get(shipId)
+    if (motion?.kind === 'fly') {
+      const from = getWorldPosition(motion.from)
+      const to = getWorldPosition(motion.to)
+      return Math.atan2(to.x - from.x, to.z - from.z)
+    }
+    return lastMoveYaw(log, shipId, fallbackCoord)
+  }
+
+  /** @returns true when a flight just finished and meshes should be rebuilt. */
+  private applyMotion(now: number): boolean {
+    let settled = false
+    for (const child of this.group.children) {
+      const shipId = child.userData.shipId as string
+      const motion = this.motion.get(shipId)
+      if (!motion || motion.kind !== 'fly') continue
+      const t = motion.duration <= 0 ? 1 : clamp01((now - motion.start) / motion.duration)
+      const e = easeInOutCubic(t)
+      const from = getWorldPosition(motion.from)
+      const to = getWorldPosition(motion.to)
+      child.position.x = lerp(from.x, to.x, e)
+      child.position.z = lerp(from.z, to.z, e)
+      const arc = Math.sin(t * Math.PI) * SHIP_FLIGHT_ARC
+      child.position.y = BASE_HOVER + arc
+      child.rotation.y = Math.atan2(to.x - from.x, to.z - from.z)
+      const bob = child.userData.bob as { baseY: number; phase: number } | undefined
+      if (bob) bob.baseY = BASE_HOVER + arc
+      if (t >= 1) {
+        this.motion.delete(shipId)
+        settled = true
+      }
+    }
+    return settled
+  }
 }
 
-function lastMoveYaw(log: GameEvent[], shipId: string): number {
+function lastMoveYaw(log: GameEvent[], shipId: string, fallback: HexCoord): number {
   for (let i = log.length - 1; i >= 0; i--) {
     const event = log[i]
     if (event.type === 'SHIP_MOVED' && event.shipId === shipId) {
@@ -78,8 +160,9 @@ function lastMoveYaw(log: GameEvent[], shipId: string): number {
       return Math.atan2(to.x - from.x, to.z - from.z)
     }
   }
-  const east = getWorldPosition({ q: 1, r: 0 })
-  return Math.atan2(east.x, east.z)
+  const east = getWorldPosition({ q: fallback.q + 1, r: fallback.r })
+  const here = getWorldPosition(fallback)
+  return Math.atan2(east.x - here.x, east.z - here.z)
 }
 
 function createNavMarker(

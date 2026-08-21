@@ -7,7 +7,16 @@ import { TilePreviewRenderer } from '../board/TilePreviewRenderer'
 import { ShipRenderer } from '../entities/ShipRenderer'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
+import { coordKey } from '../../game/board/HexCoord'
 import { userDataFromHits } from './pickHelpers'
+import { TILE_SETTLED_Y, TILE_SLOT_Y } from '../board/TileRenderer'
+import {
+  clamp01,
+  easeOutCubic,
+  lerp,
+  prefersReducedMotion,
+  TILE_RISE_MS,
+} from '../motion'
 
 export interface SceneOptions {
   showDebug: boolean
@@ -26,6 +35,11 @@ export class SpaceScene {
   readonly ships: ShipRenderer
   readonly raycaster = new THREE.Raycaster()
   private disposed = false
+  private lastState: GameState | null = null
+  private lastOptions: SceneOptions | null = null
+  private rise: { key: string; start: number; duration: number } | null = null
+  private tileY: Record<string, number> = {}
+  private queuedFlights: Array<{ shipId: string; from: HexCoord; to: HexCoord }> = []
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -49,26 +63,33 @@ export class SpaceScene {
   }
 
   sync(state: GameState, options: SceneOptions): void {
-    this.board.sync(state, options)
-    this.preview.sync(state)
-    this.ships.sync(state)
+    this.lastState = state
+    this.lastOptions = options
+    this.applySync()
   }
 
   handleEvents(events: GameEvent[], state: GameState): void {
     for (const event of events) {
-      if (event.type === 'TILE_DRAWN' && state.exploration.origin && state.exploration.target) {
-        this.camera.focusPair(state.exploration.origin, state.exploration.target)
-      }
-      if (event.type === 'TILE_PLACED') {
-        this.camera.focus(event.coord)
-      }
-      if (event.type === 'SHIP_MOVED') {
-        this.camera.focus(event.to, 6.5)
-      }
       if (event.type === 'GAME_STARTED') {
         this.camera.focus({ q: 0, r: 0 })
       }
+      if (event.type === 'TILE_PLACED') {
+        this.beginRise(coordKey(event.coord))
+      }
+      if (event.type === 'SHIP_MOVED') {
+        if (this.rise) {
+          this.ships.hold(event.shipId, event.from)
+          this.queuedFlights.push({
+            shipId: event.shipId,
+            from: event.from,
+            to: event.to,
+          })
+        } else {
+          this.ships.fly(event.shipId, event.from, event.to)
+        }
+      }
     }
+    this.lastState = state
   }
 
   pickDirection(clientX: number, clientY: number): { direction: number } | null {
@@ -86,6 +107,37 @@ export class SpaceScene {
   pickTile(clientX: number, clientY: number): HexCoord | null {
     const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
     return userDataFromHits<HexCoord>(hits, 'tileCoord') ?? null
+  }
+
+  private beginRise(key: string): void {
+    const duration = prefersReducedMotion() ? 0 : TILE_RISE_MS
+    this.rise = { key, start: performance.now(), duration }
+    this.tileY = { ...this.tileY, [key]: TILE_SLOT_Y }
+  }
+
+  private advanceRise(now: number): void {
+    if (!this.rise) return
+    const t = this.rise.duration <= 0 ? 1 : clamp01((now - this.rise.start) / this.rise.duration)
+    const y = lerp(TILE_SLOT_Y, TILE_SETTLED_Y, easeOutCubic(t))
+    this.tileY = { ...this.tileY, [this.rise.key]: y }
+    this.board.setTileY(this.rise.key, y)
+    if (t < 1) return
+    const key = this.rise.key
+    this.rise = null
+    delete this.tileY[key]
+    this.board.setTileY(key, TILE_SETTLED_Y)
+    const flights = this.queuedFlights
+    this.queuedFlights = []
+    for (const flight of flights) {
+      this.ships.fly(flight.shipId, flight.from, flight.to)
+    }
+  }
+
+  private applySync(): void {
+    if (!this.lastState || !this.lastOptions) return
+    this.board.sync(this.lastState, { ...this.lastOptions, tileY: this.tileY })
+    this.preview.sync(this.lastState)
+    this.ships.sync(this.lastState)
   }
 
   private intersectAll(clientX: number, clientY: number, objects: THREE.Object3D[]): THREE.Intersection[] {
@@ -107,10 +159,13 @@ export class SpaceScene {
   private loop = (): void => {
     if (this.disposed) return
     requestAnimationFrame(this.loop)
-    const time = performance.now() / 1000
+    const now = performance.now()
+    this.advanceRise(now)
+    const time = now / 1000
     this.board.tick(time)
     this.preview.tick(time)
-    this.ships.tick(time)
+    const shipsSettled = this.ships.tick(time)
+    if (shipsSettled) this.applySync()
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)
   }

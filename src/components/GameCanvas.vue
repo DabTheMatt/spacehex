@@ -110,7 +110,6 @@ function onUp(ev: PointerEvent): void {
   if (shipHit) {
     ui.selectedShipId = shipHit.shipId
     ui.selectedTile = null
-    focusShip(shipHit.shipId)
     return
   }
 
@@ -135,17 +134,18 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [game.state, ui.showDebug, ui.showCoords, ui.showEdges, ui.selectedTile, ui.selectedShipId],
-  () => sync(),
-  { deep: true },
-)
-
-watch(
   () => game.lastEvents,
   (events) => {
     if (!scene) return
     scene.handleEvents(events, game.state)
+    sync()
   },
+)
+
+watch(
+  () => [game.state, ui.showDebug, ui.showCoords, ui.showEdges, ui.selectedTile, ui.selectedShipId],
+  () => sync(),
+  { deep: true },
 )
 
 watch(
@@ -153,8 +153,6 @@ watch(
   () => {
     ui.selectedShipId = game.ship.id
     ui.selectedTile = null
-    focusShip(game.ship.id)
-    sync()
   },
 )
 </script>

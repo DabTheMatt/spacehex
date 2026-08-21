@@ -4,7 +4,16 @@ import { getTileDefinition } from '../../game/definitions/tiles'
 import { getRotatedEdges } from '../../game/board/tileRotation'
 import { getWorldPosition, getNeighbor } from '../../game/board/hexMath'
 import { isTilePlaced } from '../../game/board/HexMap'
-import { createHexMesh, makeDebugSprite, makeEdgeChevron, makeSelectionMarks, makeDashedHexGhost, TILE_THICKNESS } from './TileRenderer'
+import {
+  createHexMesh,
+  makeDebugSprite,
+  makeEdgeChevron,
+  makeSelectionMarks,
+  makeDashedHexGhost,
+  TILE_SETTLED_Y,
+  TILE_SLOT_Y,
+  TILE_THICKNESS,
+} from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
 import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
@@ -29,6 +38,7 @@ export class BoardRenderer {
       showEdges: boolean
       selectedKey?: string | null
       showExploreGhosts?: boolean
+      tileY?: Record<string, number>
     },
   ): void {
     this.tiles.clear()
@@ -37,15 +47,16 @@ export class BoardRenderer {
     for (const tile of Object.values(state.board.tiles)) {
       const def = getTileDefinition(tile.definitionId)
       const pos = getWorldPosition(tile.coord)
-      const mesh = createHexMesh({ fill: palette.tileFill, stroke: palette.ivory, y: 0 })
-      mesh.position.set(pos.x, 0, pos.z)
+      const key = coordKey(tile.coord)
+      const mesh = createHexMesh({ fill: palette.tileFill, stroke: palette.ivory, y: TILE_SETTLED_Y })
+      mesh.position.set(pos.x, options.tileY?.[key] ?? TILE_SETTLED_Y, pos.z)
       mesh.rotation.y = tile.rotation * (Math.PI / 3)
       mesh.userData.tileCoord = tile.coord
-      mesh.userData.tileKey = coordKey(tile.coord)
+      mesh.userData.tileKey = key
       const glyph = createTileGlyph(def)
       glyph.position.y = TILE_THICKNESS
       mesh.add(glyph)
-      if (options.selectedKey === coordKey(tile.coord)) {
+      if (options.selectedKey === key) {
         mesh.add(makeSelectionMarks())
       }
       if (options.showDebug || options.showCoords || options.showEdges) {
@@ -67,6 +78,12 @@ export class BoardRenderer {
 
   tick(time: number): void {
     tickTileGlyphs(this.tiles, time)
+  }
+
+  setTileY(key: string, y: number): void {
+    for (const child of this.tiles.children) {
+      if (child.userData.tileKey === key) child.position.y = y
+    }
   }
 
   private drawActionMarkers(state: GameState): void {
@@ -97,7 +114,7 @@ export class BoardRenderer {
       const target = getNeighbor(origin, dir)
       const ghost = makeDashedHexGhost(dir)
       const pos = getWorldPosition(target)
-      ghost.position.set(pos.x, 0, pos.z)
+      ghost.position.set(pos.x, TILE_SLOT_Y, pos.z)
       this.markers.add(ghost)
     }
   }
