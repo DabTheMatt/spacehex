@@ -98,7 +98,7 @@ export class SpaceScene {
 
   dispose(): void {
     this.disposed = true
-    this.camera.controls.dispose()
+    this.camera.dispose()
     this.renderer.dispose()
   }
 

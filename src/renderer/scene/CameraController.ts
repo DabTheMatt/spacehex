@@ -4,11 +4,20 @@ import { getWorldPosition } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { palette } from '../theme'
 
+const WASD_SPEED = 6
+
 export class CameraController {
   readonly camera: THREE.PerspectiveCamera
   readonly controls: OrbitControls
+  private readonly canvas: HTMLCanvasElement
+  private readonly raycaster = new THREE.Raycaster()
+  private readonly ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+  private grab: THREE.Vector3 | null = null
+  private keys = { w: false, a: false, s: false, d: false }
+  private lastTick = performance.now()
 
   constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200)
     this.camera.position.set(0, 8, 10)
     this.controls = new OrbitControls(this.camera, canvas)
@@ -18,6 +27,12 @@ export class CameraController {
     this.controls.maxDistance = 40
     this.controls.maxPolarAngle = Math.PI / 2 - 0.08
     this.controls.target.set(0, 0, 0)
+    this.controls.enablePan = false
+    this.controls.mouseButtons.LEFT = null
+    this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY
+    this.controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE
+    window.addEventListener('keydown', this.onKeyDown)
+    window.addEventListener('keyup', this.onKeyUp)
   }
 
   resize(width: number, height: number): void {
@@ -41,9 +56,99 @@ export class CameraController {
     this.camera.position.set(mx, 8, mz + 9)
   }
 
+  beginPan(clientX: number, clientY: number): void {
+    this.grab = this.groundPoint(clientX, clientY)
+    if (this.grab) this.canvas.style.cursor = 'grabbing'
+  }
+
+  updatePan(clientX: number, clientY: number): void {
+    if (!this.grab) return
+    const now = this.groundPoint(clientX, clientY)
+    if (!now) return
+    const delta = this.grab.clone().sub(now)
+    this.camera.position.add(delta)
+    this.controls.target.add(delta)
+  }
+
+  endPan(): void {
+    this.grab = null
+    this.canvas.style.cursor = 'grab'
+  }
+
+  get panning(): boolean {
+    return this.grab !== null
+  }
+
   tick(): void {
+    const now = performance.now()
+    const dt = Math.min(0.05, (now - this.lastTick) / 1000)
+    this.lastTick = now
+    this.applyWasd(dt)
     this.controls.update()
   }
+
+  dispose(): void {
+    window.removeEventListener('keydown', this.onKeyDown)
+    window.removeEventListener('keyup', this.onKeyUp)
+    this.controls.dispose()
+  }
+
+  private applyWasd(dt: number): void {
+    const x = (this.keys.d ? 1 : 0) - (this.keys.a ? 1 : 0)
+    const z = (this.keys.w ? 1 : 0) - (this.keys.s ? 1 : 0)
+    if (!x && !z) return
+    const forward = new THREE.Vector3()
+    this.camera.getWorldDirection(forward)
+    forward.y = 0
+    if (forward.lengthSq() < 1e-6) {
+      forward.set(0, 0, -1)
+    } else {
+      forward.normalize()
+    }
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize()
+    const move = right
+      .multiplyScalar(x)
+      .addScaledVector(forward, z)
+      .multiplyScalar(WASD_SPEED * dt)
+    this.camera.position.add(move)
+    this.controls.target.add(move)
+  }
+
+  private groundPoint(clientX: number, clientY: number): THREE.Vector3 | null {
+    const rect = this.canvas.getBoundingClientRect()
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    this.raycaster.setFromCamera(ndc, this.camera)
+    const hit = new THREE.Vector3()
+    if (!this.raycaster.ray.intersectPlane(this.ground, hit)) return null
+    return hit
+  }
+
+  private onKeyDown = (event: KeyboardEvent): void => {
+    if (isTypingTarget(event.target)) return
+    this.setKey(event.code, true)
+  }
+
+  private onKeyUp = (event: KeyboardEvent): void => {
+    this.setKey(event.code, false)
+  }
+
+  private setKey(code: string, down: boolean): void {
+    if (code === 'KeyW') this.keys.w = down
+    if (code === 'KeyA') this.keys.a = down
+    if (code === 'KeyS') this.keys.s = down
+    if (code === 'KeyD') this.keys.d = down
+  }
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  )
 }
 
 export function makeLights(scene: THREE.Scene): void {

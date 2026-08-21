@@ -17,7 +17,7 @@
         <dd>{{ game.ship.coord.q }},{{ game.ship.coord.r }}</dd>
       </div>
     </dl>
-    <p class="tiny">Kamera: przeciągnij · scroll zoom · PPM pan</p>
+    <p class="tiny">WASD lub LPM przeciągnij mapę · scroll zoom · PPM orbit</p>
   </aside>
 </template>
 

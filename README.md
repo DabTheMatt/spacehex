@@ -26,6 +26,6 @@ Po włączeniu GitHub Pages (Actions → workflow *Deploy GitHub Pages*) aplikac
 
 ## Sterowanie
 
-- Kamera: LPM orbit, scroll zoom, PPM pan
+- Kamera: LPM przeciągnij mapę (punkt pod kursorem jedzie z myszą) · WASD · scroll zoom · PPM orbit
 - Eksploracja: **EKSPLORACJA** → klik znacznika przy krawędzi
 - Obrót kafla: **Q** / **E** (lub **R**), **Enter** zatwierdza

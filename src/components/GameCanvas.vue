@@ -3,7 +3,9 @@
     ref="canvasEl"
     class="space-canvas"
     @pointerdown="onDown"
+    @pointermove="onMove"
     @pointerup="onUp"
+    @pointercancel="onUp"
   />
 </template>
 
@@ -41,11 +43,25 @@ function resize(): void {
 function onDown(ev: PointerEvent): void {
   downX = ev.clientX
   downY = ev.clientY
+  if (ev.button === 0 && scene) {
+    scene.camera.beginPan(ev.clientX, ev.clientY)
+    canvasEl.value?.setPointerCapture(ev.pointerId)
+  }
+}
+
+function onMove(ev: PointerEvent): void {
+  if (!scene?.camera.panning) return
+  scene.camera.updatePan(ev.clientX, ev.clientY)
 }
 
 function onUp(ev: PointerEvent): void {
   if (!scene) return
-  if (Math.hypot(ev.clientX - downX, ev.clientY - downY) > 6) return
+  const dragged = Math.hypot(ev.clientX - downX, ev.clientY - downY) > 6
+  if (ev.button === 0) {
+    scene.camera.endPan()
+    canvasEl.value?.releasePointerCapture(ev.pointerId)
+  }
+  if (dragged) return
 
   const status = game.state.exploration.status
   if (status === 'SELECTING_DIRECTION' || status === 'SELECTING_MOVE') {

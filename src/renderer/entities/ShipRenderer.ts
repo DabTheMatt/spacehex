@@ -55,7 +55,7 @@ export class ShipRenderer {
     for (const child of this.group.children) {
       const bob = child.userData.bob as { baseY: number; phase: number } | undefined
       if (!bob) continue
-      child.position.y = bob.baseY + Math.sin(time * 1.15 + bob.phase) * 0.045
+      child.position.y = bob.baseY + Math.sin(time * 0.4 + bob.phase) * 0.028
     }
   }
 }
@@ -79,6 +79,7 @@ function createShipMesh(shipClass: keyof typeof SHIP_DEFINITIONS, active: boolea
     const geom = new THREE.ConeGeometry(0.14, 0.42, 3)
     const mesh = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ color }))
     mesh.rotation.x = Math.PI / 2
+    mesh.rotation.z = Math.PI / 3
     return mesh
   }
   if (shipClass === 'CIERN') {
@@ -92,10 +93,11 @@ function createShipMesh(shipClass: keyof typeof SHIP_DEFINITIONS, active: boolea
     new THREE.MeshBasicMaterial({ color }),
   )
   mesh.rotation.x = Math.PI / 2
+  mesh.rotation.z = Math.PI / 3
   return mesh
 }
 
-function createHullNumber(label: string): THREE.Sprite {
+function createHullNumber(label: string): THREE.Mesh {
   const canvas = document.createElement('canvas')
   canvas.width = 128
   canvas.height = 128
@@ -103,15 +105,23 @@ function createHullNumber(label: string): THREE.Sprite {
   if (ctx) {
     ctx.clearRect(0, 0, 128, 128)
     ctx.fillStyle = css.paper
-    ctx.font = 'bold 72px Palatino, Times New Roman, serif'
+    ctx.font = 'bold 92px Palatino, Times New Roman, serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(label, 64, 68)
+    ctx.fillText(label, 64, 72)
   }
-  const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthTest: false }),
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.12, 0.12),
+    new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthTest: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    }),
   )
-  sprite.scale.set(0.28, 0.28, 1)
-  sprite.position.set(0, 0.22, 0)
-  return sprite
+  mesh.rotation.x = -Math.PI / 2
+  mesh.position.set(0, 0.072, 0)
+  return mesh
 }
