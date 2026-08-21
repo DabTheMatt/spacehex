@@ -128,6 +128,9 @@ export class CameraController {
 
   private onKeyDown = (event: KeyboardEvent): void => {
     if (isTypingTarget(event.target)) return
+    if (event.code === 'KeyW' || event.code === 'KeyA' || event.code === 'KeyS' || event.code === 'KeyD') {
+      event.preventDefault()
+    }
     this.setKey(event.code, true)
   }
 
