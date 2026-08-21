@@ -44,14 +44,6 @@ function arc(
   return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat(color))
 }
 
-/** Notch at local +X (edge 0) so every rotation is visible. */
-function orientationMark(color: number): THREE.Group {
-  const g = new THREE.Group()
-  g.add(poly([[0.72, 0.08], [0.88, 0], [0.72, -0.08]], color))
-  g.add(poly([[0.55, 0], [0.86, 0]], color))
-  return g
-}
-
 function evaGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
   g.add(poly([[-0.42, -0.28], [0.38, -0.28], [0.52, 0], [0.38, 0.28], [-0.42, 0.28]], color, true))
@@ -165,7 +157,6 @@ function blackHoleGlyph(color: number): THREE.Group {
 
 export function createTileGlyph(def: TileDefinition, color = palette.paper): THREE.Group {
   const root = new THREE.Group()
-  root.add(orientationMark(color))
   const type: TileType = def.type
   switch (type) {
     case 'EVA_1':
