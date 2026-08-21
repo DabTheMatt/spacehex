@@ -37,6 +37,9 @@ export class SpaceScene {
   private disposed = false
   private lastState: GameState | null = null
   private lastOptions: SceneOptions | null = null
+  private primed = false
+  private prevShipCoords = new Map<string, HexCoord>()
+  private prevTileKeys = new Set<string>()
   private rise: { key: string; start: number; duration: number } | null = null
   private tileY: Record<string, number> = {}
   private queuedFlights: Array<{ shipId: string; from: HexCoord; to: HexCoord }> = []
@@ -69,28 +72,12 @@ export class SpaceScene {
     this.applySync()
   }
 
-  handleEvents(events: GameEvent[], state: GameState): void {
+  handleEvents(events: GameEvent[], _state: GameState): void {
     for (const event of events) {
       if (event.type === 'GAME_STARTED') {
         this.camera.focus({ q: 0, r: 0 })
       }
-      if (event.type === 'TILE_PLACED') {
-        this.beginRise(coordKey(event.coord))
-      }
-      if (event.type === 'SHIP_MOVED') {
-        if (this.rise) {
-          this.ships.hold(event.shipId, event.from)
-          this.queuedFlights.push({
-            shipId: event.shipId,
-            from: event.from,
-            to: event.to,
-          })
-        } else {
-          this.ships.fly(event.shipId, event.from, event.to)
-        }
-      }
     }
-    this.lastState = state
   }
 
   pickDirection(clientX: number, clientY: number): { direction: number } | null {
@@ -111,13 +98,56 @@ export class SpaceScene {
   }
 
   private beginRise(key: string): void {
-    if (TILE_SLOT_Y === TILE_SETTLED_Y || prefersReducedMotion()) {
-      this.rise = null
-      return
-    }
-    const duration = TILE_RISE_MS
+    if (this.rise?.key === key || this.tileY[key] !== undefined) return
+    const duration = prefersReducedMotion() ? 0 : TILE_RISE_MS
     this.rise = { key, start: performance.now(), duration }
     this.tileY = { ...this.tileY, [key]: TILE_SLOT_Y }
+  }
+
+  private queueStateMotions(state: GameState): void {
+    const tileKeys = Object.keys(state.board.tiles)
+    if (!this.primed) {
+      this.prevTileKeys = new Set(tileKeys)
+      this.prevShipCoords = new Map(
+        Object.values(state.ships).map((ship) => [ship.id, { ...ship.coord }]),
+      )
+      this.primed = true
+      return
+    }
+
+    for (const key of tileKeys) {
+      if (!this.prevTileKeys.has(key)) this.beginRise(key)
+    }
+
+    for (const ship of Object.values(state.ships)) {
+      const prev = this.prevShipCoords.get(ship.id)
+      if (!prev) {
+        this.prevShipCoords.set(ship.id, { ...ship.coord })
+        continue
+      }
+      if (prev.q === ship.coord.q && prev.r === ship.coord.r) continue
+      if (this.ships.isBusy(ship.id)) continue
+      const destKey = coordKey(ship.coord)
+      if (this.rise && this.rise.key === destKey) {
+        this.ships.hold(ship.id, prev)
+        this.queuedFlights.push({ shipId: ship.id, from: prev, to: { ...ship.coord } })
+      } else {
+        this.ships.fly(ship.id, prev, ship.coord)
+      }
+    }
+
+    this.prevTileKeys = new Set(tileKeys)
+    this.prevShipCoords = new Map(
+      Object.values(state.ships).map((ship) => [ship.id, { ...ship.coord }]),
+    )
+  }
+
+  private applySync(): void {
+    if (!this.lastState || !this.lastOptions) return
+    this.queueStateMotions(this.lastState)
+    this.board.sync(this.lastState, { ...this.lastOptions, tileY: this.tileY })
+    this.preview.sync(this.lastState)
+    this.ships.sync(this.lastState)
   }
 
   private advanceRise(now: number): void {
@@ -136,13 +166,6 @@ export class SpaceScene {
     for (const flight of flights) {
       this.ships.fly(flight.shipId, flight.from, flight.to)
     }
-  }
-
-  private applySync(): void {
-    if (!this.lastState || !this.lastOptions) return
-    this.board.sync(this.lastState, { ...this.lastOptions, tileY: this.tileY })
-    this.preview.sync(this.lastState)
-    this.ships.sync(this.lastState)
   }
 
   private intersectAll(clientX: number, clientY: number, objects: THREE.Object3D[]): THREE.Intersection[] {

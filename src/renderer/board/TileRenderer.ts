@@ -2,8 +2,8 @@ import * as THREE from 'three'
 import { HEX_SIZE } from '../../game/board/hexMath'
 
 export const TILE_THICKNESS = 0.1
-/** Ghosts and incoming tiles sit on the same floor as placed hexes (y = 0). */
-export const TILE_SLOT_Y = 0
+/** Incoming tiles start below the board floor, then rise to y = 0. */
+export const TILE_SLOT_Y = -0.42
 export const TILE_SETTLED_Y = 0
 
 function hexShape(radius: number): THREE.Shape {
@@ -205,7 +205,7 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
 export function makeDashedHexGhost(direction: number): THREE.Group {
   const g = new THREE.Group()
   const radius = HEX_SIZE * 0.96
-  const y = TILE_THICKNESS + 0.002
+  const y = 0.006
   const pts: THREE.Vector3[] = []
   for (let i = 0; i <= 6; i++) {
     const angle = (Math.PI / 3) * (i % 6)

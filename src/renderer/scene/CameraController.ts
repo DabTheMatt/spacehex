@@ -120,13 +120,16 @@ export class CameraController {
     this.controls.target.add(move)
   }
 
+  /** Turn the look direction in place — not around the board origin. */
   private applyMapRotate(dt: number): void {
     if (!this.mapRotateEnabled) return
     const dir = (this.keys.q ? 1 : 0) - (this.keys.e ? 1 : 0)
     if (!dir) return
-    const offset = this.camera.position.clone().sub(this.controls.target)
-    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), dir * MAP_ROTATE_SPEED * dt)
-    this.camera.position.copy(this.controls.target).add(offset)
+    const angle = dir * MAP_ROTATE_SPEED * dt
+    const eye = this.camera.position
+    const offset = this.controls.target.clone().sub(eye)
+    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
+    this.controls.target.copy(eye).add(offset)
   }
 
   private groundPoint(clientX: number, clientY: number): THREE.Vector3 | null {

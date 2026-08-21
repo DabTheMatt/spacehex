@@ -41,6 +41,12 @@ type ShipMotion = HoldMotion | FlyMotion
 export class ShipRenderer {
   readonly group = new THREE.Group()
   private motion = new Map<string, ShipMotion>()
+  private facing = new Map<string, number>()
+
+  isBusy(shipId: string): boolean {
+    const motion = this.motion.get(shipId)
+    return motion?.kind === 'hold' || motion?.kind === 'fly'
+  }
 
   hold(shipId: string, coord: HexCoord): void {
     this.motion.set(shipId, { kind: 'hold', coord })
@@ -49,19 +55,19 @@ export class ShipRenderer {
   fly(shipId: string, from: HexCoord, to: HexCoord): void {
     const fromW = getWorldPosition(from)
     const toW = getWorldPosition(to)
-    const child = this.group.children.find((node) => node.userData.shipId === shipId)
-    const startYaw = child?.rotation.y ?? Math.atan2(toW.x - fromW.x, toW.z - fromW.z)
+    const endYaw = Math.atan2(toW.x - fromW.x, toW.z - fromW.z)
+    const startYaw = this.facing.get(shipId) ?? endYaw
     const instant = prefersReducedMotion()
     this.motion.set(shipId, {
       kind: 'fly',
       from,
       to,
-      fromX: child?.position.x ?? fromW.x,
-      fromZ: child?.position.z ?? fromW.z,
+      fromX: fromW.x,
+      fromZ: fromW.z,
       toX: toW.x,
       toZ: toW.z,
       startYaw,
-      endYaw: Math.atan2(toW.x - fromW.x, toW.z - fromW.z),
+      endYaw,
       start: performance.now(),
       turnMs: instant ? 0 : SHIP_TURN_MS,
       moveMs: instant ? 0 : SHIP_FLIGHT_MS,
@@ -137,6 +143,9 @@ export class ShipRenderer {
   private visualYaw(log: GameEvent[], shipId: string, fallbackCoord: HexCoord): number {
     const motion = this.motion.get(shipId)
     if (motion?.kind === 'fly') return motion.startYaw
+    const stored = this.facing.get(shipId)
+    if (stored !== undefined && motion?.kind === 'hold') return stored
+    if (stored !== undefined) return stored
     return lastMoveYaw(log, shipId, fallbackCoord)
   }
 
@@ -150,6 +159,7 @@ export class ShipRenderer {
       const elapsed = now - motion.start
       const turnT = motion.turnMs <= 0 ? 1 : clamp01(elapsed / motion.turnMs)
       child.rotation.y = lerpAngle(motion.startYaw, motion.endYaw, easeInOutCubic(turnT))
+      this.facing.set(shipId, child.rotation.y)
       child.position.y = BASE_HOVER
       const bob = child.userData.bob as { baseY: number; phase: number } | undefined
       if (bob) bob.baseY = BASE_HOVER
@@ -165,6 +175,7 @@ export class ShipRenderer {
       child.position.x = lerp(motion.fromX, motion.toX, e)
       child.position.z = lerp(motion.fromZ, motion.toZ, e)
       child.rotation.y = motion.endYaw
+      this.facing.set(shipId, motion.endYaw)
       if (moveT >= 1) {
         this.motion.delete(shipId)
         settled = true
