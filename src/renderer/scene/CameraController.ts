@@ -6,6 +6,7 @@ import { palette } from '../theme'
 import { isTypingTarget } from '../../ui/actionHotkeys'
 
 const WASD_SPEED = 6
+const MAP_ROTATE_SPEED = 1.15
 
 export class CameraController {
   readonly camera: THREE.PerspectiveCamera
@@ -14,19 +15,22 @@ export class CameraController {
   private readonly raycaster = new THREE.Raycaster()
   private readonly ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private grab: THREE.Vector3 | null = null
-  private keys = { w: false, a: false, s: false, d: false }
+  mapRotateEnabled = true
+  private keys = { w: false, a: false, s: false, d: false, q: false, e: false }
   private lastTick = performance.now()
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200)
+    this.camera = new THREE.PerspectiveCamera(45, 1, 0.08, 500)
     this.camera.position.set(0, 8, 10)
     this.controls = new OrbitControls(this.camera, canvas)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.08
-    this.controls.minDistance = 4
-    this.controls.maxDistance = 40
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.08
+    this.controls.minDistance = 1.2
+    this.controls.maxDistance = 140
+    this.controls.minPolarAngle = 0.04
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.06
+    this.controls.zoomSpeed = 1.35
     this.controls.target.set(0, 0, 0)
     this.controls.enablePan = false
     this.controls.mouseButtons.LEFT = null
@@ -85,6 +89,7 @@ export class CameraController {
     const dt = Math.min(0.05, (now - this.lastTick) / 1000)
     this.lastTick = now
     this.applyWasd(dt)
+    this.applyMapRotate(dt)
     this.controls.update()
   }
 
@@ -115,6 +120,15 @@ export class CameraController {
     this.controls.target.add(move)
   }
 
+  private applyMapRotate(dt: number): void {
+    if (!this.mapRotateEnabled) return
+    const dir = (this.keys.q ? 1 : 0) - (this.keys.e ? 1 : 0)
+    if (!dir) return
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), dir * MAP_ROTATE_SPEED * dt)
+    this.camera.position.copy(this.controls.target).add(offset)
+  }
+
   private groundPoint(clientX: number, clientY: number): THREE.Vector3 | null {
     const rect = this.canvas.getBoundingClientRect()
     const ndc = new THREE.Vector2(
@@ -129,7 +143,13 @@ export class CameraController {
 
   private onKeyDown = (event: KeyboardEvent): void => {
     if (isTypingTarget(event.target)) return
-    if (event.code === 'KeyW' || event.code === 'KeyA' || event.code === 'KeyS' || event.code === 'KeyD') {
+    if (
+      event.code === 'KeyW' ||
+      event.code === 'KeyA' ||
+      event.code === 'KeyS' ||
+      event.code === 'KeyD' ||
+      ((event.code === 'KeyQ' || event.code === 'KeyE') && this.mapRotateEnabled)
+    ) {
       event.preventDefault()
     }
     this.setKey(event.code, true)
@@ -144,6 +164,8 @@ export class CameraController {
     if (code === 'KeyA') this.keys.a = down
     if (code === 'KeyS') this.keys.s = down
     if (code === 'KeyD') this.keys.d = down
+    if (code === 'KeyQ') this.keys.q = down
+    if (code === 'KeyE') this.keys.e = down
   }
 }
 

@@ -11,7 +11,6 @@ import {
   makeSelectionMarks,
   makeDashedHexGhost,
   TILE_SETTLED_Y,
-  TILE_SLOT_Y,
   TILE_THICKNESS,
 } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
@@ -114,7 +113,7 @@ export class BoardRenderer {
       const target = getNeighbor(origin, dir)
       const ghost = makeDashedHexGhost(dir)
       const pos = getWorldPosition(target)
-      ghost.position.set(pos.x, TILE_SLOT_Y, pos.z)
+      ghost.position.set(pos.x, TILE_SETTLED_Y, pos.z)
       this.markers.add(ghost)
     }
   }

@@ -11,9 +11,10 @@ import {
   clamp01,
   easeInOutCubic,
   lerp,
+  lerpAngle,
   prefersReducedMotion,
-  SHIP_FLIGHT_ARC,
   SHIP_FLIGHT_MS,
+  SHIP_TURN_MS,
 } from '../motion'
 
 const SHIP_SPACING = 0.46
@@ -25,8 +26,15 @@ type FlyMotion = {
   kind: 'fly'
   from: HexCoord
   to: HexCoord
+  fromX: number
+  fromZ: number
+  toX: number
+  toZ: number
+  startYaw: number
+  endYaw: number
   start: number
-  duration: number
+  turnMs: number
+  moveMs: number
 }
 type ShipMotion = HoldMotion | FlyMotion
 
@@ -39,12 +47,24 @@ export class ShipRenderer {
   }
 
   fly(shipId: string, from: HexCoord, to: HexCoord): void {
+    const fromW = getWorldPosition(from)
+    const toW = getWorldPosition(to)
+    const child = this.group.children.find((node) => node.userData.shipId === shipId)
+    const startYaw = child?.rotation.y ?? Math.atan2(toW.x - fromW.x, toW.z - fromW.z)
+    const instant = prefersReducedMotion()
     this.motion.set(shipId, {
       kind: 'fly',
       from,
       to,
+      fromX: child?.position.x ?? fromW.x,
+      fromZ: child?.position.z ?? fromW.z,
+      toX: toW.x,
+      toZ: toW.z,
+      startYaw,
+      endYaw: Math.atan2(toW.x - fromW.x, toW.z - fromW.z),
       start: performance.now(),
-      duration: prefersReducedMotion() ? 0 : SHIP_FLIGHT_MS,
+      turnMs: instant ? 0 : SHIP_TURN_MS,
+      moveMs: instant ? 0 : SHIP_FLIGHT_MS,
     })
   }
 
@@ -116,11 +136,7 @@ export class ShipRenderer {
 
   private visualYaw(log: GameEvent[], shipId: string, fallbackCoord: HexCoord): number {
     const motion = this.motion.get(shipId)
-    if (motion?.kind === 'fly') {
-      const from = getWorldPosition(motion.from)
-      const to = getWorldPosition(motion.to)
-      return Math.atan2(to.x - from.x, to.z - from.z)
-    }
+    if (motion?.kind === 'fly') return motion.startYaw
     return lastMoveYaw(log, shipId, fallbackCoord)
   }
 
@@ -131,18 +147,25 @@ export class ShipRenderer {
       const shipId = child.userData.shipId as string
       const motion = this.motion.get(shipId)
       if (!motion || motion.kind !== 'fly') continue
-      const t = motion.duration <= 0 ? 1 : clamp01((now - motion.start) / motion.duration)
-      const e = easeInOutCubic(t)
-      const from = getWorldPosition(motion.from)
-      const to = getWorldPosition(motion.to)
-      child.position.x = lerp(from.x, to.x, e)
-      child.position.z = lerp(from.z, to.z, e)
-      const arc = Math.sin(t * Math.PI) * SHIP_FLIGHT_ARC
-      child.position.y = BASE_HOVER + arc
-      child.rotation.y = Math.atan2(to.x - from.x, to.z - from.z)
+      const elapsed = now - motion.start
+      const turnT = motion.turnMs <= 0 ? 1 : clamp01(elapsed / motion.turnMs)
+      child.rotation.y = lerpAngle(motion.startYaw, motion.endYaw, easeInOutCubic(turnT))
+      child.position.y = BASE_HOVER
       const bob = child.userData.bob as { baseY: number; phase: number } | undefined
-      if (bob) bob.baseY = BASE_HOVER + arc
-      if (t >= 1) {
+      if (bob) bob.baseY = BASE_HOVER
+
+      if (turnT < 1) {
+        child.position.x = motion.fromX
+        child.position.z = motion.fromZ
+        continue
+      }
+
+      const moveT = motion.moveMs <= 0 ? 1 : clamp01((elapsed - motion.turnMs) / motion.moveMs)
+      const e = easeInOutCubic(moveT)
+      child.position.x = lerp(motion.fromX, motion.toX, e)
+      child.position.z = lerp(motion.fromZ, motion.toZ, e)
+      child.rotation.y = motion.endYaw
+      if (moveT >= 1) {
         this.motion.delete(shipId)
         settled = true
       }

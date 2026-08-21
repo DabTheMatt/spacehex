@@ -2,8 +2,8 @@ import * as THREE from 'three'
 import { HEX_SIZE } from '../../game/board/hexMath'
 
 export const TILE_THICKNESS = 0.1
-/** Incoming / ghost hexes sit below settled tiles, then rise on confirm. */
-export const TILE_SLOT_Y = -0.58
+/** Ghosts and incoming tiles sit on the same floor as placed hexes (y = 0). */
+export const TILE_SLOT_Y = 0
 export const TILE_SETTLED_Y = 0
 
 function hexShape(radius: number): THREE.Shape {

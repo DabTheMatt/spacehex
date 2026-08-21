@@ -65,6 +65,7 @@ export class SpaceScene {
   sync(state: GameState, options: SceneOptions): void {
     this.lastState = state
     this.lastOptions = options
+    this.camera.mapRotateEnabled = state.phase !== 'TILE_PLACEMENT'
     this.applySync()
   }
 
@@ -110,7 +111,11 @@ export class SpaceScene {
   }
 
   private beginRise(key: string): void {
-    const duration = prefersReducedMotion() ? 0 : TILE_RISE_MS
+    if (TILE_SLOT_Y === TILE_SETTLED_Y || prefersReducedMotion()) {
+      this.rise = null
+      return
+    }
+    const duration = TILE_RISE_MS
     this.rise = { key, start: performance.now(), duration }
     this.tileY = { ...this.tileY, [key]: TILE_SLOT_Y }
   }
