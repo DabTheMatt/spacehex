@@ -12,7 +12,7 @@ npm test
 npm run dev
 ```
 
-Dev serwer: **http://localhost:5173/** (bez `/spacehex/` — ta ścieżka jest tylko w production build pod GitHub Pages).
+Dev serwer: **http://localhost:5188/** (port 5188, żeby nie zderzać się z inną grą na :5173).
 
 Build:
 

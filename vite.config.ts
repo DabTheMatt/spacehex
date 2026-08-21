@@ -6,6 +6,15 @@ export default defineConfig({
   plugins: [vue()],
   // Local/dev preview is `/`. Production GitHub Pages uses `/spacehex/`.
   base: process.env.NODE_ENV === 'production' ? '/spacehex/' : '/',
+  server: {
+    host: '0.0.0.0',
+    port: 5188,
+    strictPort: true,
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      Pragma: 'no-cache',
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
