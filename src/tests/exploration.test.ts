@@ -1,0 +1,75 @@
+import { describe, expect, it } from 'vitest'
+import { applyCommand, createInitialState } from '../game/engine/GameEngine'
+import { EXPLORATION_TILE_IDS } from '../game/definitions/tiles'
+import { getNeighbor } from '../game/board/hexMath'
+import { coordKey } from '../game/board/HexCoord'
+import { RNG } from '../game/random/RNG'
+
+describe('RNG', () => {
+  it('is deterministic for a seed', () => {
+    const a = new RNG('abc').shuffle([1, 2, 3, 4, 5, 6])
+    const b = new RNG('abc').shuffle([1, 2, 3, 4, 5, 6])
+    expect(a).toEqual(b)
+  })
+
+  it('differs across seeds', () => {
+    const a = new RNG('abc').shuffle([1, 2, 3, 4, 5, 6, 7, 8])
+    const b = new RNG('xyz').shuffle([1, 2, 3, 4, 5, 6, 7, 8])
+    expect(a).not.toEqual(b)
+  })
+})
+
+describe('exploration engine', () => {
+  it('starts with only EVA-1 and a 24-tile shuffled deck', () => {
+    const state = createInitialState('seed-1')
+    expect(Object.keys(state.board.tiles)).toEqual(['0,0'])
+    expect(state.board.tiles['0,0'].definitionId).toBe('eva-1')
+    expect(state.explorationDeck.drawPile).toHaveLength(24)
+    expect(state.explorationDeck.drawPile).toHaveLength(EXPLORATION_TILE_IDS.length)
+    const other = createInitialState('seed-2')
+    expect(state.explorationDeck.drawPile).not.toEqual(other.explorationDeck.drawPile)
+  })
+
+  it('is JSON serializable', () => {
+    const state = createInitialState('json')
+    const roundTrip = JSON.parse(JSON.stringify(state))
+    expect(roundTrip.board.tiles['0,0'].coord).toEqual({ q: 0, r: 0 })
+  })
+
+  it('draws, rotates six times, places, and moves the ship', () => {
+    let state = createInitialState('explore')
+    const top = state.explorationDeck.drawPile[0]
+    const started = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 })
+    state = started.state
+    expect(started.events.some((e) => e.type === 'TILE_DRAWN' && e.tileId === top)).toBe(true)
+    expect(state.phase).toBe('TILE_PLACEMENT')
+    expect(state.exploration.target).toEqual(getNeighbor({ q: 0, r: 0 }, 0))
+    expect(state.explorationDeck.drawPile).toHaveLength(23)
+
+    const rotations = new Set<number>()
+    for (let i = 0; i < 6; i++) {
+      const r = applyCommand(state, { type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' })
+      state = r.state
+      rotations.add(state.exploration.rotation ?? -1)
+    }
+    expect(rotations.size).toBe(6)
+
+    const confirmed = applyCommand(state, { type: 'CONFIRM_TILE_PLACEMENT' })
+    state = confirmed.state
+    const key = coordKey(getNeighbor({ q: 0, r: 0 }, 0))
+    expect(state.board.tiles[key].definitionId).toBe(top)
+    expect(state.ships['mewa-1'].coord).toEqual(getNeighbor({ q: 0, r: 0 }, 0))
+    expect(state.phase).toBe('PLAYER_TURN')
+    expect(state.movementSpent).toBe(true)
+    expect(Object.keys(state.board.tiles)).toHaveLength(2)
+  })
+
+  it('does not allow placing on an occupied hex via move-as-explore', () => {
+    let state = createInitialState('blocked')
+    state = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 }).state
+    state = applyCommand(state, { type: 'CONFIRM_TILE_PLACEMENT' }).state
+    state = applyCommand(state, { type: 'END_TURN' }).state
+    const result = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 })
+    expect(result.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(true)
+  })
+})

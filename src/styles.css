@@ -1,0 +1,219 @@
+:root {
+  color-scheme: dark;
+  --void: #0b0b0a;
+  --ivory: #cfc6b4;
+  --paper: #e7dcc8;
+  --blood: #8a2a2a;
+  --dusk: #7a9aab;
+  --ochre: #b08d57;
+  --line: #3a3832;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  background: var(--void);
+  color: var(--ivory);
+  font-family: Palatino, 'Palatino Linotype', 'Times New Roman', serif;
+}
+
+.app-shell {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.space-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+.masthead {
+  position: absolute;
+  top: 1.25rem;
+  left: 1.5rem;
+  z-index: 2;
+  pointer-events: none;
+  letter-spacing: 0.28em;
+}
+
+.masthead .mark {
+  font-size: 0.95rem;
+}
+
+.masthead .sub {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+  max-width: 22rem;
+}
+
+.hud-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  z-index: 2;
+  min-width: 22rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  background: rgba(11, 11, 10, 0.86);
+  text-align: center;
+}
+
+.row {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.label {
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+}
+
+.label.blood {
+  color: var(--blood);
+}
+
+.label.dusk {
+  color: var(--dusk);
+}
+
+button {
+  font: inherit;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  background: transparent;
+  color: var(--ivory);
+  border: 1px solid var(--ivory);
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+}
+
+button.accent {
+  border-color: var(--ochre);
+  color: var(--ochre);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.placement .drawn {
+  margin-bottom: 0.6rem;
+  letter-spacing: 0.12em;
+}
+
+.placement .sym {
+  margin-left: 0.5rem;
+  opacity: 0.8;
+}
+
+.orient,
+.hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+
+.status,
+.dev {
+  position: absolute;
+  z-index: 2;
+  top: 5rem;
+  width: 16rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  background: rgba(11, 11, 10, 0.86);
+  font-size: 0.8rem;
+}
+
+.status {
+  right: 1.25rem;
+}
+
+.dev {
+  left: 1.25rem;
+  top: auto;
+  bottom: 1.5rem;
+  max-height: 46vh;
+  overflow: auto;
+}
+
+.status h2,
+.dev h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  font-weight: normal;
+}
+
+.status dl {
+  margin: 0;
+}
+
+.status dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+  padding: 0.28rem 0;
+}
+
+.status dt {
+  opacity: 0.65;
+}
+
+.status dd {
+  margin: 0;
+}
+
+.tiny {
+  opacity: 0.55;
+  font-size: 0.7rem;
+}
+
+.dev label {
+  display: block;
+  margin: 0.4rem 0;
+}
+
+.dev input,
+.dev select {
+  width: 100%;
+  margin-top: 0.2rem;
+  background: transparent;
+  color: var(--ivory);
+  border: 1px solid var(--line);
+  font: inherit;
+  padding: 0.25rem;
+}
+
+.dev button {
+  width: 100%;
+  margin: 0.2rem 0;
+}
+
+.dev .chk {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.dev .chk input {
+  width: auto;
+}
