@@ -12,6 +12,8 @@ npm test
 npm run dev
 ```
 
+Dev serwer: **http://localhost:5173/** (bez `/spacehex/` — ta ścieżka jest tylko w production build pod GitHub Pages).
+
 Build:
 
 ```bash

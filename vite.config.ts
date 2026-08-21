@@ -4,7 +4,8 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/spacehex/',
+  // Local/dev preview is `/`. Production GitHub Pages uses `/spacehex/`.
+  base: process.env.NODE_ENV === 'production' ? '/spacehex/' : '/',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
