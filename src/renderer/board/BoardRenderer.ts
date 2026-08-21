@@ -90,6 +90,7 @@ export class BoardRenderer {
 
   private drawExploreGhosts(state: GameState): void {
     if (state.phase === 'TILE_PLACEMENT' || state.movementSpent) return
+    if (state.exploration.status !== 'SELECTING_DIRECTION') return
     const origin = activeShip(state).coord
     for (let dir = 0; dir < 6; dir++) {
       if (!canExploreDirection(state, dir)) continue

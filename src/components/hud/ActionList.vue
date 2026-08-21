@@ -24,18 +24,6 @@ const game = useGameStore()
 const actions = computed(() => {
   const st = game.state
   if (st.phase === 'TILE_PLACEMENT') return []
-  if (st.exploration.status === 'SELECTING_MOVE' || st.exploration.status === 'SELECTING_DIRECTION') {
-    return [
-      {
-        id: '00',
-        label: 'CANCEL',
-        accent: false,
-        muted: true,
-        disabled: false,
-        run: () => game.dispatch({ type: 'CANCEL_SELECTION' }),
-      },
-    ]
-  }
   if (st.movementSpent) {
     return [
       {
@@ -48,11 +36,12 @@ const actions = computed(() => {
       },
     ]
   }
+  const status = st.exploration.status
   return [
     {
       id: '01',
       label: 'MOVE',
-      accent: false,
+      accent: status === 'SELECTING_MOVE',
       muted: false,
       disabled: false,
       run: () => game.dispatch({ type: 'BEGIN_MOVE' }),
@@ -60,7 +49,7 @@ const actions = computed(() => {
     {
       id: '02',
       label: 'EXPLORE',
-      accent: true,
+      accent: status === 'SELECTING_DIRECTION',
       muted: false,
       disabled: false,
       run: () => game.dispatch({ type: 'BEGIN_EXPLORATION' }),

@@ -25,11 +25,7 @@ let downX = 0
 let downY = 0
 
 function showExploreGhosts(): boolean {
-  return (
-    ui.selectedShipId === game.ship.id &&
-    !game.state.movementSpent &&
-    game.state.phase === 'PLAYER_TURN'
-  )
+  return game.state.exploration.status === 'SELECTING_DIRECTION'
 }
 
 function sync(): void {
@@ -91,7 +87,7 @@ function onUp(ev: PointerEvent): void {
     return
   }
 
-  if (showExploreGhosts() || status === 'SELECTING_DIRECTION') {
+  if (status === 'SELECTING_DIRECTION') {
     const ghost = scene.pickDirection(ev.clientX, ev.clientY)
     if (ghost) {
       game.dispatch({ type: 'START_EXPLORATION', direction: ghost.direction })
@@ -117,19 +113,53 @@ function onUp(ev: PointerEvent): void {
 }
 
 function onKey(ev: KeyboardEvent): void {
-  if (game.state.phase !== 'TILE_PLACEMENT') return
-  const key = ev.key.toLowerCase()
-  if (key === 'q') {
-    game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'LEFT' })
-  } else if (key === 'e' || key === 'r') {
-    game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' })
-  } else if (key === 'f' || ev.key === 'Enter') {
-    game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
-  } else {
+  const target = ev.target
+  if (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  ) {
     return
   }
-  scene?.handleEvents(game.lastEvents, game.state)
-  sync()
+
+  if (game.state.phase === 'TILE_PLACEMENT') {
+    const key = ev.key.toLowerCase()
+    if (key === 'q') {
+      game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'LEFT' })
+    } else if (key === 'e' || key === 'r') {
+      game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' })
+    } else if (key === 'f' || ev.key === 'Enter') {
+      game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
+    } else {
+      return
+    }
+    scene?.handleEvents(game.lastEvents, game.state)
+    sync()
+    return
+  }
+
+  if (ev.key === 'Escape') {
+    game.dispatch({ type: 'CANCEL_SELECTION' })
+    sync()
+    return
+  }
+  if (ev.key === '1') {
+    if (game.state.movementSpent) game.dispatch({ type: 'END_TURN' })
+    else game.dispatch({ type: 'BEGIN_MOVE' })
+    scene?.handleEvents(game.lastEvents, game.state)
+    sync()
+    return
+  }
+  if (ev.key === '2') {
+    game.dispatch({ type: 'BEGIN_EXPLORATION' })
+    sync()
+    return
+  }
+  if (ev.key === '3') {
+    game.dispatch({ type: 'SKIP_MOVEMENT' })
+    scene?.handleEvents(game.lastEvents, game.state)
+    sync()
+  }
 }
 
 onMounted(() => {

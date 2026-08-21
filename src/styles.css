@@ -70,7 +70,7 @@ body,
   top: 1rem;
   left: 1.25rem;
   right: 1.25rem;
-  z-index: 2;
+  z-index: 20;
   display: flex;
   justify-content: space-between;
   gap: 1.5rem;
@@ -84,15 +84,8 @@ body,
 .action-list,
 .explore-controls {
   position: absolute;
-  z-index: 2;
+  z-index: 20;
   width: 15rem;
-  pointer-events: none;
-}
-
-.context-panel,
-.action-list,
-.explore-controls {
-  pointer-events: auto;
 }
 
 .context-panel {

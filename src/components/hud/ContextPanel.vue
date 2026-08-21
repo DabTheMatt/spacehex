@@ -21,8 +21,9 @@ const game = useGameStore()
 const ui = useUiStore()
 
 const block = computed(() => {
-  if (ui.selectedShipId) {
-    const ship = game.state.ships[ui.selectedShipId]
+  const shipId = ui.selectedShipId ?? game.ship.id
+  if (ui.selectedShipId || !ui.selectedTile) {
+    const ship = game.state.ships[shipId]
     if (!ship) return null
     const player = game.state.players[ship.playerId]
     const n = ship.playerId.replace(/\D/g, '') || '1'
