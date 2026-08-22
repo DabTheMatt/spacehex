@@ -94,16 +94,15 @@ function planetGlyph(color: number, size: 'L' | 'M' | 'S'): THREE.Group {
   const spin = new THREE.Group()
   spin.userData.animate = 'spin'
   if (size === 'L') {
-    // Keep the spinning graphic inside the hex apothem (~0.83 at HEX_SIZE 1).
-    spin.add(circle(0.28, color, 48))
-    spin.add(ellipse(0.42, 0.13, color))
-    spin.add(ellipse(0.38, 0.1, color))
-    spin.add(arc(0.16, -0.5, 2.5, color))
-    const moon = circle(0.07, color, 20)
-    moon.position.set(0.34, 0, 0.12)
+    spin.add(circle(0.42, color, 48))
+    spin.add(ellipse(0.63, 0.195, color))
+    spin.add(ellipse(0.57, 0.15, color))
+    spin.add(arc(0.24, -0.5, 2.5, color))
+    const moon = circle(0.105, color, 20)
+    moon.position.set(0.51, 0, 0.18)
     spin.add(moon)
-    spin.add(poly([[-0.14, -0.06], [0.16, 0.08]], color))
-    spin.add(poly([[-0.08, 0.12], [0.12, 0.18]], color))
+    spin.add(poly([[-0.21, -0.09], [0.24, 0.12]], color))
+    spin.add(poly([[-0.12, 0.18], [0.18, 0.27]], color))
   } else if (size === 'M') {
     spin.add(circle(0.3, color, 40))
     spin.add(arc(0.18, 0.2, 3.4, color))
