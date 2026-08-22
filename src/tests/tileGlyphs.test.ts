@@ -28,6 +28,15 @@ describe('tile glyphs', () => {
     expect(new Set(spins).size).toBe(3)
   })
 
+  it('orbits a moon around medium planets', () => {
+    const glyph = createTileGlyph(TILE_DEFINITIONS['planet-medium-1'])
+    let moons = 0
+    glyph.traverse((obj) => {
+      if (obj.userData.animate === 'moon') moons += 1
+    })
+    expect(moons).toBe(1)
+  })
+
   it('tints planets from the muted violet / rose / sage set', () => {
     const tints = [palette.planetViolet, palette.planetRose, palette.planetSage]
     expect(tints).toContain(planetTintForId('planet-large-1'))

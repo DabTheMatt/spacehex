@@ -16,7 +16,7 @@ const ui = useUiStore()
 
 const left = computed(() => {
   const n = game.player.id.replace(/\D/g, '') || '1'
-  return `SG-${n} / CYCLE ${pad(game.state.round)} / CR ${pad(game.player.credits)}`
+  return `SG-${n} / CYCLE ${pad(game.state.round)} / CR ${pad(game.player.credits)} / GLORY ${pad(game.player.glory)}`
 })
 
 function pad(value: number): string {

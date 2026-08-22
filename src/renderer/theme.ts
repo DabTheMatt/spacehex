@@ -36,4 +36,5 @@ export const css = {
   resourceRed: '#C45C4A',
   resourceGreen: '#6A9A62',
   resourceBlue: '#5A7EA8',
+  priceYellow: '#E2D06A',
 }

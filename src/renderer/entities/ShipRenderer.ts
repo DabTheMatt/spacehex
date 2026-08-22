@@ -8,6 +8,7 @@ import { coordKey } from '../../game/board/HexCoord'
 import { SHIP_DEFINITIONS } from '../../game/definitions/ships'
 import { palette, css } from '../theme'
 import { TILE_THICKNESS } from '../board/TileRenderer'
+import { evaDockIndexForPlayer, evaDockLocal, isEvaCoord } from '../board/evaDocks'
 import {
   clamp01,
   easeInOutCubic,
@@ -27,7 +28,7 @@ import {
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
-const RIM = HEX_SIZE * 0.5
+const RIM = HEX_SIZE * 0.28
 const HULL_HEIGHT = 0.11
 const BASE_HOVER = TILE_THICKNESS + 0.14
 
@@ -181,8 +182,8 @@ export class ShipRenderer {
 
     const targets = new Map<string, { x: number; z: number }>()
     for (const group of groups.values()) {
-      group.ships.forEach((ship, index) => {
-        const slot = stackWorld(group.coord, group.ships.length, index, group.yaw)
+      group.ships.forEach((ship) => {
+        const slot = parkWorld(group.coord, ship, group.ships, group.yaw)
         targets.set(ship.id, slot)
       })
     }
@@ -192,8 +193,12 @@ export class ShipRenderer {
       const coord = this.parkedCoord(ship) ?? ship.coord
       const target = targets.get(ship.id) ?? getWorldPosition(coord)
       const last = this.lastXZ.get(ship.id) ?? target
-      const yaw = this.visualYaw(state.log, ship.id, coord)
-      if (this.motion.get(ship.id)?.kind !== 'fly') this.facing.set(ship.id, yaw)
+      const flying = this.motion.get(ship.id)?.kind === 'fly'
+      let yaw = this.visualYaw(state.log, ship.id, coord)
+      if (!flying && isEvaCoord(coord)) {
+        yaw = evaDockLocal(evaDockIndexForPlayer(ship.playerId)).yaw
+      }
+      if (!flying) this.facing.set(ship.id, yaw)
       const playerNo = Number(ship.playerId.replace(/\D/g, '')) || 1
       const active = state.players[state.activePlayerId]?.shipId === ship.id
       const wrapper = new THREE.Group()
@@ -403,13 +408,19 @@ function slideBurn(
   return braking ? { ...ENGINES_OFF, port: 0.85 } : { ...ENGINES_OFF, starboard: 0.95 }
 }
 
-function stackWorld(
+function parkWorld(
   coord: HexCoord,
-  count: number,
-  index: number,
+  ship: ShipState,
+  group: ShipState[],
   yaw: number,
 ): { x: number; z: number } {
   const pos = getWorldPosition(coord)
+  if (isEvaCoord(coord)) {
+    const dock = evaDockLocal(evaDockIndexForPlayer(ship.playerId))
+    return { x: pos.x + dock.x, z: pos.z + dock.z }
+  }
+  const index = group.findIndex((item) => item.id === ship.id)
+  const count = group.length
   const sideX = Math.cos(yaw)
   const sideZ = -Math.sin(yaw)
   if (count <= 1) {

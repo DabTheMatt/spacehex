@@ -352,7 +352,12 @@ function confirmPlacement(state: GameState): EngineResult {
   if (next.planetMarkets[coordKey(placed.coord)] && !before.planetMarkets[coordKey(placed.coord)]) {
     extra.push({ type: 'PLANET_STOCKED', tileId: placed.id, coord: placed.coord })
   }
-  const discovered = resolveDiscovery(next, placed.id, placed.coord)
+  const discovered = resolveDiscovery(
+    next,
+    placed.id,
+    placed.coord,
+    placed.discoveredByPlayerId ?? state.activePlayerId,
+  )
   next = discovered.state
   extra.push(...discovered.events)
   next = append(next, extra)
@@ -505,7 +510,7 @@ function devPlace(
     next = append(next, [stocked])
     events.push(stocked)
   }
-  const discovered = resolveDiscovery(next, tileId, coord)
+  const discovered = resolveDiscovery(next, tileId, coord, placed.discoveredByPlayerId ?? state.activePlayerId)
   next = append(discovered.state, discovered.events)
   events.push(...discovered.events)
   return { state: next, events }

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { PlanetMarket, ResourceId } from '../../game/definitions/resources'
-import { RESOURCE_IDS } from '../../game/definitions/resources'
+import { RESOURCE_IDS, RESOURCE_LABEL } from '../../game/definitions/resources'
 import { palette, css } from '../theme'
 import { TILE_THICKNESS } from './TileRenderer'
 import { HEX_SIZE } from '../../game/board/hexMath'
@@ -25,7 +25,7 @@ const NAME_PLANE_H = 0.08
 const TILE_RADIUS = HEX_SIZE * 0.96
 const FLAT_EDGE = TILE_RADIUS * (Math.sqrt(3) / 2)
 /** Gap from the tile edge to the name equals one name-row height. */
-const NAME_R = FLAT_EDGE - NAME_PLANE_H - NAME_PLANE_H / 2
+const NAME_R = FLAT_EDGE - NAME_PLANE_H * 0.45
 const TOP_Z = -HEX_SIZE * 0.68
 const HEX_SPACING = 0.2
 const CLOSE_DIST = 4.2
@@ -85,7 +85,10 @@ export function createPlanetOverlay(
     const cluster = new THREE.Group()
     cluster.position.set(x, TILE_THICKNESS + 0.035, TOP_Z)
     cluster.add(stockHex(id, amount))
-    const tag = priceTag(`${buyPrice[id]}CR`, RESOURCE_CSS[id])
+    const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id])
+    name.position.set(0, 0.01, -0.11)
+    cluster.add(name)
+    const tag = priceTag(`${buyPrice[id]}CR`, css.priceYellow)
     tag.position.set(0, 0.01, 0.088)
     cluster.add(tag)
     if (amount > 0) {
@@ -310,23 +313,31 @@ function diceCluster(id: ResourceId, amount: number, x: number): THREE.Group {
   return g
 }
 
+function caption(text: string, color: string): THREE.Mesh {
+  return textPlane(text, color, 0.18, 0.045)
+}
+
 function priceTag(text: string, color: string): THREE.Mesh {
+  return textPlane(text, color, 0.2, 0.05)
+}
+
+function textPlane(text: string, color: string, width: number, height: number): THREE.Mesh {
   const canvas = document.createElement('canvas')
-  canvas.width = 192
-  canvas.height = 48
+  canvas.width = 256
+  canvas.height = 64
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.clearRect(0, 0, 192, 48)
+    ctx.clearRect(0, 0, 256, 64)
     ctx.fillStyle = color
     ctx.font = '500 22px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(text, 96, 26)
+    ctx.fillText(text, 128, 34)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.2, 0.05),
+    new THREE.PlaneGeometry(width, height),
     new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,

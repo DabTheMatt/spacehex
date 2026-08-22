@@ -133,7 +133,10 @@ function onUp(ev: PointerEvent): void {
 
   const buy = scene.pickBuy(ev.clientX, ev.clientY)
   if (buy && game.state.phase === 'PLAYER_TURN') {
-    game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })
+    const events = game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })
+    if (events.some((event) => event.type === 'COMMAND_REJECTED' && event.reason === 'BUY_LIMIT')) {
+      ui.flashNotice('OPERATION LIMIT REACHED')
+    }
     return
   }
 

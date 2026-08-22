@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { TileType } from '../../game/board/tileRotation'
 import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
+import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
 const Y = 0.012
@@ -62,10 +63,10 @@ function evaGlyph(color: number): THREE.Group {
   g.add(poly(core, color, true))
   g.add(poly([[-0.07, 0], [0.07, 0]], color))
   g.add(poly([[0, -0.07], [0, 0.07]], color))
-  for (let k = 0; k < 3; k++) {
-    const a = (Math.PI * 2 * k) / 3 + Math.PI / 6
+  for (let k = 0; k < EVA_DOCK_COUNT; k++) {
+    const a = evaDockAngle(k)
     const inner = 0.26
-    const outer = 0.46
+    const outer = EVA_DOCK_RADIUS
     g.add(
       poly(
         [
@@ -92,6 +93,7 @@ function voidGlyph(color: number): THREE.Group {
 }
 
 function planetGlyph(color: number, size: 'L' | 'M' | 'S'): THREE.Group {
+  const root = new THREE.Group()
   const spin = new THREE.Group()
   spin.userData.animate = 'spin'
   if (size === 'L') {
@@ -99,11 +101,9 @@ function planetGlyph(color: number, size: 'L' | 'M' | 'S'): THREE.Group {
     spin.add(ellipse(0.63, 0.195, color))
     spin.add(ellipse(0.57, 0.15, color))
     spin.add(arc(0.24, -0.5, 2.5, color))
-    const moon = circle(0.105, color, 20)
-    moon.position.set(0.51, 0, 0.18)
-    spin.add(moon)
     spin.add(poly([[-0.21, -0.09], [0.24, 0.12]], color))
     spin.add(poly([[-0.12, 0.18], [0.18, 0.27]], color))
+    root.add(spin)
   } else if (size === 'M') {
     spin.add(circle(0.3, color, 40))
     spin.add(arc(0.18, 0.2, 3.4, color))
@@ -111,11 +111,19 @@ function planetGlyph(color: number, size: 'L' | 'M' | 'S'): THREE.Group {
     const crater = circle(0.05, color, 12)
     crater.position.set(-0.12, 0, 0.1)
     spin.add(crater)
+    root.add(spin)
+    const moonArm = new THREE.Group()
+    moonArm.userData.animate = 'moon'
+    const moon = circle(0.055, color, 16)
+    moon.position.set(0.4, 0, 0)
+    moonArm.add(moon)
+    root.add(moonArm)
   } else {
-    spin.add(circle(0.15, color, 28))
-    spin.add(circle(0.045, color, 12))
+    spin.add(circle(0.22, color, 32))
+    spin.add(circle(0.065, color, 14))
+    root.add(spin)
   }
-  return spin
+  return root
 }
 
 function ellipse(rx: number, rz: number, color: number, segments = 48): THREE.Line {
@@ -316,6 +324,9 @@ export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
     }
     if (obj.userData.animate === 'spin') {
       obj.rotation.y = time * 0.12
+    }
+    if (obj.userData.animate === 'moon') {
+      obj.rotation.y = (time / 12) * Math.PI * 2
     }
     if (obj.userData.animate === 'pulse' && obj instanceof THREE.Mesh) {
       const mat = obj.material

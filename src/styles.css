@@ -81,6 +81,21 @@ body,
   font-size: var(--font-xs);
 }
 
+.hud-notice {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 0.55rem 1.1rem;
+  border: var(--line-width) solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--color-background) 82%, transparent);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: var(--font-sm);
+  pointer-events: none;
+}
+
 .command-bar {
   position: absolute;
   left: 0;

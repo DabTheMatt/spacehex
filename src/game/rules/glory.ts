@@ -32,9 +32,10 @@ export function resolveDiscovery(
   state: GameState,
   tileId: string,
   coord: HexCoord,
+  playerId = state.activePlayerId,
 ): { state: GameState; events: GameEvent[] } {
   const def = getTileDefinition(tileId)
-  const player = activePlayer(state)
+  const player = state.players[playerId] ?? activePlayer(state)
   const delta = discoveryGlory(def.type, coord)
   const next = addGlory(state, player.id, delta)
   const events: GameEvent[] = [

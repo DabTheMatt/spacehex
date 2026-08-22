@@ -77,6 +77,8 @@ describe('exploration engine', () => {
     expect(state.movementSpent).toBe(true)
     expect(confirmed.events.some((e) => e.type === 'TURN_ENDED')).toBe(false)
     expect(Object.keys(state.board.tiles)).toHaveLength(2)
+    expect(confirmed.events.some((e) => e.type === 'GLORY_CHANGED')).toBe(true)
+    expect(state.players['player-1'].glory).toBeGreaterThan(0)
 
     const ended = applyCommand(state, { type: 'END_TURN' })
     expect(ended.state.activePlayerId).toBe('player-2')
