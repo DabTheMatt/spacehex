@@ -138,6 +138,7 @@ function onUp(ev: PointerEvent): void {
         return
       }
       ui.inspectPlanet = null
+      ui.mapOverview = false
       scene.camera.clearInspectLimits()
       game.dispatch({ type: 'DECLARE_ATTACK', defenderId: shipHit.shipId })
       ui.threatShipId = null
