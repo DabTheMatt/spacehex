@@ -28,6 +28,7 @@ export interface SceneOptions {
   selectedKey?: string | null
   showExploreGhosts?: boolean
   hover?: BoardHover | null
+  inspectKey?: string | null
 }
 
 export class SpaceScene {
@@ -119,6 +120,11 @@ export class SpaceScene {
   pickBuy(clientX: number, clientY: number): { coord: HexCoord; resource: ResourceId } | null {
     const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
     return userDataFromHits<{ coord: HexCoord; resource: ResourceId }>(hits, 'buyLot') ?? null
+  }
+
+  pickPlanetName(clientX: number, clientY: number): HexCoord | null {
+    const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
+    return userDataFromHits<HexCoord>(hits, 'planetName') ?? null
   }
 
   private beginRise(key: string): void {

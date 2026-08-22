@@ -25,6 +25,8 @@ export interface PlayerState {
   fuel: number
   glory: number
   credits: number
+  buysThisTurn: number
+  salvagesThisTurn: number
 }
 
 export interface ShipState {

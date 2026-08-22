@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { getWorldPosition } from '../../game/board/hexMath'
+import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { palette } from '../theme'
 import { isTypingTarget } from '../../ui/actionHotkeys'
@@ -26,6 +26,8 @@ export class CameraController {
   } | null = null
   private follow: { x: number; z: number } | null = null
   private followReleased = false
+  private inspectLimits = false
+  onBreakInspect: (() => void) | null = null
   mapRotateEnabled = true
   private keys = { w: false, a: false, s: false, d: false, q: false, e: false }
   private lastTick = performance.now()
@@ -76,8 +78,56 @@ export class CameraController {
 
   /** Keep current angle and distance; glide the look-at to a hex. */
   panTo(coord: HexCoord): void {
+    this.clearInspectLimits()
     const { x, z } = getWorldPosition(coord)
     this.glideLookAt(x, z)
+  }
+
+  /**
+   * Top-down inspect: tile fills ~60% of the view, title edge toward screen-bottom.
+   * `nameTheta` is OrbitControls azimuth so the camera sits on the name edge.
+   */
+  inspectPlanet(coord: HexCoord, nameTheta: number): void {
+    const { x, z } = getWorldPosition(coord)
+    const toTarget = new THREE.Vector3(x, 0, z)
+    const phi = 0.1
+    const radius = this.inspectDistance()
+    const toPos = new THREE.Vector3(
+      x + radius * Math.sin(phi) * Math.sin(nameTheta),
+      radius * Math.cos(phi),
+      z + radius * Math.sin(phi) * Math.cos(nameTheta),
+    )
+    this.follow = null
+    this.followReleased = true
+    this.inspectLimits = true
+    this.controls.minPolarAngle = 0.02
+    this.controls.maxPolarAngle = 0.32
+    this.controls.minDistance = 2.2
+    const instant = prefersReducedMotion()
+    this.panAnim = {
+      start: performance.now(),
+      duration: instant ? 0 : CAMERA_FOCUS_MS,
+      fromTarget: this.controls.target.clone(),
+      toTarget,
+      fromPos: this.camera.position.clone(),
+      toPos,
+    }
+  }
+
+  clearInspectLimits(): void {
+    if (!this.inspectLimits) return
+    this.inspectLimits = false
+    this.controls.minPolarAngle = 0.04
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.06
+    this.controls.minDistance = 2.4
+  }
+
+  private inspectDistance(): number {
+    const vFov = (this.camera.fov * Math.PI) / 180
+    const diameter = HEX_SIZE * 2
+    const visibleMinFactor = Math.min(1, this.camera.aspect)
+    const visibleHeight = diameter / 0.6 / visibleMinFactor
+    return visibleHeight / (2 * Math.tan(vFov / 2))
   }
 
   focusPair(a: HexCoord, b: HexCoord): void {
@@ -105,6 +155,7 @@ export class CameraController {
 
   beginPan(clientX: number, clientY: number): void {
     this.releaseFollow()
+    this.breakInspect()
     this.grabbing = true
     this.panX = clientX
     this.panY = clientY
@@ -152,6 +203,7 @@ export class CameraController {
     this.lastTick = now
     if (this.keys.w || this.keys.a || this.keys.s || this.keys.d || this.keys.q || this.keys.e) {
       this.releaseFollow()
+      this.breakInspect()
     }
     this.applyFocusPan(now)
     this.applyWasd(dt)
@@ -171,6 +223,12 @@ export class CameraController {
     this.followReleased = true
     this.follow = null
     this.panAnim = null
+  }
+
+  private breakInspect(): void {
+    if (!this.inspectLimits) return
+    this.clearInspectLimits()
+    this.onBreakInspect?.()
   }
 
   private applyFollow(dt: number): void {

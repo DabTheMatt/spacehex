@@ -14,7 +14,9 @@ import {
   TILE_THICKNESS,
 } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
-import { createPlanetLots } from './planetLots'
+import { createPlanetOverlay } from './planetLots'
+import { buyPrice } from '../../game/rules/planetMarket'
+import { RESOURCE_IDS } from '../../game/definitions/resources'
 import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
 import { canExploreDirection } from '../../game/rules/exploration'
@@ -46,6 +48,7 @@ export class BoardRenderer {
       tileY?: Record<string, number>
       hover?: BoardHover | null
       hideGlyphKeys?: Set<string>
+      inspectKey?: string | null
     },
   ): void {
     this.syncTiles(state, options)
@@ -77,6 +80,7 @@ export class BoardRenderer {
       selectedKey?: string | null
       tileY?: Record<string, number>
       hideGlyphKeys?: Set<string>
+      inspectKey?: string | null
     },
   ): void {
     const keep = new Set<string>()
@@ -86,8 +90,13 @@ export class BoardRenderer {
       const selected = options.selectedKey === key
       const hideGlyph = options.hideGlyphKeys?.has(key) === true
       const market = state.planetMarkets[key]
+      const inspecting = options.inspectKey === key
       const marketSig = market
-        ? market.lots.map((lot) => `${lot.id}:${lot.amount}:${lot.price}`).join(',')
+        ? [
+            market.designation,
+            inspecting ? 'i' : '',
+            market.lots.map((lot) => `${lot.id}:${lot.amount}:${buyPrice(state, lot.id)}`).join(','),
+          ].join(':')
         : ''
       const sig = [
         tile.id,
@@ -118,7 +127,17 @@ export class BoardRenderer {
       mesh.userData.tileKey = key
       const glyph = createTileGlyph(def, palette.paper, tile.id)
       glyph.position.y = TILE_THICKNESS
-      if (market) glyph.add(createPlanetLots(market, tile.coord))
+      if (market) {
+        const prices = Object.fromEntries(
+          RESOURCE_IDS.map((id) => [id, buyPrice(state, id)]),
+        ) as Record<(typeof RESOURCE_IDS)[number], number>
+        glyph.add(
+          createPlanetOverlay(market, tile.coord, {
+            showPrices: inspecting,
+            buyPrice: prices,
+          }),
+        )
+      }
       mesh.userData.glyph = glyph
       mesh.add(glyph)
       this.syncGlyphFade(key, mesh, hideGlyph, true)
@@ -252,6 +271,7 @@ export class BoardRenderer {
 
 function setGlyphOpacity(root: THREE.Object3D, opacity: number): void {
   root.traverse((obj) => {
+    if (obj.userData.pickOnly) return
     const mesh = obj as THREE.Mesh
     const mat = mesh.material
     if (!mat) return

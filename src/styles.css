@@ -129,6 +129,28 @@ body,
   text-transform: uppercase;
 }
 
+.command-bar__cargo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  margin-top: 0.4rem;
+  font-size: var(--font-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cargo--red {
+  color: #c45c4a;
+}
+
+.cargo--green {
+  color: #6a9a62;
+}
+
+.cargo--blue {
+  color: #5a7ea8;
+}
+
 .command-bar__hint {
   margin-top: 0.35rem;
   font-size: var(--font-xs);

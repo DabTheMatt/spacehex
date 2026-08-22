@@ -18,6 +18,7 @@ import { SpaceScene } from '@/renderer/scene/SpaceScene'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { coordKey } from '@/game/board/HexCoord'
+import { planetInspectTheta } from '@/renderer/board/planetLots'
 
 const DRAG_PX = 12
 
@@ -38,6 +39,7 @@ function sync(): void {
     selectedKey: ui.selectedTile ? coordKey(ui.selectedTile) : null,
     showExploreGhosts: true,
     hover: ui.hover,
+    inspectKey: ui.inspectPlanet ? coordKey(ui.inspectPlanet) : null,
   })
 }
 
@@ -116,25 +118,51 @@ function onUp(ev: PointerEvent): void {
     return
   }
 
-  const buy = scene.pickBuy(ev.clientX, ev.clientY)
-  if (buy && game.state.phase === 'PLAYER_TURN') {
-    game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })
+  const name = scene.pickPlanetName(ev.clientX, ev.clientY)
+  if (name && game.state.planetMarkets[coordKey(name)]) {
+    const same =
+      ui.inspectPlanet && ui.inspectPlanet.q === name.q && ui.inspectPlanet.r === name.r
+    if (same) {
+      ui.inspectPlanet = null
+      scene.camera.clearInspectLimits()
+    } else {
+      ui.inspectPlanet = name
+    }
     return
+  }
+
+  if (ui.inspectPlanet) {
+    const buy = scene.pickBuy(ev.clientX, ev.clientY)
+    if (
+      buy &&
+      game.state.phase === 'PLAYER_TURN' &&
+      buy.coord.q === ui.inspectPlanet.q &&
+      buy.coord.r === ui.inspectPlanet.r
+    ) {
+      game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })
+      return
+    }
   }
 
   const hover = scene.pickHover(ev.clientX, ev.clientY)
   if (hover && game.state.phase === 'PLAYER_TURN') {
     if (hover.kind === 'STAY') {
+      ui.inspectPlanet = null
+      scene.camera.clearInspectLimits()
       game.dispatch({ type: 'SKIP_MOVEMENT' })
       ui.hover = null
       return
     }
     if (hover.kind === 'MOVE') {
+      ui.inspectPlanet = null
+      scene.camera.clearInspectLimits()
       game.dispatch({ type: 'DECLARE_MOVE', target: hover.coord })
       ui.hover = null
       return
     }
     if (hover.kind === 'EXPLORE') {
+      ui.inspectPlanet = null
+      scene.camera.clearInspectLimits()
       game.dispatch({ type: 'START_EXPLORATION', direction: hover.direction })
       game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
       ui.hover = null
@@ -144,12 +172,16 @@ function onUp(ev: PointerEvent): void {
 
   const shipHit = scene.pickShip(ev.clientX, ev.clientY)
   if (shipHit) {
+    ui.inspectPlanet = null
+    scene.camera.clearInspectLimits()
     ui.selectedShipId = shipHit.shipId
     ui.selectedTile = null
     return
   }
 
   const tile = scene.pickTile(ev.clientX, ev.clientY)
+  ui.inspectPlanet = null
+  scene.camera.clearInspectLimits()
   ui.selectedTile = tile
   ui.selectedShipId = null
 }
@@ -157,6 +189,9 @@ function onUp(ev: PointerEvent): void {
 onMounted(() => {
   if (!canvasEl.value) return
   scene = new SpaceScene(canvasEl.value)
+  scene.camera.onBreakInspect = () => {
+    ui.inspectPlanet = null
+  }
   scene.preview.onRevealed = null
   resize()
   ui.selectedShipId = game.ship.id
@@ -176,6 +211,8 @@ watch(
     if (!scene) return
     scene.handleEvents(events, game.state)
     if (events.some((event) => event.type === 'TURN_ENDED')) {
+      ui.inspectPlanet = null
+      scene.camera.clearInspectLimits()
       scene.camera.panTo(game.ship.coord)
     }
     sync()
@@ -191,6 +228,7 @@ watch(
     ui.selectedTile,
     ui.selectedShipId,
     ui.hover,
+    ui.inspectPlanet,
   ],
   () => sync(),
   { deep: true },
@@ -202,6 +240,21 @@ watch(
     ui.selectedShipId = game.ship.id
     ui.selectedTile = null
     ui.hover = null
+    ui.inspectPlanet = null
+  },
+)
+
+watch(
+  () => ui.inspectPlanet,
+  (coord) => {
+    if (!scene) return
+    if (!coord) {
+      scene.camera.clearInspectLimits()
+      return
+    }
+    const tile = game.state.board.tiles[coordKey(coord)]
+    if (!tile) return
+    scene.camera.inspectPlanet(coord, planetInspectTheta(tile.rotation))
   },
 )
 </script>

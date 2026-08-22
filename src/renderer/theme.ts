@@ -16,6 +16,9 @@ export const palette = {
   planetViolet: 0xa898b0,
   planetRose: 0xb8948c,
   planetSage: 0x8f9a8a,
+  resourceRed: 0xc45c4a,
+  resourceGreen: 0x6a9a62,
+  resourceBlue: 0x5a7ea8,
 }
 
 export const css = {
@@ -30,4 +33,7 @@ export const css = {
   engine: '#7EC8FF',
   player1: '#B58A4B',
   player2: '#6D8398',
+  resourceRed: '#C45C4A',
+  resourceGreen: '#6A9A62',
+  resourceBlue: '#5A7EA8',
 }

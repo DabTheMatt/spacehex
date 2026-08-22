@@ -51,6 +51,8 @@ export function createInitialState(seed: string): GameState {
       fuel: STARTING_FUEL,
       glory: 0,
       credits: STARTING_CREDITS,
+      buysThisTurn: 0,
+      salvagesThisTurn: 0,
     },
     'player-2': {
       id: 'player-2',
@@ -59,6 +61,8 @@ export function createInitialState(seed: string): GameState {
       fuel: STARTING_FUEL,
       glory: 0,
       credits: STARTING_CREDITS,
+      buysThisTurn: 0,
+      salvagesThisTurn: 0,
     },
   }
 
@@ -403,10 +407,8 @@ function buyResourceCommand(
   const result = buyResource(state, coord, resource)
   if (!result.ok) return reject(state, 'BUY_RESOURCE', result.reason)
   const player = activePlayer(result.state)
-  const lotPrice =
-    state.planetMarkets[coordKey(coord)]?.lots.find((item) => item.id === resource)?.price ?? 0
   const events: GameEvent[] = [
-    { type: 'RESOURCE_BOUGHT', playerId: player.id, resource, price: lotPrice, coord },
+    { type: 'RESOURCE_BOUGHT', playerId: player.id, resource, price: result.price, coord },
     { type: 'CREDITS_CHANGED', playerId: player.id, credits: player.credits },
   ]
   return { state: append(result.state, events), events }
@@ -427,6 +429,7 @@ function endTurn(state: GameState): EngineResult {
   if (nextIndex === 0) {
     events.push({ type: 'ROUND_STARTED', round: newRound })
   }
+  const nextPlayer = state.players[nextPlayerId]
   const next = append(
     {
       ...state,
@@ -435,6 +438,10 @@ function endTurn(state: GameState): EngineResult {
       movementSpent: false,
       exploration: { status: 'NONE' },
       phase: 'PLAYER_TURN',
+      players: {
+        ...state.players,
+        [nextPlayerId]: { ...nextPlayer, buysThisTurn: 0, salvagesThisTurn: 0 },
+      },
     },
     events,
   )

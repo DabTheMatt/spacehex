@@ -1,9 +1,11 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
+import { useUiStore } from '@/stores/uiStore'
 import { actionHotkey, isTypingTarget } from './actionHotkeys'
 
 export function useGameHotkeys(): void {
   const game = useGameStore()
+  const ui = useUiStore()
 
   function onKey(ev: KeyboardEvent): void {
     if (ev.repeat || isTypingTarget(ev.target)) return
@@ -24,6 +26,10 @@ export function useGameHotkeys(): void {
 
     if (ev.key === 'Escape') {
       ev.preventDefault()
+      if (ui.inspectPlanet) {
+        ui.inspectPlanet = null
+        return
+      }
       game.dispatch({ type: 'CANCEL_SELECTION' })
       return
     }
