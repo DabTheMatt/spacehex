@@ -155,6 +155,13 @@ export class ShipRenderer {
       wrapper.rotation.y = yaw
       wrapper.position.set(last.x, BASE_HOVER, last.z)
       wrapper.userData.shipId = ship.id
+      wrapper.userData.hullHeight = HULL_HEIGHT
+      const player = state.players[ship.playerId]
+      if (active && player) {
+        const callout = createActiveCallout(`SG-${playerNo}`, player.fuel, ship.hull, ship.maxHull, player.glory)
+        wrapper.add(callout)
+        wrapper.userData.callout = callout
+      }
       wrapper.userData.shipCoord = coord
       this.group.add(wrapper)
       this.maybeSlide(ship.id, last, target)
@@ -162,8 +169,13 @@ export class ShipRenderer {
     this.applyMotion(performance.now())
   }
 
-  tick(_time: number): boolean {
-    return this.applyMotion(performance.now())
+  tick(camera: THREE.Camera): boolean {
+    const settled = this.applyMotion(performance.now())
+    for (const child of this.group.children) {
+      const callout = child.userData.callout as THREE.Group | undefined
+      if (callout) layoutCallout(child, callout, camera)
+    }
+    return settled
   }
 
   pickables(): THREE.Object3D[] {
@@ -349,11 +361,8 @@ function createNavMarker(
   hull.rotation.x = -Math.PI / 2
   g.add(hull)
 
-  const sideY = HULL_HEIGHT * 0.52
-  const sideZ = 0.02
-  const sideX = half * 0.62
-  g.add(createHullNumber(label, new THREE.Vector3(sideX, sideY, sideZ), Math.PI / 2))
-  g.add(createHullNumber(label, new THREE.Vector3(-sideX, sideY, sideZ), -Math.PI / 2))
+  g.add(hullMark(label, length, half, true))
+  g.add(hullMark(label, length, half, false))
 
   const y = HULL_HEIGHT * 0.45
   const main = makeEnginePlume(
@@ -441,7 +450,29 @@ function setPlume(group: THREE.Group, intensity: number, lengthScale: number): v
   group.visible = lit > 0.03
 }
 
-function createHullNumber(label: string, position: THREE.Vector3, yaw: number): THREE.Mesh {
+function hullMark(label: string, length: number, half: number, port: boolean): THREE.Mesh {
+  const y = HULL_HEIGHT * 0.5
+  const nose = new THREE.Vector3(0, y, length * 0.5)
+  const stern = new THREE.Vector3(port ? -half : half, y, -length * 0.5)
+  const mid = nose.clone().add(stern).multiplyScalar(0.5)
+  const along = stern.clone().sub(nose).normalize()
+  const up = new THREE.Vector3(0, 1, 0)
+  const outward = new THREE.Vector3().crossVectors(along, up).normalize()
+  if ((port && outward.x > 0) || (!port && outward.x < 0)) outward.negate()
+  mid.addScaledVector(outward, 0.006)
+
+  const edge = Math.hypot(half, length)
+  const width = Math.min(0.2, edge * 0.42)
+  const height = HULL_HEIGHT * 0.7
+  const mesh = createHullNumber(label, width, height)
+  const xAxis = new THREE.Vector3().crossVectors(up, outward).normalize()
+  const yAxis = new THREE.Vector3().crossVectors(outward, xAxis).normalize()
+  mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, outward))
+  mesh.position.copy(mid)
+  return mesh
+}
+
+function createHullNumber(label: string, width: number, height: number): THREE.Mesh {
   const canvas = document.createElement('canvas')
   canvas.width = 256
   canvas.height = 96
@@ -449,23 +480,122 @@ function createHullNumber(label: string, position: THREE.Vector3, yaw: number): 
   if (ctx) {
     ctx.clearRect(0, 0, 256, 96)
     ctx.fillStyle = css.ink
-    ctx.font = '700 56px "IBM Plex Mono", monospace'
+    ctx.font = '700 52px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(label, 128, 52)
+    ctx.fillText(label, 128, 50)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
-  const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.2, 0.075),
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
     new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
       depthWrite: false,
-      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
     }),
   )
-  mesh.position.copy(position)
-  mesh.rotation.y = yaw
-  return mesh
+}
+
+function createActiveCallout(label: string, fuel: number, hull: number, maxHull: number, glory: number): THREE.Group {
+  const g = new THREE.Group()
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: makeCalloutTexture(label, fuel, hull, maxHull, glory),
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+    }),
+  )
+  sprite.center.set(0, 0)
+  sprite.scale.set(0.72, 0.42, 1)
+  g.add(sprite)
+
+  const line = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0.4, 0.5, 0)]),
+    new THREE.LineBasicMaterial({
+      color: palette.ivory,
+      transparent: true,
+      opacity: 0.55,
+      depthTest: false,
+    }),
+  )
+  g.add(line)
+  g.userData.calloutSprite = sprite
+  g.userData.calloutLine = line
+  return g
+}
+
+function layoutCallout(ship: THREE.Object3D, callout: THREE.Group, camera: THREE.Camera): void {
+  const sprite = callout.userData.calloutSprite as THREE.Sprite
+  const line = callout.userData.calloutLine as THREE.Line
+  if (!sprite || !line) return
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0)
+  if (right.lengthSq() < 1e-8) right.set(1, 0, 0)
+  else right.normalize()
+  const localRight = right.clone().applyQuaternion(ship.quaternion.clone().invert())
+  const localUp = new THREE.Vector3(0, 1, 0)
+  const origin = new THREE.Vector3(0, HULL_HEIGHT + 0.02, 0)
+  const card = origin.clone().addScaledVector(localRight, 0.55).addScaledVector(localUp, 0.48)
+  sprite.position.copy(card)
+  const geom = line.geometry as THREE.BufferGeometry
+  geom.setFromPoints([origin, card])
+  geom.computeBoundingSphere()
+}
+
+function makeCalloutTexture(
+  label: string,
+  fuel: number,
+  hull: number,
+  maxHull: number,
+  glory: number,
+): THREE.CanvasTexture {
+  const w = 256
+  const h = 148
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    ctx.clearRect(0, 0, w, h)
+    ctx.strokeStyle = '#D8D0BD'
+    ctx.lineWidth = 2
+    ctx.strokeRect(10, 10, w - 20, h - 20)
+    ctx.fillStyle = '#D8D0BD'
+    ctx.font = '600 28px "IBM Plex Mono", monospace'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, 24, 38)
+    drawPips(ctx, 24, 72, 6, fuel, 14, 6)
+    drawPips(ctx, 24, 94, Math.max(1, maxHull), hull, 14, 6)
+    drawPips(ctx, 24, 116, Math.max(glory, 1), glory, 10, 5)
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.needsUpdate = true
+  return tex
+}
+
+function drawPips(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  count: number,
+  filled: number,
+  size: number,
+  gap: number,
+): void {
+  for (let i = 0; i < count; i++) {
+    const px = x + i * (size + gap)
+    ctx.beginPath()
+    ctx.rect(px, y - size / 2, size, size * 0.35)
+    if (i < filled) ctx.fill()
+    else {
+      ctx.strokeStyle = '#D8D0BD'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+    }
+  }
 }

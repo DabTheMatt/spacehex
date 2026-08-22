@@ -74,18 +74,13 @@ export class SpaceScene {
     this.lastState = state
     this.lastOptions = options
     this.camera.mapRotateEnabled = true
-    this.camera.setOrbitEnabled(true)
     this.applySync()
   }
 
-  handleEvents(events: GameEvent[], state: GameState): void {
+  handleEvents(events: GameEvent[], _state: GameState): void {
     for (const event of events) {
       if (event.type === 'GAME_STARTED') {
         this.camera.focus({ q: 0, r: 0 })
-      }
-      if (event.type === 'TURN_ENDED') {
-        const ship = state.ships[state.players[state.activePlayerId]?.shipId ?? '']
-        if (ship) this.camera.focus(ship.coord)
       }
     }
   }
@@ -208,7 +203,7 @@ export class SpaceScene {
     const time = now / 1000
     this.board.tick(time)
     this.preview.tick(time)
-    const shipsSettled = this.ships.tick(time)
+    const shipsSettled = this.ships.tick(this.camera.camera)
     this.hoverTargets.tick(this.camera.camera)
     if (shipsSettled) this.applySync()
     this.camera.tick()

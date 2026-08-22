@@ -12,9 +12,9 @@ export class CameraController {
   readonly camera: THREE.PerspectiveCamera
   readonly controls: OrbitControls
   private readonly canvas: HTMLCanvasElement
-  private readonly raycaster = new THREE.Raycaster()
-  private readonly ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
-  private grab: THREE.Vector3 | null = null
+  private panX = 0
+  private panY = 0
+  private grabbing = false
   mapRotateEnabled = true
   private keys = { w: false, a: false, s: false, d: false, q: false, e: false }
   private lastTick = performance.now()
@@ -26,7 +26,7 @@ export class CameraController {
     this.controls = new OrbitControls(this.camera, canvas)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.08
-    this.controls.minDistance = 1.2
+    this.controls.minDistance = 2.4
     this.controls.maxDistance = 140
     this.controls.minPolarAngle = 0.04
     this.controls.maxPolarAngle = Math.PI / 2 - 0.06
@@ -63,26 +63,41 @@ export class CameraController {
   }
 
   beginPan(clientX: number, clientY: number): void {
-    this.grab = this.groundPoint(clientX, clientY)
-    if (this.grab) this.canvas.style.cursor = 'grabbing'
+    this.grabbing = true
+    this.panX = clientX
+    this.panY = clientY
+    this.controls.enableRotate = false
+    this.canvas.style.cursor = 'grabbing'
   }
 
   updatePan(clientX: number, clientY: number): void {
-    if (!this.grab) return
-    const now = this.groundPoint(clientX, clientY)
-    if (!now) return
-    const delta = this.grab.clone().sub(now)
-    this.camera.position.add(delta)
-    this.controls.target.add(delta)
+    if (!this.grabbing) return
+    const dx = clientX - this.panX
+    const dy = clientY - this.panY
+    this.panX = clientX
+    this.panY = clientY
+    const dist = this.camera.position.distanceTo(this.controls.target)
+    const vFov = (this.camera.fov * Math.PI) / 180
+    const worldPerPx = (2 * dist * Math.tan(vFov / 2)) / Math.max(1, this.canvas.clientHeight)
+    const forward = new THREE.Vector3()
+    this.camera.getWorldDirection(forward)
+    forward.y = 0
+    if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1)
+    else forward.normalize()
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize()
+    const move = right.multiplyScalar(-dx * worldPerPx).addScaledVector(forward, dy * worldPerPx)
+    this.camera.position.add(move)
+    this.controls.target.add(move)
   }
 
   endPan(): void {
-    this.grab = null
+    this.grabbing = false
+    this.controls.enableRotate = true
     this.canvas.style.cursor = 'grab'
   }
 
   get panning(): boolean {
-    return this.grab !== null
+    return this.grabbing
   }
 
   setOrbitEnabled(enabled: boolean): void {
@@ -95,7 +110,7 @@ export class CameraController {
     this.lastTick = now
     this.applyWasd(dt)
     this.applyMapRotate(dt)
-    this.controls.update()
+    if (!this.grabbing) this.controls.update()
   }
 
   dispose(): void {
@@ -135,18 +150,6 @@ export class CameraController {
     const offset = this.controls.target.clone().sub(eye)
     offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
     this.controls.target.copy(eye).add(offset)
-  }
-
-  private groundPoint(clientX: number, clientY: number): THREE.Vector3 | null {
-    const rect = this.canvas.getBoundingClientRect()
-    const ndc = new THREE.Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -((clientY - rect.top) / rect.height) * 2 + 1,
-    )
-    this.raycaster.setFromCamera(ndc, this.camera)
-    const hit = new THREE.Vector3()
-    if (!this.raycaster.ray.intersectPlane(this.ground, hit)) return null
-    return hit
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {

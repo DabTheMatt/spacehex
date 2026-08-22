@@ -100,8 +100,8 @@ function onMove(ev: PointerEvent): void {
     const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY)
     if (!dragging && dist > DRAG_PX) {
       dragging = true
-      scene.camera.beginPan(downX, downY)
-      scene.camera.updatePan(ev.clientX, ev.clientY)
+      scene.camera.setOrbitEnabled(false)
+      scene.camera.beginPan(ev.clientX, ev.clientY)
       return
     }
     if (dragging) scene.camera.updatePan(ev.clientX, ev.clientY)
@@ -115,6 +115,7 @@ function onUp(ev: PointerEvent): void {
   const wasDrag = dragging
   if (ev.button === 0) {
     scene.camera.endPan()
+    scene.camera.setOrbitEnabled(true)
     canvasEl.value?.releasePointerCapture(ev.pointerId)
   }
   dragging = false
