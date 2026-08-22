@@ -2,14 +2,14 @@
   <aside v-if="info" class="tile-info">
     <h2>{{ info.label }}</h2>
     <dl>
-      <div><dt>Typ</dt><dd>{{ info.type }}</dd></div>
-      <div><dt>Pole</dt><dd>{{ info.key }}</dd></div>
-      <div><dt>Orientacja</dt><dd>{{ info.rotationDeg }}°</dd></div>
-      <div><dt>Odkrył</dt><dd>{{ info.discovered }}</dd></div>
-      <div><dt>Statki</dt><dd>{{ info.ships }}</dd></div>
+      <div><dt>Type</dt><dd>{{ info.type }}</dd></div>
+      <div><dt>Hex</dt><dd>{{ info.key }}</dd></div>
+      <div><dt>Orientation</dt><dd>{{ info.rotationDeg }}°</dd></div>
+      <div><dt>Discovered by</dt><dd>{{ info.discovered }}</dd></div>
+      <div><dt>Ships</dt><dd>{{ info.ships }}</dd></div>
     </dl>
     <p class="tiny">{{ info.note }}</p>
-    <button type="button" @click="ui.selectedTile = null">ZAMKNIJ</button>
+    <button type="button" @click="ui.selectedTile = null">CLOSE</button>
   </aside>
 </template>
 
@@ -44,9 +44,9 @@ const info = computed(() => {
     type: def.type,
     key,
     rotationDeg: tile.rotation * 60,
-    discovered: `${discoverer}${tile.discoveredRound != null ? ` · runda ${tile.discoveredRound}` : ''}`,
+    discovered: `${discoverer}${tile.discoveredRound != null ? ` · round ${tile.discoveredRound}` : ''}`,
     ships: ships.length ? ships.join(', ') : '—',
-    note: 'TODO RULE CLARIFICATION T7: efekt sektora nie jest jeszcze zdefiniowany.',
+    note: 'TODO RULE CLARIFICATION T7: sector effect is not defined yet.',
   }
 })
 </script>

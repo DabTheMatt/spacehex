@@ -9,6 +9,6 @@ export interface ShipDefinition {
 
 export const SHIP_DEFINITIONS: Record<ShipClass, ShipDefinition> = {
   MEWA: { id: 'MEWA', label: 'Mewa', symbol: '△', hull: 3 },
-  CIERN: { id: 'CIERN', label: 'Cierń', symbol: '◆', hull: 3 },
-  DRZAZGA: { id: 'DRZAZGA', label: 'Drzazga', symbol: '▲', hull: 2 },
+  CIERN: { id: 'CIERN', label: 'Thorn', symbol: '◆', hull: 3 },
+  DRZAZGA: { id: 'DRZAZGA', label: 'Splinter', symbol: '▲', hull: 2 },
 }

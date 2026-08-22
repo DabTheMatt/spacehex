@@ -81,9 +81,15 @@ export class SpaceScene {
   handleEvents(events: GameEvent[], _state: GameState): void {
     for (const event of events) {
       if (event.type === 'GAME_STARTED') {
+        this.resetSession()
         this.camera.focus({ q: 0, r: 0 })
       }
     }
+  }
+
+  pickPlacement(clientX: number, clientY: number): boolean {
+    const hits = this.intersectAll(clientX, clientY, this.preview.group.children)
+    return userDataFromHits<boolean>(hits, 'placementTarget') === true
   }
 
   pickHover(clientX: number, clientY: number): BoardHover | null {
@@ -199,6 +205,17 @@ export class SpaceScene {
     this.disposed = true
     this.camera.dispose()
     this.renderer.dispose()
+  }
+
+  private resetSession(): void {
+    this.primed = false
+    this.prevShipCoords.clear()
+    this.prevTileKeys.clear()
+    this.riseByKey.clear()
+    this.tileY = {}
+    this.flightsByTile.clear()
+    this.hideGlyphKeys.clear()
+    this.ships.reset()
   }
 
   private loop = (): void => {

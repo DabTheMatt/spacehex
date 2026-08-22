@@ -83,6 +83,14 @@ export class ShipRenderer {
     return list
   }
 
+  reset(): void {
+    this.motion.clear()
+    this.facing.clear()
+    this.lastXZ.clear()
+    this.landed = []
+    this.group.clear()
+  }
+
   /** World XZ of a ship currently in flight, if any. */
   flyingWorld(): { x: number; z: number } | null {
     for (const child of this.group.children) {

@@ -76,6 +76,11 @@ body,
   font-weight: 500;
 }
 
+.global-status__new {
+  pointer-events: auto;
+  font-size: var(--font-xs);
+}
+
 .command-bar {
   position: absolute;
   left: 0;

@@ -28,5 +28,6 @@ Po włączeniu GitHub Pages (Actions → workflow *Deploy GitHub Pages*) aplikac
 
 - Kamera: LPM przeciągnij mapę (punkt pod kursorem jedzie z myszą) · WASD · scroll zoom · PPM orbit
 - Dev panel: `` ` ``
-- Eksploracja: **EKSPLORACJA** → klik znacznika przy krawędzi
-- Obrót kafla: **Q** / **E** (lub **R**), **Enter** zatwierdza
+- Explore: **EXPLORE** → click an edge marker
+- Rotate tile: **Q** / **E**, then **click the hex** to place
+- New game: **NEW GAME**

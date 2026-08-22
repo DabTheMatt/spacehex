@@ -105,7 +105,7 @@ const params = computed(() => {
 
 const hint = computed(() => {
   if (mode.value === 'MOVE_TARGETING' || mode.value === 'EXPLORE_EDGE_SELECTION') return 'ESC  CANCEL'
-  if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE   ·   ENTER  CONFIRM'
+  if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE   ·   CLICK HEX TO PLACE'
   return ''
 })
 
@@ -147,15 +147,6 @@ const actions = computed(() => {
         muted: false,
         disabled: false,
         run: () => game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' }),
-      },
-      {
-        id: 'enter',
-        num: 'ENT',
-        label: 'CONFIRM',
-        accent: true,
-        muted: false,
-        disabled: false,
-        run: () => game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' }),
       },
     ]
   }

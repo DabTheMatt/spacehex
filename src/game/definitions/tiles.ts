@@ -16,28 +16,28 @@ function def(
 export const TILE_DEFINITIONS: Record<string, TileDefinition> = {
   'eva-1': def('eva-1', 'EVA_1', 'EVA-1', 'EVA'),
 
-  'void-1': def('void-1', 'VOID', 'Pustka', '+'),
-  'void-2': def('void-2', 'VOID', 'Pustka', '+'),
-  'void-3': def('void-3', 'VOID', 'Pustka', '+'),
-  'void-4': def('void-4', 'VOID', 'Pustka', '+'),
-  'void-5': def('void-5', 'VOID', 'Pustka', '+'),
+  'void-1': def('void-1', 'VOID', 'Void', '+'),
+  'void-2': def('void-2', 'VOID', 'Void', '+'),
+  'void-3': def('void-3', 'VOID', 'Void', '+'),
+  'void-4': def('void-4', 'VOID', 'Void', '+'),
+  'void-5': def('void-5', 'VOID', 'Void', '+'),
 
-  'planet-large-1': def('planet-large-1', 'PLANET_LARGE', 'Planeta duża', '○L'),
-  'planet-large-2': def('planet-large-2', 'PLANET_LARGE', 'Planeta duża', '○L'),
-  'planet-large-3': def('planet-large-3', 'PLANET_LARGE', 'Planeta duża', '○L'),
+  'planet-large-1': def('planet-large-1', 'PLANET_LARGE', 'Large Planet', '○L'),
+  'planet-large-2': def('planet-large-2', 'PLANET_LARGE', 'Large Planet', '○L'),
+  'planet-large-3': def('planet-large-3', 'PLANET_LARGE', 'Large Planet', '○L'),
 
-  'planet-medium-1': def('planet-medium-1', 'PLANET_MEDIUM', 'Planeta średnia', '○'),
-  'planet-medium-2': def('planet-medium-2', 'PLANET_MEDIUM', 'Planeta średnia', '○'),
-  'planet-medium-3': def('planet-medium-3', 'PLANET_MEDIUM', 'Planeta średnia', '○'),
-  'planet-medium-4': def('planet-medium-4', 'PLANET_MEDIUM', 'Planeta średnia', '○'),
+  'planet-medium-1': def('planet-medium-1', 'PLANET_MEDIUM', 'Medium Planet', '○'),
+  'planet-medium-2': def('planet-medium-2', 'PLANET_MEDIUM', 'Medium Planet', '○'),
+  'planet-medium-3': def('planet-medium-3', 'PLANET_MEDIUM', 'Medium Planet', '○'),
+  'planet-medium-4': def('planet-medium-4', 'PLANET_MEDIUM', 'Medium Planet', '○'),
 
-  'planet-small-1': def('planet-small-1', 'PLANET_SMALL', 'Planeta mała', 'o'),
-  'planet-small-2': def('planet-small-2', 'PLANET_SMALL', 'Planeta mała', 'o'),
-  'planet-small-3': def('planet-small-3', 'PLANET_SMALL', 'Planeta mała', 'o'),
-  'planet-small-4': def('planet-small-4', 'PLANET_SMALL', 'Planeta mała', 'o'),
-  'planet-small-5': def('planet-small-5', 'PLANET_SMALL', 'Planeta mała', 'o'),
+  'planet-small-1': def('planet-small-1', 'PLANET_SMALL', 'Small Planet', 'o'),
+  'planet-small-2': def('planet-small-2', 'PLANET_SMALL', 'Small Planet', 'o'),
+  'planet-small-3': def('planet-small-3', 'PLANET_SMALL', 'Small Planet', 'o'),
+  'planet-small-4': def('planet-small-4', 'PLANET_SMALL', 'Small Planet', 'o'),
+  'planet-small-5': def('planet-small-5', 'PLANET_SMALL', 'Small Planet', 'o'),
 
-  'asteroid-1': def('asteroid-1', 'ASTEROID', 'Asteroidy', '•••', [
+  'asteroid-1': def('asteroid-1', 'ASTEROID', 'Asteroids', '•••', [
     'ASTEROID',
     'OPEN',
     'ASTEROID',
@@ -45,7 +45,7 @@ export const TILE_DEFINITIONS: Record<string, TileDefinition> = {
     'ASTEROID',
     'OPEN',
   ]),
-  'asteroid-2': def('asteroid-2', 'ASTEROID', 'Asteroidy', '•••', [
+  'asteroid-2': def('asteroid-2', 'ASTEROID', 'Asteroids', '•••', [
     'OPEN',
     'ASTEROID',
     'OPEN',
@@ -53,7 +53,7 @@ export const TILE_DEFINITIONS: Record<string, TileDefinition> = {
     'OPEN',
     'ASTEROID',
   ]),
-  'asteroid-3': def('asteroid-3', 'ASTEROID', 'Asteroidy', '•••', [
+  'asteroid-3': def('asteroid-3', 'ASTEROID', 'Asteroids', '•••', [
     'ASTEROID',
     'ASTEROID',
     'OPEN',
@@ -62,7 +62,7 @@ export const TILE_DEFINITIONS: Record<string, TileDefinition> = {
     'OPEN',
   ]),
 
-  'shadow-base-1': def('shadow-base-1', 'SHADOW_BASE', 'Baza Cieni', '□', [
+  'shadow-base-1': def('shadow-base-1', 'SHADOW_BASE', 'Shadow Base', '□', [
     'GATE',
     'OPEN',
     'OPEN',
@@ -71,15 +71,15 @@ export const TILE_DEFINITIONS: Record<string, TileDefinition> = {
     'OPEN',
   ]),
 
-  'wreck-tanker-1': def('wreck-tanker-1', 'WRECK_TANKER', 'Dryfujący tankowiec', '⊏'),
+  'wreck-tanker-1': def('wreck-tanker-1', 'WRECK_TANKER', 'Drifting Tanker', '⊏'),
   'wreck-transport-1': def(
     'wreck-transport-1',
     'WRECK_TRANSPORT',
-    'Rozbity transportowiec',
+    'Wrecked Transport',
     '⊐',
   ),
 
-  'black-hole-1': def('black-hole-1', 'BLACK_HOLE', 'Czarna dziura', '●', [
+  'black-hole-1': def('black-hole-1', 'BLACK_HOLE', 'Black Hole', '●', [
     'SPECIAL',
     'SPECIAL',
     'SPECIAL',

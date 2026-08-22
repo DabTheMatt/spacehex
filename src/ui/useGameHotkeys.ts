@@ -19,10 +19,6 @@ export function useGameHotkeys(): void {
         game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' })
         return
       }
-      if (ev.code === 'KeyF' || ev.key === 'Enter') {
-        ev.preventDefault()
-        game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
-      }
       return
     }
 

@@ -43,14 +43,14 @@ export function createInitialState(seed: string): GameState {
   const players: GameState['players'] = {
     'player-1': {
       id: 'player-1',
-      name: 'Gracz 1',
+      name: 'Player 1',
       shipId: 'mewa-1',
       fuel: STARTING_FUEL,
       glory: 0,
     },
     'player-2': {
       id: 'player-2',
-      name: 'Gracz 2',
+      name: 'Player 2',
       shipId: 'mewa-2',
       fuel: STARTING_FUEL,
       glory: 0,

@@ -25,7 +25,14 @@ export class TilePreviewRenderer {
       return
     }
     const key = `${coordKey(exp.target)}:${exp.pendingTileId}`
-    if (this.placedKey === key) return
+    if (this.placedKey === key) {
+      const mesh = this.group.children[0]
+      if (mesh) {
+        mesh.rotation.y = (exp.rotation ?? 0) * (Math.PI / 3)
+        mesh.userData.placementTarget = true
+      }
+      return
+    }
     this.group.clear()
     this.placedKey = key
     this.revealed = false
@@ -41,6 +48,8 @@ export class TilePreviewRenderer {
     })
     mesh.position.set(pos.x, TILE_SLOT_Y, pos.z)
     mesh.rotation.y = (exp.rotation ?? 0) * (Math.PI / 3)
+    mesh.userData.placementTarget = true
+    mesh.userData.tileCoord = exp.target
     this.group.add(mesh)
     this.applyOpacity(0.04)
   }

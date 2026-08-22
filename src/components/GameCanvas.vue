@@ -126,6 +126,13 @@ function onUp(ev: PointerEvent): void {
     return
   }
 
+  if (game.state.phase === 'TILE_PLACEMENT') {
+    if (scene.pickPlacement(ev.clientX, ev.clientY)) {
+      game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
+    }
+    return
+  }
+
   if (ev.button === 0 && ui.hover && !previewBusy()) {
     confirmHover()
     return
