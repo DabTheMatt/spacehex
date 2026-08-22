@@ -13,6 +13,7 @@ export const useUiStore = defineStore('ui', () => {
 
   const selectedShipId = ref<string | null>('mewa-1')
   const hover = ref<BoardHover | null>(null)
+  const threatShipId = ref<string | null>(null)
   const hoverRotation = ref(0)
   const inspectPlanet = ref<HexCoord | null>(null)
   const mapOverview = ref(false)
@@ -39,6 +40,7 @@ export const useUiStore = defineStore('ui', () => {
     selectedTile,
     selectedShipId,
     hover,
+    threatShipId,
     hoverRotation,
     inspectPlanet,
     mapOverview,

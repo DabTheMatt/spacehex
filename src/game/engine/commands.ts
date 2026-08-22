@@ -9,6 +9,7 @@ export type GameCommand =
   | { type: 'BEGIN_EXPLORATION' }
   | { type: 'CANCEL_SELECTION' }
   | { type: 'DECLARE_MOVE'; target: HexCoord }
+  | { type: 'DECLARE_ATTACK'; defenderId: string }
   | { type: 'START_EXPLORATION'; direction: number }
   | { type: 'ROTATE_PENDING_TILE'; direction: 'LEFT' | 'RIGHT' }
   | { type: 'CONFIRM_TILE_PLACEMENT' }

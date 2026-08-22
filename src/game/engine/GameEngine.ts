@@ -15,7 +15,7 @@ import { FUEL_COST_EXPLORE, FUEL_COST_MOVE, FUEL_COST_SKIP } from '../definition
 import { activePlayer, activeShip, spendFuel } from '../rules/fuel'
 import { canMoveTo } from '../rules/movement'
 import { canExploreDirection } from '../rules/exploration'
-import { resolveCombatOnEntry } from '../rules/combat'
+import { resolveDeclaredCombat, canDeclareAttack } from '../rules/combat'
 import { resolveDiscovery, addGlory } from '../rules/glory'
 import { buyResource, sellResource, stockPlanetIfNeeded } from '../rules/planetMarket'
 import { rollSectorName } from '../definitions/sectorNames'
@@ -55,6 +55,7 @@ export function createInitialState(seed: string): GameState {
       credits: STARTING_CREDITS,
       buysThisTurn: 0,
       salvagesThisTurn: 0,
+      attacksThisTurn: 0,
     },
     'player-2': {
       id: 'player-2',
@@ -65,6 +66,7 @@ export function createInitialState(seed: string): GameState {
       credits: STARTING_CREDITS,
       buysThisTurn: 0,
       salvagesThisTurn: 0,
+      attacksThisTurn: 0,
     },
   }
 
@@ -136,6 +138,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return cancelSelection(state)
     case 'DECLARE_MOVE':
       return declareMove(state, command.target)
+    case 'DECLARE_ATTACK':
+      return declareAttack(state, command.defenderId)
     case 'START_EXPLORATION':
       return startExploration(state, command.direction)
     case 'ROTATE_PENDING_TILE':
@@ -389,10 +393,15 @@ function moveShip(state: GameState, target: HexCoord, fuelCost: number): EngineR
     fuel: next.players[activePlayer(state).id].fuel,
   }
   next = append(next, [moveEvent, fuelEvent])
-  const combat = resolveCombatOnEntry(next, ship.id, target)
-  next = combat.state
-  next = append(next, combat.events)
-  return { state: next, events: [moveEvent, fuelEvent, ...combat.events] }
+  return { state: next, events: [moveEvent, fuelEvent] }
+}
+
+function declareAttack(state: GameState, defenderId: string): EngineResult {
+  const check = canDeclareAttack(state, defenderId)
+  if (!check.ok) return reject(state, 'DECLARE_ATTACK', check.reason)
+  const combat = resolveDeclaredCombat(state, defenderId)
+  const next = append(combat.state, combat.events)
+  return { state: next, events: combat.events }
 }
 
 function skipMovement(state: GameState): EngineResult {
@@ -490,7 +499,7 @@ function endTurn(state: GameState): EngineResult {
       phase: 'PLAYER_TURN',
       players: {
         ...state.players,
-        [nextPlayerId]: { ...nextPlayer, buysThisTurn: 0, salvagesThisTurn: 0 },
+        [nextPlayerId]: { ...nextPlayer, buysThisTurn: 0, salvagesThisTurn: 0, attacksThisTurn: 0 },
       },
     },
     events,

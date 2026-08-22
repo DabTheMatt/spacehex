@@ -76,6 +76,8 @@ export class ShipRenderer {
   private visualPark = new Map<string, HexCoord>()
   private landed: HexCoord[] = []
   private hubTime = 0
+  private duel = new Map<string, { x: number; z: number; yaw: number }>()
+  private threatShipId: string | null = null
 
   isBusy(shipId: string): boolean {
     const motion = this.motion.get(shipId)
@@ -95,12 +97,38 @@ export class ShipRenderer {
     return list
   }
 
+  anySliding(): boolean {
+    for (const motion of this.motion.values()) {
+      if (motion.kind === 'slide') return true
+    }
+    return false
+  }
+
+  setDuel(attackerId: string, defenderId: string, coord: HexCoord): void {
+    const pos = getWorldPosition(coord)
+    this.duel.set(attackerId, { x: pos.x - RIM, z: pos.z, yaw: Math.PI / 2 })
+    this.duel.set(defenderId, { x: pos.x + RIM, z: pos.z, yaw: -Math.PI / 2 })
+  }
+
+  clearDuel(): void {
+    this.duel.clear()
+  }
+
+  setThreat(shipId: string | null): void {
+    this.threatShipId = shipId
+    for (const child of this.group.children) {
+      tintThreat(child, child.userData.shipId === shipId)
+    }
+  }
+
   reset(): void {
     this.motion.clear()
     this.facing.clear()
     this.lastXZ.clear()
     this.visualPark.clear()
     this.landed = []
+    this.duel.clear()
+    this.threatShipId = null
     this.group.clear()
   }
 
@@ -199,8 +227,15 @@ export class ShipRenderer {
     }
 
     const targets = new Map<string, { x: number; z: number }>()
+    const yaws = new Map<string, number>()
     for (const group of groups.values()) {
       group.ships.forEach((ship) => {
+        const duel = this.duel.get(ship.id)
+        if (duel) {
+          targets.set(ship.id, { x: duel.x, z: duel.z })
+          yaws.set(ship.id, duel.yaw)
+          return
+        }
         const slot = parkWorld(group.coord, ship, group.ships, group.yaw, this.hubTime)
         targets.set(ship.id, slot)
       })
@@ -212,11 +247,11 @@ export class ShipRenderer {
       const target = targets.get(ship.id) ?? getWorldPosition(coord)
       const last = this.lastXZ.get(ship.id) ?? target
       const flying = this.motion.get(ship.id)?.kind === 'fly'
-      let yaw = this.visualYaw(state.log, ship.id, coord)
-      if (!flying && isEvaCoord(coord)) {
+      let yaw = yaws.get(ship.id) ?? this.visualYaw(state.log, ship.id, coord)
+      if (!flying && isEvaCoord(coord) && !this.duel.has(ship.id)) {
         yaw = evaDockWorldOffset(evaDockIndexForPlayer(ship.playerId), evaHubAngleAt(this.hubTime)).yaw
       }
-      if (!flying) this.facing.set(ship.id, yaw)
+      if (!flying && !this.duel.has(ship.id)) this.facing.set(ship.id, yaw)
       const playerNo = Number(ship.playerId.replace(/\D/g, '')) || 1
       const active = state.players[state.activePlayerId]?.shipId === ship.id
       const wrapper = new THREE.Group()
@@ -224,20 +259,22 @@ export class ShipRenderer {
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
       wrapper.userData.beacon = marker.userData.beacon
-      wrapper.quaternion.setFromAxisAngle(Y_AXIS, yaw)
+      const shownYaw = this.facing.get(ship.id) ?? yaw
+      wrapper.quaternion.setFromAxisAngle(Y_AXIS, shownYaw)
       wrapper.position.set(last.x, BASE_HOVER, last.z)
       wrapper.userData.shipId = ship.id
       wrapper.userData.playerId = ship.playerId
       wrapper.userData.hullHeight = HULL_HEIGHT
       wrapper.userData.shipCoord = coord
       this.group.add(wrapper)
+      tintThreat(wrapper, this.threatShipId === ship.id)
       if (flying) {
         continue
       }
-      if (isEvaCoord(coord)) {
+      if (isEvaCoord(coord) && !this.duel.has(ship.id)) {
         this.parkAtEva(ship.id, ship.playerId, last, target, yaw)
       } else {
-        this.maybeSlide(ship.id, last, target)
+        this.maybeSlide(ship.id, last, target, yaw)
       }
     }
     this.applyMotion(performance.now())
@@ -251,7 +288,7 @@ export class ShipRenderer {
       const coord = child.userData.shipCoord as HexCoord | undefined
       const playerId = child.userData.playerId as string | undefined
       const motion = this.motion.get(shipId)
-      if (coord && playerId && isEvaCoord(coord) && motion?.kind !== 'fly' && motion?.kind !== 'hold' && motion?.kind !== 'slide') {
+      if (coord && playerId && isEvaCoord(coord) && !this.duel.has(shipId) && motion?.kind !== 'fly' && motion?.kind !== 'hold' && motion?.kind !== 'slide') {
         const pos = getWorldPosition(coord)
         const dock = evaDockWorldOffset(evaDockIndexForPlayer(playerId), evaHubAngleAt(time))
         child.position.set(pos.x + dock.x, BASE_HOVER, pos.z + dock.z)
@@ -314,18 +351,22 @@ export class ShipRenderer {
     shipId: string,
     from: { x: number; z: number },
     to: { x: number; z: number },
+    endYaw?: number,
   ): void {
     const motion = this.motion.get(shipId)
     if (motion?.kind === 'fly' || motion?.kind === 'hold') return
+    const yaw = this.facing.get(shipId) ?? 0
+    const face = endYaw ?? yaw
     const dist = Math.hypot(to.x - from.x, to.z - from.z)
-    if (dist < 0.02) return
+    const yawGap = Math.abs(shortestAngleDelta(yaw, face))
+    if (dist < 0.02 && yawGap < 0.04) return
     if (
       motion?.kind === 'slide' &&
-      Math.hypot(motion.toX - to.x, motion.toZ - to.z) < 0.02
+      Math.hypot(motion.toX - to.x, motion.toZ - to.z) < 0.02 &&
+      Math.abs(shortestAngleDelta(motion.endYaw, face)) < 0.04
     ) {
       return
     }
-    const yaw = this.facing.get(shipId) ?? 0
     this.motion.set(shipId, {
       kind: 'slide',
       fromX: from.x,
@@ -333,7 +374,7 @@ export class ShipRenderer {
       toX: to.x,
       toZ: to.z,
       startYaw: yaw,
-      endYaw: yaw,
+      endYaw: face,
       start: performance.now(),
       duration: prefersReducedMotion() ? 0 : SHIP_SLIDE_MS,
     })
@@ -598,6 +639,7 @@ function createNavMarker(
     new THREE.ExtrudeGeometry(shape, { depth: HULL_HEIGHT, bevelEnabled: false, steps: 1 }),
     new THREE.MeshBasicMaterial({ color, depthWrite: true, depthTest: true }),
   )
+  hull.userData.hullPaint = color
   hull.rotation.x = -Math.PI / 2
   hull.renderOrder = 3
   g.add(hull)
@@ -662,6 +704,16 @@ function createNavMarker(
   }
   applyEngineBurn(g, ENGINES_OFF)
   return g
+}
+
+function tintThreat(wrapper: THREE.Object3D, on: boolean): void {
+  wrapper.traverse((obj) => {
+    const mesh = obj as THREE.Mesh
+    if (!mesh.isMesh || typeof mesh.userData.hullPaint !== 'number') return
+    const mat = mesh.material as THREE.MeshBasicMaterial
+    if (!mat?.color) return
+    mat.color.set(on ? palette.blood : mesh.userData.hullPaint)
+  })
 }
 
 function hullColor(playerNo: number, active: boolean): number {

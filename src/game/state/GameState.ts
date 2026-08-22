@@ -27,6 +27,7 @@ export interface PlayerState {
   credits: number
   buysThisTurn: number
   salvagesThisTurn: number
+  attacksThisTurn: number
 }
 
 export interface ShipState {

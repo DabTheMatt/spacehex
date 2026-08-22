@@ -1,12 +1,12 @@
 import * as THREE from 'three'
 import { missileSidePoint, missileWorldPos, type Vec3 } from './missilePath'
-import { prefersReducedMotion } from '../motion'
+import { clamp01, prefersReducedMotion } from '../motion'
 
+export const MISSILE_SIDE_MS = 280
+export const MISSILE_FLY_MS = 520
+export const MISSILE_BOOM_MS = 220
+export const MISSILE_SHOT_MS = MISSILE_SIDE_MS + MISSILE_FLY_MS + MISSILE_BOOM_MS
 const TRAIL = 14
-const SIDE_MS = 280
-const FLY_MS = 520
-const BOOM_MS = 220
-const STAGGER_MS = 55
 const ROCKET_COLOR = 0xc45c4a
 
 type Shot = {
@@ -20,22 +20,48 @@ type Shot = {
   colors: Float32Array
   boom: THREE.Mesh
   done: boolean
+  hit: boolean
+  onHit?: (target: Vec3) => void
+}
+
+type Floater = {
+  sprite: THREE.Sprite
+  start: number
+  origin: Vec3
 }
 
 export class CombatFx {
   readonly group = new THREE.Group()
   private shots: Shot[] = []
+  private floaters: Floater[] = []
 
-  spawnVolley(origin: Vec3, yaw: number, target: Vec3, count: number, now: number): void {
-    const n = Math.max(0, Math.floor(count))
-    if (n === 0) return
+  get idle(): boolean {
+    return this.shots.length === 0
+  }
+
+  spawnOne(
+    origin: Vec3,
+    yaw: number,
+    target: Vec3,
+    now: number,
+    sideIndex: number,
+    onHit?: (target: Vec3) => void,
+  ): void {
     if (prefersReducedMotion()) {
-      this.spawnBoom(target, now)
+      onHit?.(target)
+      this.spawnDamage(target, 1, now)
       return
     }
-    for (let i = 0; i < n; i++) {
-      this.shots.push(this.makeShot(origin, missileSidePoint(origin, yaw, i), target, now + i * STAGGER_MS))
-    }
+    this.shots.push(
+      this.makeShot(origin, missileSidePoint(origin, yaw, sideIndex), target, now, onHit),
+    )
+  }
+
+  spawnDamage(target: Vec3, amount: number, now: number): void {
+    const sprite = damageSprite(amount)
+    sprite.position.set(target.x, target.y + 0.08, target.z)
+    this.group.add(sprite)
+    this.floaters.push({ sprite, start: now, origin: { ...target, y: target.y + 0.08 } })
   }
 
   tick(now: number): void {
@@ -47,8 +73,11 @@ export class CombatFx {
         shot.trail.visible = false
         continue
       }
-      if (elapsed <= SIDE_MS + FLY_MS) {
-        const t = elapsed <= SIDE_MS ? elapsed / SIDE_MS : 1 + (elapsed - SIDE_MS) / FLY_MS
+      if (elapsed <= MISSILE_SIDE_MS + MISSILE_FLY_MS) {
+        const t =
+          elapsed <= MISSILE_SIDE_MS
+            ? elapsed / MISSILE_SIDE_MS
+            : 1 + (elapsed - MISSILE_SIDE_MS) / MISSILE_FLY_MS
         const p = missileWorldPos(shot.origin, shot.side, shot.target, t)
         const prev = {
           x: shot.rocket.position.x,
@@ -67,7 +96,11 @@ export class CombatFx {
         this.pushTrail(shot, p)
       } else {
         shot.rocket.visible = false
-        const boomT = (elapsed - SIDE_MS - FLY_MS) / BOOM_MS
+        if (!shot.hit) {
+          shot.hit = true
+          shot.onHit?.(shot.target)
+        }
+        const boomT = (elapsed - MISSILE_SIDE_MS - MISSILE_FLY_MS) / MISSILE_BOOM_MS
         if (boomT >= 1) {
           shot.done = true
           shot.trail.visible = false
@@ -89,39 +122,42 @@ export class CombatFx {
       }
       this.shots = this.shots.filter((shot) => !shot.done)
     }
+    this.tickFloaters(now)
   }
 
   dispose(): void {
     for (const shot of this.shots) {
       this.group.remove(shot.rocket, shot.trail, shot.boom)
     }
+    for (const floater of this.floaters) this.group.remove(floater.sprite)
     this.shots = []
+    this.floaters = []
     this.group.clear()
   }
 
-  private spawnBoom(target: Vec3, _now: number): void {
-    const boom = makeBoom()
-    boom.position.set(target.x, target.y, target.z)
-    boom.visible = true
-    const dummy: Shot = {
-      origin: target,
-      side: target,
-      target,
-      start: performance.now() - SIDE_MS - FLY_MS,
-      rocket: makeRocket(),
-      trail: makeTrail(new Float32Array(TRAIL * 3), new Float32Array(TRAIL * 3)),
-      positions: new Float32Array(TRAIL * 3),
-      colors: new Float32Array(TRAIL * 3),
-      boom,
-      done: false,
+  private tickFloaters(now: number): void {
+    const keep: Floater[] = []
+    for (const floater of this.floaters) {
+      const t = clamp01((now - floater.start) / 900)
+      floater.sprite.position.set(floater.origin.x, floater.origin.y + t * 0.22, floater.origin.z)
+      const mat = floater.sprite.material as THREE.SpriteMaterial
+      mat.opacity = 1 - t
+      if (t >= 1) {
+        this.group.remove(floater.sprite)
+        continue
+      }
+      keep.push(floater)
     }
-    dummy.rocket.visible = false
-    dummy.trail.visible = false
-    this.group.add(dummy.rocket, dummy.trail, dummy.boom)
-    this.shots.push(dummy)
+    this.floaters = keep
   }
 
-  private makeShot(origin: Vec3, side: Vec3, target: Vec3, start: number): Shot {
+  private makeShot(
+    origin: Vec3,
+    side: Vec3,
+    target: Vec3,
+    start: number,
+    onHit?: (target: Vec3) => void,
+  ): Shot {
     const positions = new Float32Array(TRAIL * 3)
     const colors = new Float32Array(TRAIL * 3)
     for (let i = 0; i < TRAIL; i++) {
@@ -135,7 +171,20 @@ export class CombatFx {
     const trail = makeTrail(positions, colors)
     const boom = makeBoom()
     this.group.add(rocket, trail, boom)
-    return { origin, side, target, start, rocket, trail, positions, colors, boom, done: false }
+    return {
+      origin,
+      side,
+      target,
+      start,
+      rocket,
+      trail,
+      positions,
+      colors,
+      boom,
+      done: false,
+      hit: false,
+      onHit,
+    }
   }
 
   private pushTrail(shot: Shot, p: Vec3): void {
@@ -168,6 +217,33 @@ export class CombatFx {
     const geo = shot.trail.geometry as THREE.BufferGeometry
     geo.attributes.color.needsUpdate = true
   }
+}
+
+function damageSprite(amount: number): THREE.Sprite {
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    ctx.clearRect(0, 0, 128, 128)
+    ctx.fillStyle = '#C45C4A'
+    ctx.font = '700 72px "IBM Plex Mono", monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(`-${amount}`, 64, 70)
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.needsUpdate = true
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+  })
+  const sprite = new THREE.Sprite(mat)
+  sprite.scale.set(0.28, 0.28, 0.28)
+  sprite.renderOrder = 14
+  return sprite
 }
 
 function makeRocket(): THREE.Mesh {

@@ -107,6 +107,15 @@ export class CameraController {
    * `nameTheta` is OrbitControls azimuth so the camera sits on the name edge.
    */
   inspectPlanet(coord: HexCoord, nameTheta: number): void {
+    this.beginInspect(coord, nameTheta, 0.14)
+  }
+
+  /** Same framing as a name inspect, at half the polar angle (45° instead of near-vertical). */
+  inspectCombat(coord: HexCoord, theta = 0): void {
+    this.beginInspect(coord, theta, Math.PI / 4)
+  }
+
+  private beginInspect(coord: HexCoord, theta: number, toPhi: number): void {
     this.overview = false
     this.overviewRestore = null
     const { x, z } = getWorldPosition(coord)
@@ -114,7 +123,6 @@ export class CameraController {
     const fromTarget = this.controls.target.clone()
     const offset = this.camera.position.clone().sub(fromTarget)
     const from = new THREE.Spherical().setFromVector3(offset)
-    const toPhi = 0.14
     const toRadius = this.inspectDistance()
     this.follow = null
     this.followReleased = true
@@ -131,7 +139,7 @@ export class CameraController {
       fromPhi: from.phi,
       toPhi,
       fromTheta: from.theta,
-      thetaDelta: shortestAngleDelta(from.theta, nameTheta),
+      thetaDelta: shortestAngleDelta(from.theta, theta),
     }
   }
 

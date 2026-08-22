@@ -20,6 +20,7 @@ import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { coordKey } from '@/game/board/HexCoord'
 import { planetInspectTheta } from '@/renderer/board/planetLots'
+import { canDeclareAttack } from '@/game/rules/combat'
 import { isEvaHex } from '@/game/rules/planetMarket'
 
 const DRAG_PX = 12
@@ -45,6 +46,7 @@ function sync(): void {
     inspectKey: ui.inspectPlanet ? coordKey(ui.inspectPlanet) : null,
     showTileNames: ui.showTileNames,
     showMarketIcons: ui.showMarketIcons,
+    threatShipId: ui.threatShipId,
   })
 }
 
@@ -62,13 +64,26 @@ function resize(): void {
 
 function updateHover(clientX: number, clientY: number): void {
   if (!scene || game.state.phase === 'TILE_PLACEMENT') return
+  const shipHit = scene.pickShip(clientX, clientY)
+  if (shipHit && canDeclareAttack(game.state, shipHit.shipId).ok) {
+    ui.threatShipId = shipHit.shipId
+    ui.hover = null
+    scene.camera.setOrbitEnabled(false)
+    if (canvasEl.value) canvasEl.value.style.cursor = 'pointer'
+    return
+  }
+  ui.threatShipId = null
+  scene.camera.setOrbitEnabled(true)
+  if (canvasEl.value) canvasEl.value.style.cursor = 'grab'
   ui.hover = scene.pickHover(clientX, clientY)
 }
 
 function onLeave(): void {
   if (dragging) return
   ui.hover = null
+  ui.threatShipId = null
   scene?.camera.setOrbitEnabled(true)
+  if (canvasEl.value) canvasEl.value.style.cursor = 'grab'
 }
 
 function onDown(ev: PointerEvent): void {
@@ -113,6 +128,20 @@ function onUp(ev: PointerEvent): void {
 
   if (ev.button === 2) {
     ev.preventDefault()
+    const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY)
+    if (dist > DRAG_PX) return
+    const shipHit = scene.pickShip(ev.clientX, ev.clientY)
+    if (shipHit) {
+      const check = canDeclareAttack(game.state, shipHit.shipId)
+      if (!check.ok) {
+        if (check.reason === 'ATTACK_LIMIT') ui.flashNotice('ATTACK LIMIT REACHED')
+        return
+      }
+      ui.inspectPlanet = null
+      scene.camera.clearInspectLimits()
+      game.dispatch({ type: 'DECLARE_ATTACK', defenderId: shipHit.shipId })
+      ui.threatShipId = null
+    }
     return
   }
 
@@ -244,6 +273,7 @@ watch(
     ui.selectedTile,
     ui.selectedShipId,
     ui.hover,
+    ui.threatShipId,
     ui.inspectPlanet,
     ui.showTileNames,
     ui.showMarketIcons,
@@ -258,6 +288,7 @@ watch(
     ui.selectedShipId = game.ship.id
     ui.selectedTile = null
     ui.hover = null
+    ui.threatShipId = null
     ui.inspectPlanet = null
   },
 )

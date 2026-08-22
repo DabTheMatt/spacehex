@@ -64,6 +64,7 @@ import {
   RESOURCE_IDS,
   RESOURCE_LABEL,
 } from '@/game/definitions/resources'
+import { shipsAt } from '@/game/rules/combat'
 import { buyPrice, evaSellParts, formatSellParts, isEvaHex } from '@/game/rules/planetMarket'
 
 const game = useGameStore()
@@ -106,6 +107,11 @@ const planetLots = computed(() => {
 
 const planetHint = computed(() => {
   if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE'
+  const others = shipsAt(game.state, game.ship.coord).filter((item) => item.id !== game.ship.id)
+  if (others.length && others.some((item) => item.hull > 0)) {
+    if ((game.player.attacksThisTurn ?? 0) >= 1) return 'ATTACK USED THIS TURN'
+    return 'RIGHT-CLICK ENEMY TO ATTACK'
+  }
   if (isEvaHex(planetCoord.value)) {
     const here = isEvaHex(game.ship.coord)
     if (!here) return 'DOCK TO SELL'

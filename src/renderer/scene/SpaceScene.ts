@@ -10,7 +10,6 @@ import { CombatFx } from '../fx/CombatFx'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
-import { SHIP_DEFINITIONS } from '../../game/definitions/ships'
 import type { ResourceId } from '../../game/definitions/resources'
 import { userDataFromHits } from './pickHelpers'
 import type { BoardHover } from '../../ui/boardHover'
@@ -21,6 +20,7 @@ import {
   lerp,
   prefersReducedMotion,
   TILE_RISE_MS,
+  CAMERA_FOCUS_MS,
 } from '../motion'
 
 export interface SceneOptions {
@@ -33,6 +33,7 @@ export interface SceneOptions {
   inspectKey?: string | null
   showTileNames?: boolean
   showMarketIcons?: boolean
+  threatShipId?: string | null
 }
 
 export class SpaceScene {
@@ -46,7 +47,16 @@ export class SpaceScene {
   readonly combat: CombatFx
   readonly raycaster = new THREE.Raycaster()
   private disposed = false
-  private pendingCombat: Array<{ attackerId: string; defenderId: string; since: number }> = []
+  private duel: {
+    attackerId: string
+    defenderId: string
+    coord: HexCoord
+    shots: Array<{ attackerId: string; defenderId: string; damage: number }>
+    index: number
+    stage: 'align' | 'fire' | 'recover'
+    sideCount: Record<string, number>
+    startedAt: number
+  } | null = null
   private lastState: GameState | null = null
   private lastOptions: SceneOptions | null = null
   private primed = false
@@ -101,18 +111,36 @@ export class SpaceScene {
   }
 
   handleEvents(events: GameEvent[], _state: GameState): void {
+    const shots: Array<{ attackerId: string; defenderId: string; damage: number }> = []
+    let started: { attackerId: string; defenderId: string; coord: HexCoord } | null = null
     for (const event of events) {
       if (event.type === 'GAME_STARTED') {
         this.resetSession()
         this.camera.panTo({ q: 0, r: 0 })
       }
-      if (event.type === 'COMBAT_RESOLVED') {
-        this.pendingCombat.push({
+      if (event.type === 'COMBAT_STARTED') started = event
+      if (event.type === 'COMBAT_SHOT') {
+        shots.push({
           attackerId: event.attackerId,
           defenderId: event.defenderId,
-          since: performance.now(),
+          damage: event.damage,
         })
       }
+    }
+    if (started) {
+      this.duel = {
+        attackerId: started.attackerId,
+        defenderId: started.defenderId,
+        coord: started.coord,
+        shots,
+        index: 0,
+        stage: 'align',
+        sideCount: {},
+        startedAt: performance.now(),
+      }
+      this.ships.setThreat(null)
+      this.ships.setDuel(started.attackerId, started.defenderId, started.coord)
+      this.camera.inspectCombat(started.coord, 0)
     }
   }
 
@@ -211,6 +239,7 @@ export class SpaceScene {
     })
     this.preview.sync(this.lastState)
     this.ships.sync(this.lastState)
+    this.ships.setThreat(this.duel ? null : (this.lastOptions.threatShipId ?? null))
     this.hoverTargets.sync(this.lastState, this.lastOptions.hover ?? null)
   }
 
@@ -266,45 +295,43 @@ export class SpaceScene {
     this.revealWhenSettled.clear()
     this.ships.reset()
     this.combat.dispose()
-    this.pendingCombat = []
+    this.duel = null
   }
 
-  private flushCombat(state: GameState, now: number): void {
-    const rest: typeof this.pendingCombat = []
-    for (const fight of this.pendingCombat) {
-      const from = this.ships.worldPose(fight.attackerId)
-      const to = this.ships.worldPose(fight.defenderId)
-      if (!from || !to) {
-        rest.push(fight)
-        continue
-      }
-      const dist = Math.hypot(from.x - to.x, from.z - to.z)
-      if (dist > 1.25 && now - fight.since < 8000) {
-        rest.push(fight)
-        continue
-      }
-      const attacker = state.ships[fight.attackerId]
-      const defender = state.ships[fight.defenderId]
-      if (attacker) {
-        this.combat.spawnVolley(
-          from,
-          from.yaw,
-          to,
-          SHIP_DEFINITIONS[attacker.class].attack,
-          now,
-        )
-      }
-      if (defender) {
-        this.combat.spawnVolley(
-          to,
-          to.yaw,
-          from,
-          SHIP_DEFINITIONS[defender.class].attack,
-          now + 90,
-        )
-      }
+  private advanceDuel(now: number): void {
+    const duel = this.duel
+    if (!duel) return
+    if (duel.stage === 'align') {
+      const wait = prefersReducedMotion() ? 0 : CAMERA_FOCUS_MS
+      if (now - duel.startedAt < wait) return
+      if (this.ships.anySliding() || this.ships.anyBusy()) return
+      duel.stage = 'fire'
     }
-    this.pendingCombat = rest
+    if (duel.stage === 'fire') {
+      if (!this.combat.idle) return
+      if (duel.index >= duel.shots.length) {
+        duel.stage = 'recover'
+        this.ships.clearDuel()
+        this.applySync()
+        this.camera.clearInspectLimits()
+        return
+      }
+      const shot = duel.shots[duel.index]
+      const from = this.ships.worldPose(shot.attackerId)
+      const to = this.ships.worldPose(shot.defenderId)
+      if (!from || !to) return
+      const side = duel.sideCount[shot.attackerId] ?? 0
+      duel.sideCount[shot.attackerId] = side + 1
+      this.combat.spawnOne(from, from.yaw, to, now, side, (target) => {
+        this.combat.spawnDamage(target, shot.damage, performance.now())
+      })
+      duel.index += 1
+      return
+    }
+    if (duel.stage === 'recover') {
+      if (this.ships.anySliding()) return
+      this.duel = null
+    }
   }
 
   private loop = (): void => {
@@ -317,7 +344,7 @@ export class SpaceScene {
     this.preview.tick(time)
     const shipsSettled = this.ships.tick(this.camera.camera, time)
     this.hoverTargets.tick(time)
-    if (this.lastState) this.flushCombat(this.lastState, now)
+    this.advanceDuel(now)
     this.combat.tick(now)
     let glyphsChanged = false
     for (const coord of this.ships.consumeLanded()) {
@@ -331,7 +358,9 @@ export class SpaceScene {
       glyphsChanged = true
     }
     this.camera.setFollow(this.ships.flyingWorld())
-    if (shipsSettled || glyphsChanged || riseRevealed) this.applySync()
+    if ((shipsSettled || glyphsChanged || riseRevealed) && (!this.duel || this.duel.stage === 'recover')) {
+      this.applySync()
+    }
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)
   }

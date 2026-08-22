@@ -6,6 +6,7 @@ export const FUEL_COST_SKIP = 0
 
 /** TODO RULE CLARIFICATION T5 */
 export const COMBAT_DAMAGE = 1
+export const MAX_ATTACKS_PER_TURN = 1
 
 export const PLAYER_IDS = ['player-1', 'player-2'] as const
 

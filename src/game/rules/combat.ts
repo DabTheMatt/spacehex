@@ -1,9 +1,11 @@
 import type { GameState } from '../state/GameState'
-import { COMBAT_DAMAGE } from '../definitions/constants'
+import { COMBAT_DAMAGE, MAX_ATTACKS_PER_TURN } from '../definitions/constants'
 import type { HexCoord } from '../board/HexCoord'
 import type { GameEvent } from '../engine/events'
 import type { ShipState } from '../state/GameState'
+import { SHIP_DEFINITIONS } from '../definitions/ships'
 import { addGlory, GLORY_DAMAGE, GLORY_DESTROY } from './glory'
+import { activeShip } from './fuel'
 
 export function shipsAt(state: GameState, coord: HexCoord): ShipState[] {
   return Object.values(state.ships).filter(
@@ -11,57 +13,140 @@ export function shipsAt(state: GameState, coord: HexCoord): ShipState[] {
   )
 }
 
-/** TODO RULE CLARIFICATION T5 — wejście na pole z wrogim statkiem: 1 obrażenie. */
-export function resolveCombatOnEntry(
+export type CombatReject =
+  | 'NOT_IN_TURN'
+  | 'NO_SHIP'
+  | 'SELF'
+  | 'NOT_COLOCATED'
+  | 'ATTACK_LIMIT'
+  | 'WRECK'
+
+export function canDeclareAttack(
   state: GameState,
-  attackerId: string,
-  coord: HexCoord,
-): { state: GameState; events: GameEvent[] } {
-  const others = shipsAt(state, coord).filter((s) => s.id !== attackerId)
-  if (others.length === 0) {
-    return { state, events: [] }
+  defenderId: string,
+): { ok: true } | { ok: false; reason: CombatReject } {
+  if (state.phase !== 'PLAYER_TURN') return { ok: false, reason: 'NOT_IN_TURN' }
+  const attacker = activeShip(state)
+  const defender = state.ships[defenderId]
+  if (!attacker) return { ok: false, reason: 'NO_SHIP' }
+  if (!defender) return { ok: false, reason: 'NO_SHIP' }
+  if (defender.id === attacker.id) return { ok: false, reason: 'SELF' }
+  if (defender.coord.q !== attacker.coord.q || defender.coord.r !== attacker.coord.r) {
+    return { ok: false, reason: 'NOT_COLOCATED' }
   }
-  const events: GameEvent[] = []
+  if ((state.players[attacker.playerId]?.attacksThisTurn ?? 0) >= MAX_ATTACKS_PER_TURN) {
+    return { ok: false, reason: 'ATTACK_LIMIT' }
+  }
+  if (attacker.hull <= 0 || defender.hull <= 0) return { ok: false, reason: 'WRECK' }
+  return { ok: true }
+}
+
+export interface PlannedShot {
+  attackerId: string
+  defenderId: string
+  damage: number
+}
+
+/** Alternate single shots, attacker first, until attack is spent or a hull hits 0. */
+export function planDuelShots(attacker: ShipState, defender: ShipState): PlannedShot[] {
+  const shots: PlannedShot[] = []
+  let aHull = attacker.hull
+  let bHull = defender.hull
+  const aAtk = SHIP_DEFINITIONS[attacker.class].attack
+  const bAtk = SHIP_DEFINITIONS[defender.class].attack
+  const rounds = Math.max(aAtk, bAtk)
+  for (let i = 0; i < rounds; i++) {
+    if (i < aAtk && aHull > 0 && bHull > 0) {
+      const damage = Math.min(COMBAT_DAMAGE, bHull)
+      bHull -= damage
+      shots.push({ attackerId: attacker.id, defenderId: defender.id, damage })
+    }
+    if (bHull <= 0) break
+    if (i < bAtk && bHull > 0 && aHull > 0) {
+      const damage = Math.min(COMBAT_DAMAGE, aHull)
+      aHull -= damage
+      shots.push({ attackerId: defender.id, defenderId: attacker.id, damage })
+    }
+    if (aHull <= 0) break
+  }
+  return shots
+}
+
+/** TODO RULE CLARIFICATION T5 — 1 obrażenie na rakietę, liczba rakiet = atak. */
+export function resolveDeclaredCombat(
+  state: GameState,
+  defenderId: string,
+): { state: GameState; events: GameEvent[] } {
+  const check = canDeclareAttack(state, defenderId)
+  if (!check.ok) return { state, events: [] }
+  const attacker = activeShip(state)
+  const defender = state.ships[defenderId]
+  const planned = planDuelShots(attacker, defender)
+  const events: GameEvent[] = [
+    {
+      type: 'COMBAT_STARTED',
+      attackerId: attacker.id,
+      defenderId: defender.id,
+      coord: { ...attacker.coord },
+    },
+  ]
   let ships = { ...state.ships }
-  let nextState = state
-  const attacker = ships[attackerId]
-  for (const defender of others) {
-    const hullAfter = Math.max(0, defender.hull - COMBAT_DAMAGE)
+  let nextState: GameState = { ...state, ships }
+  const hullLeft: Record<string, number> = {
+    [attacker.id]: attacker.hull,
+    [defender.id]: defender.hull,
+  }
+  for (const shot of planned) {
+    const target = ships[shot.defenderId]
+    const before = hullLeft[shot.defenderId]
+    const hullAfter = Math.max(0, before - shot.damage)
+    hullLeft[shot.defenderId] = hullAfter
     ships = {
       ...ships,
-      [defender.id]: {
-        ...defender,
-        hull: hullAfter,
-      },
-      [attacker.id]: {
-        ...ships[attacker.id],
-        hull: Math.max(0, ships[attacker.id].hull - COMBAT_DAMAGE),
-      },
+      [shot.defenderId]: { ...target, hull: hullAfter },
     }
-    events.push({
-      type: 'COMBAT_RESOLVED',
-      attackerId,
-      defenderId: defender.id,
-      damage: COMBAT_DAMAGE,
-    })
     nextState = { ...nextState, ships }
-    nextState = addGlory(nextState, attacker.playerId, GLORY_DAMAGE)
+    events.push({
+      type: 'COMBAT_SHOT',
+      attackerId: shot.attackerId,
+      defenderId: shot.defenderId,
+      damage: shot.damage,
+      hullAfter,
+    })
+    const shooter = ships[shot.attackerId]
+    nextState = addGlory(nextState, shooter.playerId, GLORY_DAMAGE)
     events.push({
       type: 'GLORY_CHANGED',
-      playerId: attacker.playerId,
-      glory: nextState.players[attacker.playerId].glory,
+      playerId: shooter.playerId,
+      glory: nextState.players[shooter.playerId].glory,
       delta: GLORY_DAMAGE,
     })
-    if (hullAfter === 0 && defender.hull > 0) {
-      const bonus = GLORY_DESTROY[defender.class]
-      nextState = addGlory(nextState, attacker.playerId, bonus)
+    if (hullAfter === 0 && before > 0) {
+      const bonus = GLORY_DESTROY[target.class]
+      nextState = addGlory(nextState, shooter.playerId, bonus)
       events.push({
         type: 'GLORY_CHANGED',
-        playerId: attacker.playerId,
-        glory: nextState.players[attacker.playerId].glory,
+        playerId: shooter.playerId,
+        glory: nextState.players[shooter.playerId].glory,
         delta: bonus,
       })
     }
   }
+  const player = nextState.players[attacker.playerId]
+  nextState = {
+    ...nextState,
+    players: {
+      ...nextState.players,
+      [attacker.playerId]: {
+        ...player,
+        attacksThisTurn: (player.attacksThisTurn ?? 0) + 1,
+      },
+    },
+  }
+  events.push({
+    type: 'COMBAT_ENDED',
+    attackerId: attacker.id,
+    defenderId: defender.id,
+  })
   return { state: nextState, events }
 }
