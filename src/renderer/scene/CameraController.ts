@@ -24,6 +24,7 @@ export class CameraController {
     fromPos: THREE.Vector3
     toPos: THREE.Vector3
   } | null = null
+  private follow: { x: number; z: number } | null = null
   mapRotateEnabled = true
   private keys = { w: false, a: false, s: false, d: false, q: false, e: false }
   private lastTick = performance.now()
@@ -57,14 +58,22 @@ export class CameraController {
 
   focus(coord: HexCoord, height = 7): void {
     this.panAnim = null
+    this.follow = null
     const { x, z } = getWorldPosition(coord)
     this.controls.target.set(x, 0, z)
     const offset = new THREE.Vector3(0, height, height * 1.1)
     this.camera.position.copy(this.controls.target).add(offset)
   }
 
+  /** Keep current angle and distance; lock look-at to a world XZ each frame. */
+  setFollow(point: { x: number; z: number } | null): void {
+    this.follow = point
+    if (point) this.panAnim = null
+  }
+
   /** Keep current angle and distance; glide the look-at to a hex. */
   panTo(coord: HexCoord): void {
+    this.follow = null
     const { x, z } = getWorldPosition(coord)
     const toTarget = new THREE.Vector3(x, 0, z)
     const offset = this.camera.position.clone().sub(this.controls.target)
@@ -92,6 +101,7 @@ export class CameraController {
 
   beginPan(clientX: number, clientY: number): void {
     this.panAnim = null
+    this.follow = null
     this.grabbing = true
     this.panX = clientX
     this.panY = clientY
@@ -143,13 +153,22 @@ export class CameraController {
     this.applyFocusPan(now)
     this.applyWasd(dt)
     this.applyMapRotate(dt)
-    if (!this.grabbing && !this.panAnim) this.controls.update()
+    this.applyFollow()
+    if (!this.grabbing && !this.panAnim && !this.follow) this.controls.update()
   }
 
   dispose(): void {
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
     this.controls.dispose()
+  }
+
+  private applyFollow(): void {
+    const point = this.follow
+    if (!point || this.grabbing) return
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    this.controls.target.set(point.x, 0, point.z)
+    this.camera.position.copy(this.controls.target).add(offset)
   }
 
   private applyFocusPan(now: number): void {

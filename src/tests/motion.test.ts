@@ -67,6 +67,8 @@ describe('placement motion', () => {
       moveMs: 900,
       yawDelta: left,
     })
+    expect(counter.port).toBe(1)
+    expect(counter.starboard).toBe(0)
     const rightKick = shipEngineBurn({
       elapsed: 40,
       turnMs: SHIP_TURN_MS,
@@ -106,5 +108,27 @@ describe('placement motion', () => {
     expect(burn.brakePort).toBeGreaterThan(0.5)
     expect(burn.brakeStarboard).toBeGreaterThan(0.5)
     expect(burn.main).toBeLessThan(0.5)
+  })
+
+  it('keeps the same ignite and brake clock when the ship is already aligned', () => {
+    const early = shipEngineBurn({
+      elapsed: 200,
+      turnMs: SHIP_TURN_MS,
+      igniteMs: SHIP_MAIN_IGNITE_MS,
+      moveMs: 900,
+      yawDelta: 0,
+    })
+    expect(early.main).toBe(0)
+    expect(early.brakePort).toBe(0)
+
+    const brakes = shipEngineBurn({
+      elapsed: SHIP_TURN_MS + SHIP_MAIN_IGNITE_MS + 900 - 40,
+      turnMs: SHIP_TURN_MS,
+      igniteMs: SHIP_MAIN_IGNITE_MS,
+      moveMs: 900,
+      yawDelta: 0,
+    })
+    expect(brakes.brakePort).toBeGreaterThan(0.5)
+    expect(brakes.brakeStarboard).toBeGreaterThan(0.5)
   })
 })

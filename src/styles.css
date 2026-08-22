@@ -105,6 +105,13 @@ body,
   gap: 0.35rem;
 }
 
+.action-list.end-turn {
+  top: 25%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: auto;
+}
+
 .explore-controls {
   left: 50%;
   bottom: 1.25rem;

@@ -1,5 +1,5 @@
 <template>
-  <nav v-if="actions.length" class="action-list">
+  <nav v-if="actions.length" class="action-list" :class="{ 'end-turn': endTurnOnly }">
     <button
       v-for="action in actions"
       :key="action.id"
@@ -9,7 +9,7 @@
       :disabled="action.disabled"
       @click="action.run"
     >
-      <span class="num">{{ action.id }}</span>
+      <span v-if="action.num" class="num">{{ action.num }}</span>
       <span>{{ action.label }}</span>
     </button>
   </nav>
@@ -21,13 +21,16 @@ import { useGameStore } from '@/stores/gameStore'
 
 const game = useGameStore()
 
+const endTurnOnly = computed(() => game.state.movementSpent && game.state.phase !== 'TILE_PLACEMENT')
+
 const actions = computed(() => {
   const st = game.state
   if (st.phase === 'TILE_PLACEMENT') return []
   if (st.movementSpent) {
     return [
       {
-        id: '01',
+        id: 'end-turn',
+        num: '',
         label: 'KONIEC TURY',
         accent: true,
         muted: false,
@@ -40,6 +43,7 @@ const actions = computed(() => {
   return [
     {
       id: '01',
+      num: '01',
       label: 'MOVE',
       accent: status === 'SELECTING_MOVE',
       muted: false,
@@ -48,6 +52,7 @@ const actions = computed(() => {
     },
     {
       id: '02',
+      num: '02',
       label: 'EXPLORE',
       accent: status === 'SELECTING_DIRECTION',
       muted: false,
@@ -56,6 +61,7 @@ const actions = computed(() => {
     },
     {
       id: '03',
+      num: '03',
       label: 'STAY',
       accent: false,
       muted: false,

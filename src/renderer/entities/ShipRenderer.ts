@@ -76,6 +76,16 @@ export class ShipRenderer {
     return false
   }
 
+  /** World XZ of a ship currently in flight, if any. */
+  flyingWorld(): { x: number; z: number } | null {
+    for (const child of this.group.children) {
+      const shipId = child.userData.shipId as string
+      if (this.motion.get(shipId)?.kind !== 'fly') continue
+      return { x: child.position.x, z: child.position.z }
+    }
+    return null
+  }
+
   hold(shipId: string, coord: HexCoord): void {
     this.motion.set(shipId, { kind: 'hold', coord })
   }
@@ -85,7 +95,7 @@ export class ShipRenderer {
     const toW = getWorldPosition(to)
     const last = this.lastXZ.get(shipId)
     const endYaw = Math.atan2(toW.x - fromW.x, toW.z - fromW.z)
-    const startYaw = this.facing.get(shipId) ?? endYaw
+    const startYaw = this.facing.get(shipId) ?? lastMoveYaw([], shipId, from)
     const yawDelta = shortestAngleDelta(startYaw, endYaw)
     const instant = prefersReducedMotion()
     this.motion.set(shipId, {
@@ -156,6 +166,7 @@ export class ShipRenderer {
       const target = targets.get(ship.id) ?? getWorldPosition(coord)
       const last = this.lastXZ.get(ship.id) ?? target
       const yaw = this.visualYaw(state.log, ship.id, coord)
+      if (this.motion.get(ship.id)?.kind !== 'fly') this.facing.set(ship.id, yaw)
       const playerNo = Number(ship.playerId.replace(/\D/g, '')) || 1
       const active = state.players[state.activePlayerId]?.shipId === ship.id
       const wrapper = new THREE.Group()
@@ -239,7 +250,11 @@ export class ShipRenderer {
 
   private visualYaw(log: GameEvent[], shipId: string, fallbackCoord: HexCoord): number {
     const motion = this.motion.get(shipId)
-    if (motion?.kind === 'fly') return motion.startYaw
+    if (motion?.kind === 'fly') {
+      const elapsed = performance.now() - motion.start
+      const turnT = motion.turnMs <= 0 ? 1 : clamp01(elapsed / motion.turnMs)
+      return lerpAngle(motion.startYaw, motion.endYaw, easeInOutCubic(turnT))
+    }
     const stored = this.facing.get(shipId)
     if (stored !== undefined) return stored
     return lastMoveYaw(log, shipId, fallbackCoord)
@@ -383,45 +398,45 @@ function createNavMarker(
   g.add(hullMark(label, length, half, true))
   g.add(hullMark(label, length, half, false))
 
-  const y = HULL_HEIGHT * 0.45
+  const y = HULL_HEIGHT * 0.55
   const main = makeEnginePlume(
-    0.03,
-    0.15,
-    new THREE.Vector3(0, y, -length * 0.5 - 0.014),
+    0.032,
+    0.16,
+    new THREE.Vector3(0, y, -length * 0.5 - 0.02),
     new THREE.Vector3(0, 0, -1),
   )
   g.add(main)
 
   const port = makeEnginePlume(
-    0.012,
-    0.055,
-    new THREE.Vector3(-half * 0.88, y, 0.04),
+    0.014,
+    0.07,
+    new THREE.Vector3(-half * 0.92, y, 0.02),
     new THREE.Vector3(-1, 0, 0),
   )
   g.add(port)
 
   const starboard = makeEnginePlume(
-    0.012,
-    0.055,
-    new THREE.Vector3(half * 0.88, y, 0.04),
+    0.014,
+    0.07,
+    new THREE.Vector3(half * 0.92, y, 0.02),
     new THREE.Vector3(1, 0, 0),
   )
   g.add(starboard)
 
   const s = Math.SQRT1_2
   const brakePort = makeEnginePlume(
-    0.012,
-    0.055,
-    new THREE.Vector3(-half * 0.7, y, -length * 0.22),
-    new THREE.Vector3(-s, 0, -s),
+    0.03,
+    0.15,
+    new THREE.Vector3(-half * 0.55, y, length * 0.42),
+    new THREE.Vector3(-s, 0, s),
   )
   g.add(brakePort)
 
   const brakeStarboard = makeEnginePlume(
-    0.012,
-    0.055,
-    new THREE.Vector3(half * 0.7, y, -length * 0.22),
-    new THREE.Vector3(s, 0, -s),
+    0.03,
+    0.15,
+    new THREE.Vector3(half * 0.55, y, length * 0.42),
+    new THREE.Vector3(s, 0, s),
   )
   g.add(brakeStarboard)
 
@@ -444,22 +459,52 @@ function makeEnginePlume(
   const group = new THREE.Group()
   group.position.copy(attach)
   group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), exhaust.clone().normalize())
+
+  const nozzle = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius * 0.55, radius * 0.9, radius * 1.4, 8, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0x2c2c28,
+      side: THREE.DoubleSide,
+    }),
+  )
+  nozzle.position.y = -radius * 0.2
+  group.add(nozzle)
+
   const mesh = new THREE.Mesh(
-    new THREE.ConeGeometry(radius, length, 8, 1, true),
+    new THREE.ConeGeometry(radius, length, 10, 1, true),
     new THREE.MeshBasicMaterial({
       color: palette.engine,
       transparent: true,
       opacity: 0,
       depthWrite: false,
-      depthTest: true,
+      depthTest: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
     }),
   )
   mesh.position.y = length * 0.5
+  mesh.renderOrder = 4
   group.add(mesh)
+
+  const core = new THREE.Mesh(
+    new THREE.ConeGeometry(radius * 0.4, length * 0.7, 8, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0xdeffff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    }),
+  )
+  core.position.y = length * 0.28
+  core.renderOrder = 5
+  group.add(core)
+
   group.userData.plumeMesh = mesh
-  group.visible = false
+  group.userData.plumeCore = core
+  group.visible = true
   return group
 }
 
@@ -483,24 +528,29 @@ function applyEngineBurn(
       }
     | undefined
   if (!engines) return
-  setPlume(engines.main, burn.main, 1.35)
-  setPlume(engines.port, burn.port, 1.05)
-  setPlume(engines.starboard, burn.starboard, 1.05)
-  setPlume(engines.brakePort, burn.brakePort, 1.05)
-  setPlume(engines.brakeStarboard, burn.brakeStarboard, 1.05)
+  setPlume(engines.main, burn.main, 1.45)
+  setPlume(engines.port, burn.port, 1.15)
+  setPlume(engines.starboard, burn.starboard, 1.15)
+  setPlume(engines.brakePort, burn.brakePort, 1.7)
+  setPlume(engines.brakeStarboard, burn.brakeStarboard, 1.7)
 }
 
 function setPlume(group: THREE.Group, intensity: number, lengthScale: number): void {
   const mesh = group.userData.plumeMesh as THREE.Mesh | undefined
+  const core = group.userData.plumeCore as THREE.Mesh | undefined
   if (!mesh) return
   const mat = mesh.material
   if (Array.isArray(mat) || !('opacity' in mat)) return
   const lit = clamp01(intensity)
-  mat.opacity = lit * 0.9
-  const sx = 0.65 + lit * 0.45
-  const sy = 0.55 + lit * lengthScale
-  group.scale.set(sx, sy, sx)
-  group.visible = lit > 0.03
+  mat.opacity = lit * 0.95
+  if (core && !Array.isArray(core.material) && 'opacity' in core.material) {
+    core.material.opacity = lit * 0.85
+    core.visible = lit > 0.03
+  }
+  const sx = 0.75 + lit * 0.55
+  const sy = 0.6 + lit * lengthScale
+  mesh.scale.set(sx, sy, sx)
+  group.visible = true
 }
 
 function hullMark(label: string, length: number, half: number, port: boolean): THREE.Mesh {

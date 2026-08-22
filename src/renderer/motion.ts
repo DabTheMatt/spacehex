@@ -26,7 +26,9 @@ export function shortestAngleDelta(from: number, to: number): number {
 }
 
 /**
- * RCS kick (opposite side) → counter-brake → main ignite → cruise → side brake.
+ * RCS kick (opposite side) → counter-brake → main ignite → cruise → bow brakes.
+ * Turn / ignite / translate windows always match the ship motion clock
+ * (turnMs is waited even when yaw is already aligned).
  * Left yaw fires starboard first, then port; right yaw is the reverse.
  */
 export function shipEngineBurn(options: {
@@ -46,7 +48,8 @@ export function shipEngineBurn(options: {
   const left = options.yawDelta < 0
   const off: EngineBurn = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
 
-  if (turning && options.elapsed < options.turnMs) {
+  if (options.elapsed < options.turnMs) {
+    if (!turning) return off
     if (options.elapsed <= kickMs) {
       return left ? { ...off, starboard: 1 } : { ...off, port: 1 }
     }
@@ -56,7 +59,7 @@ export function shipEngineBurn(options: {
     return off
   }
 
-  const afterTurn = options.elapsed - (turning ? options.turnMs : 0)
+  const afterTurn = options.elapsed - options.turnMs
   if (afterTurn < options.igniteMs) {
     const ramp = options.igniteMs <= 0 ? 1 : clamp01(afterTurn / 160)
     return { ...off, main: 0.25 + 0.75 * ramp }
@@ -71,8 +74,8 @@ export function shipEngineBurn(options: {
       return {
         ...off,
         main: Math.max(0, 1 - t),
-        brakePort: 0.55 + 0.45 * t,
-        brakeStarboard: 0.55 + 0.45 * t,
+        brakePort: 0.7 + 0.3 * t,
+        brakeStarboard: 0.7 + 0.3 * t,
       }
     }
     return { ...off, main: 1 }

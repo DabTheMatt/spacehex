@@ -205,6 +205,7 @@ export class SpaceScene {
     this.preview.tick(time)
     const shipsSettled = this.ships.tick(this.camera.camera)
     this.hoverTargets.tick(this.camera.camera)
+    this.camera.setFollow(this.ships.flyingWorld())
     if (shipsSettled) this.applySync()
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)
