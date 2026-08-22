@@ -273,7 +273,7 @@ export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
       if (!Array.isArray(mat) && 'opacity' in mat) {
         const count = Number(obj.userData.runwayCount) || 5
         const index = Number(obj.userData.runwayIndex) || 0
-        const chase = Math.floor(time * 6) % count
+        const chase = Math.floor(time * 2) % count
         const prev = (chase + count - 1) % count
         mat.transparent = true
         mat.opacity = index === chase ? 1 : index === prev ? 0.4 : 0.12

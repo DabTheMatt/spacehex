@@ -1,8 +1,8 @@
 :root {
-  --color-background: #07080a;
-  --color-primary: #b4bcc6;
-  --color-muted: #6a7078;
-  --color-accent: #8a96a2;
+  --color-background: #0b0c0c;
+  --color-primary: #d8d0bd;
+  --color-muted: #77756e;
+  --color-accent: #b58a4b;
 
   --font-ui: 'IBM Plex Mono', ui-monospace, monospace;
   --font-display: 'Cormorant Garamond', Palatino, serif;

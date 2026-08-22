@@ -1,12 +1,12 @@
-export const TILE_RISE_MS = 520
-export const TILE_REVEAL_MS = 880
-export const SHIP_TURN_MS = 560
-export const SHIP_RCS_KICK_MS = 200
-export const SHIP_RCS_COUNTER_MS = 180
+export const TILE_RISE_MS = 900
+export const TILE_REVEAL_MS = 1500
+export const SHIP_TURN_MS = 980
+export const SHIP_RCS_KICK_MS = 340
+export const SHIP_RCS_COUNTER_MS = 300
 export const SHIP_MAIN_IGNITE_MS = 1000
-export const SHIP_FLIGHT_MS = 900
-export const SHIP_BRAKE_MS = 280
-export const SHIP_SLIDE_MS = 420
+export const SHIP_FLIGHT_MS = 1600
+export const SHIP_BRAKE_MS = 480
+export const SHIP_SLIDE_MS = 700
 
 export interface EngineBurn {
   main: number

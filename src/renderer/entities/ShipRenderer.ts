@@ -344,7 +344,7 @@ function createNavMarker(
   active: boolean,
   label: string,
 ): THREE.Group {
-  const color = active ? palette.ivory : palette.dusk
+  const color = active ? palette.ochre : palette.ivory
   const g = new THREE.Group()
   const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
   const half = shipClass === 'DRZAZGA' ? 0.1 : 0.12
@@ -364,14 +364,14 @@ function createNavMarker(
   number.position.set(0, HULL_HEIGHT + 0.0015, 0.02)
   g.add(number)
 
-  const y = HULL_HEIGHT * 0.45
-  const main = makeEnginePlume(0.034, 0.12, new THREE.Vector3(0, y, -length * 0.5), new THREE.Vector3(0, 0, -1))
+  const y = HULL_HEIGHT * 0.5
+  const main = makeEnginePlume(0.028, 0.14, new THREE.Vector3(0, y, -length * 0.5 - 0.012), new THREE.Vector3(0, 0, -1))
   g.add(main)
 
-  const port = makeEnginePlume(0.016, 0.055, new THREE.Vector3(-half * 0.92, y, 0.02), new THREE.Vector3(-1, 0, 0))
+  const port = makeEnginePlume(0.012, 0.05, new THREE.Vector3(-half * 0.98, y, 0.02), new THREE.Vector3(-1, 0, 0))
   g.add(port)
 
-  const starboard = makeEnginePlume(0.016, 0.055, new THREE.Vector3(half * 0.92, y, 0.02), new THREE.Vector3(1, 0, 0))
+  const starboard = makeEnginePlume(0.012, 0.05, new THREE.Vector3(half * 0.98, y, 0.02), new THREE.Vector3(1, 0, 0))
   g.add(starboard)
 
   g.userData.engines = { main, port, starboard }
@@ -384,7 +384,10 @@ function makeEnginePlume(
   length: number,
   attach: THREE.Vector3,
   exhaust: THREE.Vector3,
-): THREE.Mesh {
+): THREE.Group {
+  const group = new THREE.Group()
+  group.position.copy(attach)
+  group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), exhaust.clone().normalize())
   const mesh = new THREE.Mesh(
     new THREE.ConeGeometry(radius, length, 8, 1, true),
     new THREE.MeshBasicMaterial({
@@ -392,34 +395,39 @@ function makeEnginePlume(
       transparent: true,
       opacity: 0,
       depthWrite: false,
+      depthTest: true,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
     }),
   )
-  const dir = exhaust.clone().normalize()
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
-  mesh.position.copy(attach).addScaledVector(dir, length * 0.5)
-  mesh.visible = false
-  return mesh
+  mesh.position.y = length * 0.5
+  group.add(mesh)
+  group.userData.plumeMesh = mesh
+  group.visible = false
+  return group
 }
 
 function applyEngineBurn(root: THREE.Object3D, burn: { main: number; port: number; starboard: number }): void {
   const engines = root.userData.engines as
-    | { main: THREE.Mesh; port: THREE.Mesh; starboard: THREE.Mesh }
+    | { main: THREE.Group; port: THREE.Group; starboard: THREE.Group }
     | undefined
   if (!engines) return
-  setPlume(engines.main, burn.main, 1.15)
-  setPlume(engines.port, burn.port, 0.9)
-  setPlume(engines.starboard, burn.starboard, 0.9)
+  setPlume(engines.main, burn.main, 1.35)
+  setPlume(engines.port, burn.port, 1.05)
+  setPlume(engines.starboard, burn.starboard, 1.05)
 }
 
-function setPlume(mesh: THREE.Mesh, intensity: number, lengthScale: number): void {
+function setPlume(group: THREE.Group, intensity: number, lengthScale: number): void {
+  const mesh = group.userData.plumeMesh as THREE.Mesh | undefined
+  if (!mesh) return
   const mat = mesh.material
   if (Array.isArray(mat) || !('opacity' in mat)) return
   const lit = clamp01(intensity)
-  mat.opacity = lit * 0.95
-  mesh.scale.set(0.7 + lit * 0.55, 0.4 + lit * lengthScale, 0.7 + lit * 0.55)
-  mesh.visible = lit > 0.03
+  mat.opacity = lit * 0.9
+  const sx = 0.65 + lit * 0.45
+  const sy = 0.55 + lit * lengthScale
+  group.scale.set(sx, sy, sx)
+  group.visible = lit > 0.03
 }
 
 function createDeckNumber(label: string): THREE.Mesh {
