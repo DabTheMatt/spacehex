@@ -83,7 +83,7 @@ export class SpaceScene {
     for (const event of events) {
       if (event.type === 'GAME_STARTED') {
         this.resetSession()
-        this.camera.focus({ q: 0, r: 0 })
+        this.camera.panTo({ q: 0, r: 0 })
       }
     }
   }

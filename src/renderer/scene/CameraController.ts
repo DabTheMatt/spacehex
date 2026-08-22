@@ -58,16 +58,11 @@ export class CameraController {
     this.camera.updateProjectionMatrix()
   }
 
-  focus(coord: HexCoord, height = 7): void {
-    this.panAnim = null
-    this.follow = null
-    const { x, z } = getWorldPosition(coord)
-    this.controls.target.set(x, 0, z)
-    const offset = new THREE.Vector3(0, height, height * 1.1)
-    this.camera.position.copy(this.controls.target).add(offset)
+  focus(coord: HexCoord): void {
+    this.panTo(coord)
   }
 
-  /** Keep current angle and distance; lock look-at to a world XZ each frame. */
+  /** Keep current angle and distance; ease the look-at toward a world XZ. */
   setFollow(point: { x: number; z: number } | null): void {
     if (!point) {
       this.follow = null
@@ -81,12 +76,22 @@ export class CameraController {
 
   /** Keep current angle and distance; glide the look-at to a hex. */
   panTo(coord: HexCoord): void {
-    this.follow = null
     const { x, z } = getWorldPosition(coord)
+    this.glideLookAt(x, z)
+  }
+
+  focusPair(a: HexCoord, b: HexCoord): void {
+    const pa = getWorldPosition(a)
+    const pb = getWorldPosition(b)
+    this.glideLookAt((pa.x + pb.x) / 2, (pa.z + pb.z) / 2)
+  }
+
+  private glideLookAt(x: number, z: number): void {
+    this.follow = null
     const toTarget = new THREE.Vector3(x, 0, z)
     const offset = this.camera.position.clone().sub(this.controls.target)
     const toPos = toTarget.clone().add(offset)
-    if (this.controls.target.distanceTo(toTarget) < 0.12) return
+    if (this.controls.target.distanceTo(toTarget) < 0.04) return
     const instant = prefersReducedMotion()
     this.panAnim = {
       start: performance.now(),
@@ -96,15 +101,6 @@ export class CameraController {
       fromPos: this.camera.position.clone(),
       toPos,
     }
-  }
-
-  focusPair(a: HexCoord, b: HexCoord): void {
-    const pa = getWorldPosition(a)
-    const pb = getWorldPosition(b)
-    const mx = (pa.x + pb.x) / 2
-    const mz = (pa.z + pb.z) / 2
-    this.controls.target.set(mx, 0, mz)
-    this.camera.position.set(mx, 8, mz + 9)
   }
 
   beginPan(clientX: number, clientY: number): void {
@@ -160,7 +156,7 @@ export class CameraController {
     this.applyFocusPan(now)
     this.applyWasd(dt)
     this.applyMapRotate(dt)
-    this.applyFollow()
+    this.applyFollow(dt)
     if (!this.grabbing && !this.panAnim && !this.follow) this.controls.update()
   }
 
@@ -177,12 +173,20 @@ export class CameraController {
     this.panAnim = null
   }
 
-  private applyFollow(): void {
+  private applyFollow(dt: number): void {
     const point = this.follow
     if (!point || this.grabbing) return
-    const offset = this.camera.position.clone().sub(this.controls.target)
-    this.controls.target.set(point.x, 0, point.z)
-    this.camera.position.copy(this.controls.target).add(offset)
+    const target = this.controls.target
+    const offset = this.camera.position.clone().sub(target)
+    const dx = point.x - target.x
+    const dz = point.z - target.z
+    const dist = Math.hypot(dx, dz)
+    const rate = dist > 0.45 ? 5.5 : 11
+    const k = 1 - Math.exp(-rate * dt)
+    target.x += dx * k
+    target.z += dz * k
+    target.y = 0
+    this.camera.position.copy(target).add(offset)
   }
 
   private applyFocusPan(now: number): void {

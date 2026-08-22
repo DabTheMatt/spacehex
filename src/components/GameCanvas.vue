@@ -44,7 +44,7 @@ function sync(): void {
 function focusShip(shipId: string): void {
   const ship = game.state.ships[shipId]
   if (!ship || !scene) return
-  scene.camera.focus(ship.coord)
+  scene.camera.panTo(ship.coord)
 }
 
 function resize(): void {

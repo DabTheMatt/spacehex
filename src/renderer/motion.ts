@@ -8,7 +8,7 @@ export const SHIP_MAIN_IGNITE_MS = 1000
 export const SHIP_FLIGHT_MS = 2400
 export const SHIP_BRAKE_MS = 720
 export const SHIP_SLIDE_MS = 1000
-export const CAMERA_FOCUS_MS = 1100
+export const CAMERA_FOCUS_MS = 1400
 /** Minimum center-to-center XZ distance so two hulls do not overlap. */
 export const SHIP_CLEARANCE = 0.38
 
