@@ -423,10 +423,7 @@ function createNavMarker(
   shape.closePath()
   const hull = new THREE.Mesh(
     new THREE.ExtrudeGeometry(shape, { depth: HULL_HEIGHT, bevelEnabled: false, steps: 1 }),
-    new THREE.MeshBasicMaterial({
-        color,
-        depthWrite: false,
-      }),
+    new THREE.MeshBasicMaterial({ color, depthWrite: false }),
   )
   hull.rotation.x = -Math.PI / 2
   hull.renderOrder = 2
