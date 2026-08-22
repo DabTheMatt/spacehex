@@ -49,9 +49,9 @@ export class HoverTargetRenderer {
 
   private addLabel(hover: BoardHover): void {
     const pos = getWorldPosition(hover.coord)
-    const sprite = makeCaption(hoverCaption(hover.kind))
-    sprite.position.set(pos.x, TILE_THICKNESS + 0.28, pos.z)
-    this.labels.add(sprite)
+    const mesh = makeCaption(hoverCaption(hover.kind))
+    mesh.position.set(pos.x, TILE_THICKNESS + 0.03, pos.z)
+    this.labels.add(mesh)
   }
 
   private addHit(hover: BoardHover, y: number, radius: number): void {
@@ -74,7 +74,7 @@ export class HoverTargetRenderer {
   }
 }
 
-function makeCaption(text: string): THREE.Sprite {
+function makeCaption(text: string): THREE.Mesh {
   const canvas = document.createElement('canvas')
   canvas.width = 512
   canvas.height = 96
@@ -82,23 +82,24 @@ function makeCaption(text: string): THREE.Sprite {
   if (ctx) {
     ctx.clearRect(0, 0, 512, 96)
     ctx.fillStyle = css.ivory
-    ctx.font = '500 42px "IBM Plex Mono", monospace'
+    ctx.font = '500 26px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(text, 256, 50)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
-  const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.95, 0.18),
+    new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
       depthTest: false,
       depthWrite: false,
+      side: THREE.DoubleSide,
     }),
   )
-  sprite.center.set(0.5, 0.5)
-  sprite.scale.set(1.35, 0.25, 1)
-  sprite.renderOrder = 12
-  return sprite
+  mesh.rotation.x = -Math.PI / 2
+  mesh.renderOrder = 12
+  return mesh
 }

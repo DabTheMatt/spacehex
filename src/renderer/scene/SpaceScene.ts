@@ -8,10 +8,11 @@ import { ShipRenderer } from '../entities/ShipRenderer'
 import { HoverTargetRenderer } from '../entities/HoverTargetRenderer'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
-import { coordKey } from '../../game/board/HexCoord'
+import { coordKey, parseCoordKey } from '../../game/board/HexCoord'
 import { userDataFromHits } from './pickHelpers'
 import type { BoardHover } from '../../ui/boardHover'
 import { TILE_SETTLED_Y, TILE_SLOT_Y } from '../board/TileRenderer'
+import { activeShip } from '../../game/rules/fuel'
 import {
   clamp01,
   easeOutCubic,
@@ -144,20 +145,36 @@ export class SpaceScene {
         continue
       }
       if (prev.q === ship.coord.q && prev.r === ship.coord.r) continue
+      const dest = { ...ship.coord }
+      if (this.ships.isFlyingTo(ship.id, dest) || this.ships.isParkedAt(ship.id, dest)) {
+        this.prevShipCoords.set(ship.id, dest)
+        continue
+      }
       if (this.ships.isBusy(ship.id)) continue
-      const destKey = coordKey(ship.coord)
+      const destKey = coordKey(dest)
       if (this.riseByKey.has(destKey)) {
         this.ships.hold(ship.id, prev)
         const queued = this.flightsByTile.get(destKey) ?? []
-        queued.push({ shipId: ship.id, from: prev, to: { ...ship.coord } })
+        queued.push({ shipId: ship.id, from: prev, to: dest })
         this.flightsByTile.set(destKey, queued)
       } else {
-        this.ships.fly(ship.id, prev, ship.coord)
+        this.ships.fly(ship.id, prev, dest)
       }
-      this.prevShipCoords.set(ship.id, { ...ship.coord })
+      this.prevShipCoords.set(ship.id, dest)
     }
 
+    this.beginExploreFlight(state)
     this.prevTileKeys = new Set(tileKeys)
+  }
+
+  private beginExploreFlight(state: GameState): void {
+    if (state.phase !== 'TILE_PLACEMENT' || !state.exploration.target) return
+    const ship = activeShip(state)
+    const dest = state.exploration.target
+    if (this.ships.isFlyingTo(ship.id, dest) || this.ships.isParkedAt(ship.id, dest)) return
+    if (this.ships.isBusy(ship.id)) return
+    const from = this.prevShipCoords.get(ship.id) ?? ship.coord
+    this.ships.fly(ship.id, from, dest)
   }
 
   private applySync(): void {
@@ -185,6 +202,9 @@ export class SpaceScene {
       this.board.setTileY(key, TILE_SETTLED_Y)
       const flights = this.flightsByTile.get(key) ?? []
       this.flightsByTile.delete(key)
+      if (flights.length === 0 && !this.ships.isAnyoneFlyingTo(parseCoordKey(key))) {
+        this.hideGlyphKeys.delete(key)
+      }
       for (const flight of flights) {
         this.ships.fly(flight.shipId, flight.from, flight.to)
       }

@@ -26,7 +26,7 @@ import {
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
-const RIM = HEX_SIZE * 0.7
+const RIM = HEX_SIZE * 0.32
 const HULL_HEIGHT = 0.11
 const BASE_HOVER = TILE_THICKNESS + 0.08
 
@@ -63,6 +63,7 @@ export class ShipRenderer {
   private motion = new Map<string, ShipMotion>()
   private facing = new Map<string, number>()
   private lastXZ = new Map<string, { x: number; z: number }>()
+  private visualPark = new Map<string, HexCoord>()
   private landed: HexCoord[] = []
 
   isBusy(shipId: string): boolean {
@@ -87,6 +88,7 @@ export class ShipRenderer {
     this.motion.clear()
     this.facing.clear()
     this.lastXZ.clear()
+    this.visualPark.clear()
     this.landed = []
     this.group.clear()
   }
@@ -103,6 +105,23 @@ export class ShipRenderer {
 
   hold(shipId: string, coord: HexCoord): void {
     this.motion.set(shipId, { kind: 'hold', coord })
+  }
+
+  isFlyingTo(shipId: string, coord: HexCoord): boolean {
+    const motion = this.motion.get(shipId)
+    return motion?.kind === 'fly' && coordKey(motion.to) === coordKey(coord)
+  }
+
+  isParkedAt(shipId: string, coord: HexCoord): boolean {
+    const parked = this.visualPark.get(shipId)
+    return parked ? coordKey(parked) === coordKey(coord) : false
+  }
+
+  isAnyoneFlyingTo(coord: HexCoord): boolean {
+    for (const motion of this.motion.values()) {
+      if (motion.kind === 'fly' && coordKey(motion.to) === coordKey(coord)) return true
+    }
+    return false
   }
 
   fly(shipId: string, from: HexCoord, to: HexCoord): void {
@@ -132,6 +151,10 @@ export class ShipRenderer {
   }
 
   sync(state: GameState): void {
+    for (const ship of Object.values(state.ships)) {
+      const parked = this.visualPark.get(ship.id)
+      if (parked && coordKey(parked) === coordKey(ship.coord)) this.visualPark.delete(ship.id)
+    }
     const parked = new Map<string, ShipState[]>()
     const flying: ShipState[] = []
     for (const ship of Object.values(state.ships)) {
@@ -221,7 +244,7 @@ export class ShipRenderer {
     const motion = this.motion.get(ship.id)
     if (motion?.kind === 'fly') return null
     if (motion?.kind === 'hold') return motion.coord
-    return ship.coord
+    return this.visualPark.get(ship.id) ?? ship.coord
   }
 
   private stackYaw(state: GameState, group: ShipState[], coord: HexCoord): number {
@@ -339,6 +362,7 @@ export class ShipRenderer {
       if (moveT >= 1) {
         applyEngineBurn(child, ENGINES_OFF)
         this.landed.push({ ...motion.to })
+        this.visualPark.set(shipId, { ...motion.to })
         this.motion.delete(shipId)
         settled = true
       }
@@ -401,18 +425,14 @@ function createNavMarker(
     new THREE.ExtrudeGeometry(shape, { depth: HULL_HEIGHT, bevelEnabled: false, steps: 1 }),
     new THREE.MeshBasicMaterial({
         color,
-        transparent: true,
-        opacity: 0.78,
         depthWrite: false,
-        depthTest: false,
       }),
   )
   hull.rotation.x = -Math.PI / 2
   hull.renderOrder = 2
   g.add(hull)
 
-  g.add(hullMark(label, length, half, true))
-  g.add(hullMark(label, length, half, false))
+  g.add(hullMark(label, length, half))
 
   const y = HULL_HEIGHT * 0.5
   const main = makeThruster(
@@ -454,7 +474,7 @@ function createNavMarker(
   g.userData.engines = { main, port, starboard, brakePort, brakeStarboard }
   if (active) {
     const beacon = new THREE.Mesh(
-      new THREE.SphereGeometry(0.018, 10, 8),
+      new THREE.SphereGeometry(0.008, 8, 6),
       new THREE.MeshBasicMaterial({
         color: 0xf4f1e8,
         transparent: true,
@@ -464,7 +484,7 @@ function createNavMarker(
         blending: THREE.AdditiveBlending,
       }),
     )
-    beacon.position.set(0, HULL_HEIGHT + 0.045, length * 0.08)
+    beacon.position.set(-half * 0.42, HULL_HEIGHT + 0.022, length * 0.22)
     beacon.renderOrder = 10
     g.add(beacon)
     g.userData.beacon = beacon
@@ -574,40 +594,32 @@ function setPlume(group: THREE.Group, intensity: number, lengthScale: number): v
   mesh.visible = lit > 0.03
 }
 
-function hullMark(label: string, length: number, half: number, port: boolean): THREE.Mesh {
-  const y = HULL_HEIGHT * 0.5
-  const nose = new THREE.Vector3(0, y, length * 0.5)
-  const stern = new THREE.Vector3(port ? -half : half, y, -length * 0.5)
-  const mid = nose.clone().add(stern).multiplyScalar(0.5)
-  const along = stern.clone().sub(nose).normalize()
-  const up = new THREE.Vector3(0, 1, 0)
-  const outward = new THREE.Vector3().crossVectors(along, up).normalize()
-  if ((port && outward.x > 0) || (!port && outward.x < 0)) outward.negate()
-  mid.addScaledVector(outward, 0.006)
-
-  const edge = Math.hypot(half, length)
-  const width = Math.min(0.2, edge * 0.42)
-  const height = HULL_HEIGHT * 0.7
-  const mesh = createHullNumber(label, width, height)
-  const xAxis = new THREE.Vector3().crossVectors(up, outward).normalize()
-  const yAxis = new THREE.Vector3().crossVectors(outward, xAxis).normalize()
-  mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, outward))
-  mesh.position.copy(mid)
+function hullMark(label: string, length: number, half: number): THREE.Mesh {
+  const width = Math.min(0.22, half * 1.7)
+  const depth = Math.min(0.1, length * 0.26)
+  const mesh = createHullNumber(label, width, depth)
+  mesh.rotation.x = -Math.PI / 2
+  mesh.position.set(0, HULL_HEIGHT + 0.004, length * 0.16)
+  mesh.renderOrder = 4
   return mesh
 }
 
 function createHullNumber(label: string, width: number, height: number): THREE.Mesh {
   const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 96
+  canvas.width = 384
+  canvas.height = 128
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.clearRect(0, 0, 256, 96)
-    ctx.fillStyle = css.ink
-    ctx.font = '700 52px "IBM Plex Mono", monospace'
+    ctx.clearRect(0, 0, 384, 128)
+    ctx.font = '800 72px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(label, 128, 50)
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = 14
+    ctx.strokeStyle = css.ink
+    ctx.strokeText(label, 192, 68)
+    ctx.fillStyle = css.ivory
+    ctx.fillText(label, 192, 68)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
@@ -618,9 +630,6 @@ function createHullNumber(label: string, width: number, height: number): THREE.M
       transparent: true,
       depthWrite: false,
       depthTest: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
     }),
   )
 }
