@@ -3,7 +3,6 @@ import { dicePips, EDGE_MARGIN, OVERLAY_HOVER } from '../renderer/board/planetLo
 import { BASE_HOVER } from '../renderer/entities/ShipRenderer'
 import { EVA_HUB_SPIN } from '../renderer/board/evaDocks'
 import { missileSidePoint, missileWorldPos } from '../renderer/fx/missilePath'
-import { hullFillRatio } from '../renderer/entities/ShipRenderer'
 
 describe('dice pips', () => {
   it('uses a six-sided die layout', () => {
@@ -53,11 +52,5 @@ describe('missiles', () => {
     const b = missileSidePoint(origin, 0, 1)
     expect(a.x).toBeGreaterThan(0)
     expect(b.x).toBeLessThan(0)
-  })
-
-  it('fills hull along the length by remaining hit points', () => {
-    expect(hullFillRatio(3, 3)).toBe(1)
-    expect(hullFillRatio(1, 3)).toBeCloseTo(1 / 3)
-    expect(hullFillRatio(0, 3)).toBe(0)
   })
 })

@@ -21,6 +21,7 @@ type Shot = {
   boom: THREE.Mesh
   done: boolean
   hit: boolean
+  trailArmed: boolean
   onHit?: (target: Vec3) => void
 }
 
@@ -85,7 +86,8 @@ export class CombatFx {
           z: shot.rocket.position.z,
         }
         shot.rocket.visible = true
-        shot.trail.visible = true
+        const homing = elapsed > MISSILE_SIDE_MS
+        shot.trail.visible = homing
         shot.rocket.position.set(p.x, p.y, p.z)
         const dx = p.x - prev.x
         const dy = p.y - prev.y
@@ -93,7 +95,13 @@ export class CombatFx {
         if (dx * dx + dy * dy + dz * dz > 1e-8) {
           shot.rocket.lookAt(p.x + dx, p.y + dy, p.z + dz)
         }
-        this.pushTrail(shot, p)
+        if (homing) {
+          if (!shot.trailArmed) {
+            this.seedTrail(shot, p)
+            shot.trailArmed = true
+          }
+          this.pushTrail(shot, p)
+        }
       } else {
         shot.rocket.visible = false
         if (!shot.hit) {
@@ -183,7 +191,16 @@ export class CombatFx {
       boom,
       done: false,
       hit: false,
+      trailArmed: false,
       onHit,
+    }
+  }
+
+  private seedTrail(shot: Shot, p: Vec3): void {
+    for (let i = 0; i < TRAIL; i++) {
+      shot.positions[i * 3] = p.x
+      shot.positions[i * 3 + 1] = p.y
+      shot.positions[i * 3 + 2] = p.z
     }
   }
 

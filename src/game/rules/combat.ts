@@ -20,6 +20,15 @@ export type CombatReject =
   | 'ATTACK_LIMIT'
   | 'WRECK'
 
+export function hostileOnHex(state: GameState, defenderId: string): boolean {
+  if (state.phase !== 'PLAYER_TURN') return false
+  const attacker = activeShip(state)
+  const defender = state.ships[defenderId]
+  if (!attacker || !defender || defender.id === attacker.id) return false
+  if (defender.coord.q !== attacker.coord.q || defender.coord.r !== attacker.coord.r) return false
+  return attacker.hull > 0 && defender.hull > 0
+}
+
 export function canDeclareAttack(
   state: GameState,
   defenderId: string,

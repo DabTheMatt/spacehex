@@ -146,8 +146,6 @@ export class SpaceScene {
         startedAt: performance.now(),
       }
       this.ships.setThreat(null)
-      this.ships.holdHull(started.attackerId, started.attackerHull)
-      this.ships.holdHull(started.defenderId, started.defenderHull)
       this.ships.setDuel(started.attackerId, started.defenderId, started.coord)
       this.camera.inspectCombat(started.coord, 0)
     }
@@ -321,7 +319,6 @@ export class SpaceScene {
       if (duel.index >= duel.shots.length) {
         duel.stage = 'recover'
         this.ships.clearDuel()
-        this.ships.clearHullOverride()
         this.applySync()
         this.camera.clearInspectLimits()
         return
@@ -334,8 +331,6 @@ export class SpaceScene {
       duel.sideCount[shot.attackerId] = side + 1
       this.combat.spawnOne(from, from.yaw, to, now, side, (target) => {
         this.combat.spawnDamage(target, shot.damage, performance.now())
-        const maxHull = this.lastState?.ships[shot.defenderId]?.maxHull ?? 3
-        this.ships.setHull(shot.defenderId, shot.hullAfter, maxHull)
       })
       duel.index += 1
       return

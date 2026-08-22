@@ -94,7 +94,6 @@ describe('declared combat', () => {
     let next = applyCommand(state, { type: 'DECLARE_ATTACK', defenderId: 'mewa-2' }).state
     expect(next.ships['mewa-1'].hull).toBe(2)
     expect(next.ships['mewa-2'].hull).toBe(2)
-    next = applyCommand(next, { type: 'SKIP_MOVEMENT' }).state
     next = applyCommand(next, { type: 'END_TURN' }).state
     expect(next.activePlayerId).toBe('player-2')
     expect(canDeclareAttack(next, 'mewa-1').ok).toBe(true)

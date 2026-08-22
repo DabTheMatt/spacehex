@@ -20,7 +20,7 @@ import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { coordKey } from '@/game/board/HexCoord'
 import { planetInspectTheta } from '@/renderer/board/planetLots'
-import { canDeclareAttack } from '@/game/rules/combat'
+import { canDeclareAttack, hostileOnHex } from '@/game/rules/combat'
 import { isEvaHex } from '@/game/rules/planetMarket'
 
 const DRAG_PX = 12
@@ -65,7 +65,7 @@ function resize(): void {
 function updateHover(clientX: number, clientY: number): void {
   if (!scene || game.state.phase === 'TILE_PLACEMENT') return
   const shipHit = scene.pickShip(clientX, clientY)
-  if (shipHit && canDeclareAttack(game.state, shipHit.shipId).ok) {
+  if (shipHit && hostileOnHex(game.state, shipHit.shipId)) {
     ui.threatShipId = shipHit.shipId
     ui.hover = null
     scene.camera.setOrbitEnabled(false)

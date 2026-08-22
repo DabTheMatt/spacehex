@@ -155,7 +155,9 @@ const cargoRows = computed(() => {
 })
 
 const showEndTurn = computed(
-  () => game.state.movementSpent && game.state.phase !== 'TILE_PLACEMENT',
+  () =>
+    game.state.phase !== 'TILE_PLACEMENT' &&
+    (game.state.movementSpent || (game.player.attacksThisTurn ?? 0) > 0),
 )
 
 function pad(value: number): string {

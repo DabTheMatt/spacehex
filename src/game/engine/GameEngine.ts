@@ -477,7 +477,8 @@ function endTurn(state: GameState): EngineResult {
   if (state.phase === 'TILE_PLACEMENT') {
     return reject(state, 'END_TURN', 'MUST_PLACE_TILE')
   }
-  if (!state.movementSpent) {
+  const attacked = (activePlayer(state).attacksThisTurn ?? 0) > 0
+  if (!state.movementSpent && !attacked) {
     return reject(state, 'END_TURN', 'MUST_MOVE_OR_SKIP')
   }
   const currentIndex = PLAYER_IDS.indexOf(state.activePlayerId as (typeof PLAYER_IDS)[number])
