@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { HEX_SIZE } from '../../game/board/hexMath'
+import { palette } from '../theme'
 
 export const TILE_THICKNESS = 0.1
 /** Incoming tile sits just under the board: its top face is the placed-hex floor (y = 0). */
@@ -192,7 +193,7 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
   const g = new THREE.Group()
   const y = TILE_THICKNESS + 0.012
   const tick = 0.11
-  const mat = new THREE.LineBasicMaterial({ color: 0xb58a4b })
+  const mat = new THREE.LineBasicMaterial({ color: palette.ochre })
   for (let i = 0; i < 6; i++) {
     const a0 = (Math.PI / 3) * i
     const a1 = (Math.PI / 3) * ((i + 1) % 6)
@@ -231,7 +232,7 @@ export function makeDashedHexGhost(direction: number, opacity = 0.22): THREE.Gro
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(pts),
     new THREE.LineDashedMaterial({
-      color: 0xb58a4b,
+      color: palette.ochre,
       dashSize: 0.07,
       gapSize: 0.055,
       transparent: true,
@@ -246,7 +247,7 @@ export function makeDashedHexGhost(direction: number, opacity = 0.22): THREE.Gro
   const hit = new THREE.Mesh(
     new THREE.ShapeGeometry(hexShape(radius)),
     new THREE.MeshBasicMaterial({
-      color: 0xb58a4b,
+      color: palette.ochre,
       transparent: true,
       opacity: Math.min(0.08, opacity * 0.25),
       side: THREE.DoubleSide,

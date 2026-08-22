@@ -56,7 +56,7 @@ function evaGlyph(color: number): THREE.Group {
     const x = -0.22 + t * 0.5
     for (const side of [-1, 1]) {
       const lamp = new THREE.Mesh(
-        new THREE.CircleGeometry(0.022, 10),
+        new THREE.CircleGeometry(0.007, 8),
         new THREE.MeshBasicMaterial({
           color: palette.ochre,
           transparent: true,

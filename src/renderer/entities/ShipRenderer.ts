@@ -14,7 +14,11 @@ import {
   lerp,
   lerpAngle,
   prefersReducedMotion,
+  shipEngineBurn,
+  shortestAngleDelta,
+  SHIP_BRAKE_MS,
   SHIP_FLIGHT_MS,
+  SHIP_MAIN_IGNITE_MS,
   SHIP_SLIDE_MS,
   SHIP_TURN_MS,
 } from '../motion'
@@ -34,8 +38,10 @@ type FlyMotion = {
   toZ: number
   startYaw: number
   endYaw: number
+  yawDelta: number
   start: number
   turnMs: number
+  igniteMs: number
   moveMs: number
 }
 type SlideMotion = {
@@ -70,6 +76,7 @@ export class ShipRenderer {
     const last = this.lastXZ.get(shipId)
     const endYaw = Math.atan2(toW.x - fromW.x, toW.z - fromW.z)
     const startYaw = this.facing.get(shipId) ?? endYaw
+    const yawDelta = shortestAngleDelta(startYaw, endYaw)
     const instant = prefersReducedMotion()
     this.motion.set(shipId, {
       kind: 'fly',
@@ -81,8 +88,10 @@ export class ShipRenderer {
       toZ: toW.z,
       startYaw,
       endYaw,
+      yawDelta,
       start: performance.now(),
-      turnMs: instant ? 0 : SHIP_TURN_MS,
+      turnMs: instant || Math.abs(yawDelta) < 0.04 ? 0 : SHIP_TURN_MS,
+      igniteMs: instant ? 0 : SHIP_MAIN_IGNITE_MS,
       moveMs: instant ? 0 : SHIP_FLIGHT_MS,
     })
   }
@@ -140,7 +149,9 @@ export class ShipRenderer {
       const playerNo = Number(ship.playerId.replace(/\D/g, '')) || 1
       const active = state.players[state.activePlayerId]?.shipId === ship.id
       const wrapper = new THREE.Group()
-      wrapper.add(createNavMarker(ship.class, active, String(playerNo)))
+      const marker = createNavMarker(ship.class, active, String(playerNo))
+      wrapper.add(marker)
+      wrapper.userData.engines = marker.userData.engines
       wrapper.rotation.y = yaw
       wrapper.position.set(last.x, BASE_HOVER, last.z)
       wrapper.userData.bob = { baseY: BASE_HOVER, phase: playerNo * 1.7 }
@@ -221,10 +232,12 @@ export class ShipRenderer {
       const shipId = child.userData.shipId as string
       const motion = this.motion.get(shipId)
       if (!motion) {
+        applyEngineBurn(child, { main: 0, port: 0, starboard: 0 })
         this.remember(child)
         continue
       }
       if (motion.kind === 'hold') {
+        applyEngineBurn(child, { main: 0, port: 0, starboard: 0 })
         this.remember(child)
         continue
       }
@@ -249,6 +262,16 @@ export class ShipRenderer {
       const bob = child.userData.bob as { baseY: number; phase: number } | undefined
       if (bob) bob.baseY = BASE_HOVER
 
+      const burn = shipEngineBurn({
+        elapsed,
+        turnMs: motion.turnMs,
+        igniteMs: motion.igniteMs,
+        moveMs: motion.moveMs,
+        yawDelta: motion.yawDelta,
+        brakeMs: SHIP_BRAKE_MS,
+      })
+      applyEngineBurn(child, burn)
+
       if (turnT < 1) {
         child.position.x = motion.fromX
         child.position.z = motion.fromZ
@@ -256,7 +279,17 @@ export class ShipRenderer {
         continue
       }
 
-      const moveT = motion.moveMs <= 0 ? 1 : clamp01((elapsed - motion.turnMs) / motion.moveMs)
+      const afterTurn = elapsed - motion.turnMs
+      if (afterTurn < motion.igniteMs) {
+        child.position.x = motion.fromX
+        child.position.z = motion.fromZ
+        child.rotation.y = motion.endYaw
+        this.facing.set(shipId, motion.endYaw)
+        this.remember(child)
+        continue
+      }
+
+      const moveT = motion.moveMs <= 0 ? 1 : clamp01((afterTurn - motion.igniteMs) / motion.moveMs)
       const e = easeInOutCubic(moveT)
       child.position.x = lerp(motion.fromX, motion.toX, e)
       child.position.z = lerp(motion.fromZ, motion.toZ, e)
@@ -264,6 +297,7 @@ export class ShipRenderer {
       this.facing.set(shipId, motion.endYaw)
       this.remember(child)
       if (moveT >= 1) {
+        applyEngineBurn(child, { main: 0, port: 0, starboard: 0 })
         this.motion.delete(shipId)
         settled = true
       }
@@ -310,7 +344,7 @@ function createNavMarker(
   active: boolean,
   label: string,
 ): THREE.Group {
-  const color = active ? palette.ochre : palette.ivory
+  const color = active ? palette.ivory : palette.dusk
   const g = new THREE.Group()
   const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
   const half = shipClass === 'DRZAZGA' ? 0.1 : 0.12
@@ -329,7 +363,63 @@ function createNavMarker(
   const number = createDeckNumber(label)
   number.position.set(0, HULL_HEIGHT + 0.0015, 0.02)
   g.add(number)
+
+  const y = HULL_HEIGHT * 0.45
+  const main = makeEnginePlume(0.034, 0.12, new THREE.Vector3(0, y, -length * 0.5), new THREE.Vector3(0, 0, -1))
+  g.add(main)
+
+  const port = makeEnginePlume(0.016, 0.055, new THREE.Vector3(-half * 0.92, y, 0.02), new THREE.Vector3(-1, 0, 0))
+  g.add(port)
+
+  const starboard = makeEnginePlume(0.016, 0.055, new THREE.Vector3(half * 0.92, y, 0.02), new THREE.Vector3(1, 0, 0))
+  g.add(starboard)
+
+  g.userData.engines = { main, port, starboard }
+  applyEngineBurn(g, { main: 0, port: 0, starboard: 0 })
   return g
+}
+
+function makeEnginePlume(
+  radius: number,
+  length: number,
+  attach: THREE.Vector3,
+  exhaust: THREE.Vector3,
+): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.ConeGeometry(radius, length, 8, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: palette.engine,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    }),
+  )
+  const dir = exhaust.clone().normalize()
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+  mesh.position.copy(attach).addScaledVector(dir, length * 0.5)
+  mesh.visible = false
+  return mesh
+}
+
+function applyEngineBurn(root: THREE.Object3D, burn: { main: number; port: number; starboard: number }): void {
+  const engines = root.userData.engines as
+    | { main: THREE.Mesh; port: THREE.Mesh; starboard: THREE.Mesh }
+    | undefined
+  if (!engines) return
+  setPlume(engines.main, burn.main, 1.15)
+  setPlume(engines.port, burn.port, 0.9)
+  setPlume(engines.starboard, burn.starboard, 0.9)
+}
+
+function setPlume(mesh: THREE.Mesh, intensity: number, lengthScale: number): void {
+  const mat = mesh.material
+  if (Array.isArray(mat) || !('opacity' in mat)) return
+  const lit = clamp01(intensity)
+  mat.opacity = lit * 0.95
+  mesh.scale.set(0.7 + lit * 0.55, 0.4 + lit * lengthScale, 0.7 + lit * 0.55)
+  mesh.visible = lit > 0.03
 }
 
 function createDeckNumber(label: string): THREE.Mesh {
