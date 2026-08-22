@@ -219,7 +219,7 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
 }
 
 /** Empty-neighbor ghost — dashed outline only, not a placed tile. */
-export function makeDashedHexGhost(direction: number): THREE.Group {
+export function makeDashedHexGhost(direction: number, opacity = 0.22): THREE.Group {
   const g = new THREE.Group()
   const radius = HEX_SIZE * 0.96
   const y = 0.006
@@ -235,7 +235,7 @@ export function makeDashedHexGhost(direction: number): THREE.Group {
       dashSize: 0.07,
       gapSize: 0.055,
       transparent: true,
-      opacity: 0.9,
+      opacity,
     }),
   )
   line.computeLineDistances()
@@ -248,7 +248,7 @@ export function makeDashedHexGhost(direction: number): THREE.Group {
     new THREE.MeshBasicMaterial({
       color: 0xb58a4b,
       transparent: true,
-      opacity: 0.06,
+      opacity: Math.min(0.08, opacity * 0.25),
       side: THREE.DoubleSide,
       depthWrite: false,
     }),
@@ -260,3 +260,4 @@ export function makeDashedHexGhost(direction: number): THREE.Group {
   g.userData = pick
   return g
 }
+

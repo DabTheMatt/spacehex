@@ -74,10 +74,9 @@ export class BoardRenderer {
     }
 
     this.drawActionMarkers(state)
-    if (options.showExploreGhosts) this.drawExploreGhosts(state)
-    else if (options.hover?.kind === 'EXPLORE') this.drawHoverGhost(options.hover.direction, options.hover.coord)
+    this.drawExploreGhosts(state, options.hover?.kind === 'EXPLORE' ? options.hover.direction : null)
     if (options.hover?.kind === 'MOVE' || options.hover?.kind === 'STAY') {
-      this.drawHoverGhost(-1, options.hover.coord)
+      this.drawHoverGhost(-1, options.hover.coord, 0.85)
     }
   }
 
@@ -110,21 +109,20 @@ export class BoardRenderer {
     }
   }
 
-  private drawHoverGhost(direction: number, coord: { q: number; r: number }): void {
-    const ghost = makeDashedHexGhost(direction)
+  private drawHoverGhost(direction: number, coord: { q: number; r: number }, opacity: number): void {
+    const ghost = makeDashedHexGhost(direction, opacity)
     const pos = getWorldPosition(coord)
     ghost.position.set(pos.x, TILE_SETTLED_Y, pos.z)
     this.markers.add(ghost)
   }
 
-  private drawExploreGhosts(state: GameState): void {
-    if (state.phase === 'TILE_PLACEMENT' || state.movementSpent) return
-    if (state.exploration.status !== 'SELECTING_DIRECTION') return
+  private drawExploreGhosts(state: GameState, highlightDir: number | null): void {
+    if (state.phase !== 'PLAYER_TURN' || state.movementSpent) return
     const origin = activeShip(state).coord
     for (let dir = 0; dir < 6; dir++) {
       if (!canExploreDirection(state, dir)) continue
       const target = getNeighbor(origin, dir)
-      this.drawHoverGhost(dir, target)
+      this.drawHoverGhost(dir, target, highlightDir === dir ? 0.92 : 0.16)
     }
   }
 

@@ -27,8 +27,6 @@ export interface SceneOptions {
   selectedKey?: string | null
   showExploreGhosts?: boolean
   hover?: BoardHover | null
-  peekTileId?: string | null
-  hoverRotation?: number
 }
 
 export class SpaceScene {
@@ -75,8 +73,7 @@ export class SpaceScene {
   sync(state: GameState, options: SceneOptions): void {
     this.lastState = state
     this.lastOptions = options
-    this.camera.mapRotateEnabled =
-      state.phase !== 'TILE_PLACEMENT' && options.hover?.kind !== 'EXPLORE'
+    this.camera.mapRotateEnabled = true
     this.camera.setOrbitEnabled(!options.hover)
     this.applySync()
   }
@@ -92,11 +89,6 @@ export class SpaceScene {
   pickHover(clientX: number, clientY: number): BoardHover | null {
     const hits = this.intersectAll(clientX, clientY, this.hoverTargets.pickables())
     return userDataFromHits<BoardHover>(hits, 'boardHover') ?? null
-  }
-
-  pickRotateControl(clientX: number, clientY: number): boolean {
-    const hits = this.intersectAll(clientX, clientY, this.hoverTargets.rotatePickables())
-    return userDataFromHits<boolean>(hits, 'rotateControl') === true
   }
 
   pickDirection(clientX: number, clientY: number): { direction: number } | null {
@@ -165,15 +157,7 @@ export class SpaceScene {
     if (!this.lastState || !this.lastOptions) return
     this.queueStateMotions(this.lastState)
     this.board.sync(this.lastState, { ...this.lastOptions, tileY: this.tileY })
-    const peek =
-      this.lastOptions.hover?.kind === 'EXPLORE' && this.lastOptions.peekTileId
-        ? {
-            coord: this.lastOptions.hover.coord,
-            tileId: this.lastOptions.peekTileId,
-            rotation: this.lastOptions.hoverRotation ?? 0,
-          }
-        : null
-    this.preview.sync(this.lastState, peek)
+    this.preview.sync(this.lastState)
     this.ships.sync(this.lastState)
     this.hoverTargets.sync(this.lastState, this.lastOptions.hover ?? null)
   }
