@@ -38,19 +38,30 @@ export class HoverTargetRenderer {
       }
     }
 
-    if (hover) this.addLabel(hover)
+    if (hover) this.addLabel(hover, ship.coord)
   }
 
-  tick(_camera: THREE.Camera): void {}
+  tick(time = 0): void {
+    const pulse = 0.42 + 0.58 * (0.5 + 0.5 * Math.sin(time * 3.4))
+    const scale = 0.92 + 0.08 * (0.5 + 0.5 * Math.sin(time * 3.4))
+    this.labels.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return
+      const mat = obj.material
+      if (Array.isArray(mat) || !('opacity' in mat)) return
+      mat.opacity = pulse
+      obj.scale.setScalar(scale)
+    })
+  }
 
   pickables(): THREE.Object3D[] {
     return this.group.children.filter((child) => child !== this.labels)
   }
 
-  private addLabel(hover: BoardHover): void {
+  private addLabel(hover: BoardHover, origin: { q: number; r: number }): void {
     const pos = getWorldPosition(hover.coord)
+    const edge = edgeOffset(hover.coord, origin)
     const mesh = makeCaption(hoverCaption(hover.kind))
-    mesh.position.set(pos.x, TILE_THICKNESS + 0.03, pos.z)
+    mesh.position.set(pos.x + edge.x, TILE_THICKNESS + 0.035, pos.z + edge.z)
     this.labels.add(mesh)
   }
 
@@ -90,10 +101,11 @@ function makeCaption(text: string): THREE.Mesh {
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.95, 0.18),
+    new THREE.PlaneGeometry(0.62, 0.14),
     new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
+      opacity: 1,
       depthTest: false,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -102,4 +114,24 @@ function makeCaption(text: string): THREE.Mesh {
   mesh.rotation.x = -Math.PI / 2
   mesh.renderOrder = 12
   return mesh
+}
+
+function edgeOffset(
+  target: { q: number; r: number },
+  origin: { q: number; r: number },
+): { x: number; z: number } {
+  const from = getWorldPosition(origin)
+  const to = getWorldPosition(target)
+  let dx = from.x - to.x
+  let dz = from.z - to.z
+  const len = Math.hypot(dx, dz)
+  if (len < 0.001) {
+    dx = 0
+    dz = 1
+  } else {
+    dx /= len
+    dz /= len
+  }
+  const rim = HEX_SIZE * 0.7
+  return { x: dx * rim, z: dz * rim }
 }

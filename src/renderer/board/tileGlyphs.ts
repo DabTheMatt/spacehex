@@ -211,6 +211,14 @@ function tankerGlyph(color: number): THREE.Group {
   return g
 }
 
+function crateGlyph(color: number, sx: number, sy: number, sz: number): THREE.Group {
+  const g = new THREE.Group()
+  const geom = new THREE.BoxGeometry(sx, sy, sz)
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geom), lineMat(color))
+  g.add(edges)
+  return g
+}
+
 function transportGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
   g.add(poly([[-0.18, -0.28], [0.18, -0.28], [0.18, 0.08], [-0.18, 0.08]], color, true))
@@ -221,6 +229,19 @@ function transportGlyph(color: number): THREE.Group {
   g.add(poly([[0.06, 0.08], [0.14, 0.2]], color))
   g.add(poly([[-0.12, -0.28], [-0.2, -0.42]], color))
   g.add(poly([[0.12, -0.28], [0.22, -0.4]], color))
+
+  const crates: Array<{ x: number; z: number; spinY: number; sx: number; sy: number; sz: number }> = [
+    { x: -0.34, z: -0.14, spinY: 0.62, sx: 0.09, sy: 0.07, sz: 0.11 },
+    { x: 0.3, z: -0.2, spinY: -0.48, sx: 0.08, sy: 0.06, sz: 0.09 },
+    { x: 0.02, z: 0.34, spinY: 0.84, sx: 0.07, sy: 0.07, sz: 0.08 },
+  ]
+  for (const crate of crates) {
+    const box = crateGlyph(color, crate.sx, crate.sy, crate.sz)
+    box.position.set(crate.x, Y + 0.04, crate.z)
+    box.userData.animate = 'crate'
+    box.userData.spinY = crate.spinY
+    g.add(box)
+  }
   return g
 }
 
@@ -286,6 +307,11 @@ export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
       obj.rotation.x = 0
       obj.rotation.z = 0
       obj.rotation.y = time * Number(obj.userData.spinY || 0)
+    }
+    if (obj.userData.animate === 'crate') {
+      obj.rotation.x = 0.18
+      obj.rotation.z = 0
+      obj.rotation.y = time * Number(obj.userData.spinY || 0.5)
     }
     if (obj.userData.animate === 'spin') {
       obj.rotation.y = time * 0.12

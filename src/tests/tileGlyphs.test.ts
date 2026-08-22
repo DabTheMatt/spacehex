@@ -17,6 +17,17 @@ describe('tile glyphs', () => {
     expect(spins.some((speed) => speed < 0)).toBe(true)
   })
 
+  it('tumbles three crates on the wrecked transport', () => {
+    const glyph = createTileGlyph(TILE_DEFINITIONS['wreck-transport-1'])
+    const spins: number[] = []
+    glyph.traverse((obj) => {
+      if (obj.userData.animate !== 'crate') return
+      spins.push(Number(obj.userData.spinY))
+    })
+    expect(spins).toHaveLength(3)
+    expect(new Set(spins).size).toBe(3)
+  })
+
   it('tints planets from the muted violet / rose / sage set', () => {
     const tints = [palette.planetViolet, palette.planetRose, palette.planetSage]
     expect(tints).toContain(planetTintForId('planet-large-1'))

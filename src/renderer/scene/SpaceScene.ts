@@ -233,7 +233,7 @@ export class SpaceScene {
     this.board.tick(time)
     this.preview.tick(time)
     const shipsSettled = this.ships.tick(this.camera.camera, time)
-    this.hoverTargets.tick(this.camera.camera)
+    this.hoverTargets.tick(time)
     let glyphsChanged = false
     for (const coord of this.ships.consumeLanded()) {
       const key = coordKey(coord)

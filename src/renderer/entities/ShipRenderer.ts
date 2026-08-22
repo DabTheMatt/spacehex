@@ -29,7 +29,7 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
 const RIM = HEX_SIZE * 0.64
 const HULL_HEIGHT = 0.11
-const BASE_HOVER = TILE_THICKNESS + 0.28
+const BASE_HOVER = TILE_THICKNESS + 0.14
 
 type HoldMotion = { kind: 'hold'; coord: HexCoord }
 type FlyMotion = {
