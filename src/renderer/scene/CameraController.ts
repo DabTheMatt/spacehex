@@ -35,7 +35,6 @@ export class CameraController {
     toPhi: number
     fromTheta: number
     thetaDelta: number
-    lockInspect: boolean
   } | null = null
   private follow: { x: number; z: number } | null = null
   private followReleased = false
@@ -124,7 +123,6 @@ export class CameraController {
       toPhi,
       fromTheta: from.theta,
       thetaDelta: shortestAngleDelta(from.theta, nameTheta),
-      lockInspect: true,
     }
   }
 
@@ -302,11 +300,6 @@ export class CameraController {
     this.camera.lookAt(target)
     if (t < 1) return
     this.orbitAnim = null
-    if (anim.lockInspect) {
-      this.controls.minPolarAngle = 0.02
-      this.controls.maxPolarAngle = 0.35
-      this.controls.minDistance = 2.2
-    }
   }
 
   private applyWasd(dt: number): void {

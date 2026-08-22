@@ -52,33 +52,34 @@ function arc(
 
 function evaGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
-  g.add(poly([[-0.42, -0.28], [0.38, -0.28], [0.52, 0], [0.38, 0.28], [-0.42, 0.28]], color, true))
-  g.add(poly([[-0.22, -0.16], [-0.22, 0.16]], color))
-  g.add(poly([[-0.22, 0], [0.18, 0]], color))
-
-  const count = 5
-  for (let i = 0; i < count; i++) {
-    const t = i / (count - 1)
-    const x = -0.22 + t * 0.5
-    for (const side of [-1, 1]) {
-      const lamp = new THREE.Mesh(
-        new THREE.CircleGeometry(0.007, 8),
-        new THREE.MeshBasicMaterial({
-          color: palette.ochre,
-          transparent: true,
-          opacity: 0.18,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-        }),
-      )
-      lamp.rotation.x = -Math.PI / 2
-      lamp.position.set(x, Y + 0.004, side * 0.09)
-      lamp.userData.animate = 'runway'
-      lamp.userData.runwayIndex = i
-      lamp.userData.runwayCount = count
-      g.add(lamp)
-    }
+  g.add(circle(0.4, color, 56))
+  g.add(circle(0.26, color, 40, 0.85))
+  const core: Array<[number, number]> = []
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i + Math.PI / 6
+    core.push([Math.cos(a) * 0.13, Math.sin(a) * 0.13])
   }
+  g.add(poly(core, color, true))
+  g.add(poly([[-0.07, 0], [0.07, 0]], color))
+  g.add(poly([[0, -0.07], [0, 0.07]], color))
+  for (let k = 0; k < 3; k++) {
+    const a = (Math.PI * 2 * k) / 3 + Math.PI / 6
+    const inner = 0.26
+    const outer = 0.46
+    g.add(
+      poly(
+        [
+          [Math.cos(a) * inner, Math.sin(a) * inner],
+          [Math.cos(a) * outer, Math.sin(a) * outer],
+        ],
+        color,
+      ),
+    )
+    const dock = circle(0.045, color, 16)
+    dock.position.set(Math.cos(a) * outer, 0, Math.sin(a) * outer)
+    g.add(dock)
+  }
+  g.add(arc(0.33, 0.4, 2.2, color, 18))
   return g
 }
 

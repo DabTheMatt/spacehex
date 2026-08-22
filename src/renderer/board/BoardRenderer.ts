@@ -14,7 +14,7 @@ import {
   TILE_THICKNESS,
 } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
-import { createPlanetOverlay, tickPlanetLod } from './planetLots'
+import { createPlanetOverlay, tickPlanetLod, createEdgeLabel } from './planetLots'
 import { buyPrice } from '../../game/rules/planetMarket'
 import { RESOURCE_IDS } from '../../game/definitions/resources'
 import { palette } from '../theme'
@@ -131,6 +131,9 @@ export class BoardRenderer {
           RESOURCE_IDS.map((id) => [id, buyPrice(state, id)]),
         ) as Record<(typeof RESOURCE_IDS)[number], number>
         glyph.add(createPlanetOverlay(market, tile.coord, prices))
+      }
+      if (def.type === 'EVA_1') {
+        glyph.add(createEdgeLabel('EVA-1 Space Station', { width: 0.92 }))
       }
       mesh.userData.glyph = glyph
       mesh.add(glyph)

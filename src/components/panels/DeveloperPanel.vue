@@ -16,7 +16,7 @@
       − fuel
     </button>
     <button type="button" @click="game.dispatch({ type: 'DEV_ADD_GLORY', playerId: game.player.id, amount: 1 })">
-      + PCH
+      + glory
     </button>
     <button type="button" @click="game.dispatch({ type: 'DEV_DAMAGE_SHIP', shipId: game.ship.id, amount: 1 })">
       deal damage

@@ -17,6 +17,7 @@ export type GameEvent =
   | { type: 'RESOURCE_BOUGHT'; playerId: string; resource: ResourceId; price: number; coord: HexCoord }
   | { type: 'CREDITS_CHANGED'; playerId: string; credits: number }
   | { type: 'COMBAT_RESOLVED'; attackerId: string; defenderId: string; damage: number }
+  | { type: 'GLORY_CHANGED'; playerId: string; glory: number; delta: number }
   | { type: 'TURN_ENDED'; playerId: string }
   | { type: 'ROUND_STARTED'; round: number }
   | { type: 'FUEL_CHANGED'; playerId: string; fuel: number }

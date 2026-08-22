@@ -96,7 +96,8 @@ const planetHint = computed(() => {
   const here = game.ship.coord.q === coord.q && game.ship.coord.r === coord.r
   const left = MAX_BUYS_PER_TURN - (game.player.buysThisTurn ?? 0)
   if (!here) return 'DOCK TO BUY'
-  return `CLICK PRICE TO BUY  ·  ${left} LEFT`
+  if (left <= 0) return 'BUY LIMIT  ·  2 PER TURN'
+  return `CLICK PRICE TO BUY  ·  ${left} / ${MAX_BUYS_PER_TURN}`
 })
 
 const shipId = computed(() => {
@@ -113,7 +114,7 @@ const shipParams = computed(() => {
     { label: 'FUEL', value: pad(player.fuel) },
     { label: 'CR', value: pad(player.credits) },
     { label: 'HOLD', value: `${cargoUsed(ship.cargo)}/${CARGO_CAPACITY[ship.class]}` },
-    { label: 'PCH', value: pad(player.glory) },
+    { label: 'GLORY', value: pad(player.glory) },
   ]
 })
 

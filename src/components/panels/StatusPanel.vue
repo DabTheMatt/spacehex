@@ -7,7 +7,7 @@
       <div><dt>Ship</dt><dd>Mewa △</dd></div>
       <div><dt>Fuel</dt><dd>{{ game.player.fuel }}</dd></div>
       <div><dt>Hull</dt><dd>{{ game.ship.hull }}/{{ game.ship.maxHull }}</dd></div>
-      <div><dt>PCH</dt><dd>{{ game.player.glory }}</dd></div>
+      <div><dt>Glory</dt><dd>{{ game.player.glory }}</dd></div>
       <div>
         <dt>Exploration deck</dt>
         <dd>{{ game.state.explorationDeck.drawPile.length }}</dd>

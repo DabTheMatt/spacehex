@@ -21,11 +21,15 @@ const RESOURCE_CSS: Record<ResourceId, string> = {
 
 /** Name sits on +Z so inspect can put that edge at screen-bottom. */
 const NAME_ANGLE = Math.PI / 2
-const NAME_R = HEX_SIZE * 0.55
+const NAME_PLANE_H = 0.08
+const TILE_RADIUS = HEX_SIZE * 0.96
+const FLAT_EDGE = TILE_RADIUS * (Math.sqrt(3) / 2)
+/** Gap from the tile edge to the name equals one name-row height. */
+const NAME_R = FLAT_EDGE - NAME_PLANE_H - NAME_PLANE_H / 2
 const TOP_Z = -HEX_SIZE * 0.68
 const HEX_SPACING = 0.2
-const CLOSE_DIST = 5.6
-const FAR_DIST = 8.2
+const CLOSE_DIST = 4.2
+const FAR_DIST = 6.0
 
 export function planetInspectTheta(tileRotation: number): number {
   return tileRotation * (Math.PI / 3)
@@ -82,7 +86,7 @@ export function createPlanetOverlay(
     cluster.position.set(x, TILE_THICKNESS + 0.035, TOP_Z)
     cluster.add(stockHex(id, amount))
     const tag = priceTag(`${buyPrice[id]}CR`, RESOURCE_CSS[id])
-    tag.position.set(0, 0.01, 0.105)
+    tag.position.set(0, 0.01, 0.088)
     cluster.add(tag)
     if (amount > 0) {
       const hit = new THREE.Mesh(
@@ -158,24 +162,32 @@ function setLodOpacity(root: THREE.Object3D | undefined, opacity: number): void 
 }
 
 function planetName(text: string, coord: HexCoord): THREE.Group {
+  return createEdgeLabel(text, { coord, clickable: true })
+}
+
+export function createEdgeLabel(
+  text: string,
+  options: { coord?: HexCoord; clickable?: boolean; width?: number } = {},
+): THREE.Group {
   const g = new THREE.Group()
   g.position.set(Math.cos(NAME_ANGLE) * NAME_R, TILE_THICKNESS + 0.04, Math.sin(NAME_ANGLE) * NAME_R)
+  const width = options.width ?? 0.7
   const canvas = document.createElement('canvas')
-  canvas.width = 640
+  canvas.width = 768
   canvas.height = 80
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.clearRect(0, 0, 640, 80)
+    ctx.clearRect(0, 0, 768, 80)
     ctx.fillStyle = css.ivory
     ctx.font = '400 26px "IBM Plex Mono", "Noto Sans", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(text, 320, 42)
+    ctx.fillText(text, 384, 42)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.7, 0.088),
+    new THREE.PlaneGeometry(width, NAME_PLANE_H),
     new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
@@ -186,9 +198,9 @@ function planetName(text: string, coord: HexCoord): THREE.Group {
   )
   mesh.rotation.x = -Math.PI / 2
   mesh.renderOrder = 8
-  mesh.userData.planetName = coord
+  if (options.clickable && options.coord) mesh.userData.planetName = options.coord
   const hit = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.76, 0.14),
+    new THREE.PlaneGeometry(width + 0.06, NAME_PLANE_H + 0.05),
     new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0,
@@ -198,8 +210,12 @@ function planetName(text: string, coord: HexCoord): THREE.Group {
   )
   hit.rotation.x = -Math.PI / 2
   hit.position.y = 0.01
-  hit.userData.planetName = coord
-  hit.userData.pickOnly = true
+  if (options.clickable && options.coord) {
+    hit.userData.planetName = options.coord
+    hit.userData.pickOnly = true
+  } else {
+    hit.userData.pickOnly = true
+  }
   g.add(mesh, hit)
   return g
 }

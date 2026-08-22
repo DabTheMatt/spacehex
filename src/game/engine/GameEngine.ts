@@ -16,7 +16,7 @@ import { activePlayer, activeShip, spendFuel } from '../rules/fuel'
 import { canMoveTo } from '../rules/movement'
 import { canExploreDirection } from '../rules/exploration'
 import { resolveCombatOnEntry } from '../rules/combat'
-import { resolveSector } from '../rules/glory'
+import { resolveDiscovery, addGlory } from '../rules/glory'
 import { buyResource, stockPlanetIfNeeded } from '../rules/planetMarket'
 import type { ResourceId } from '../definitions/resources'
 import type { HexCoord } from '../board/HexCoord'
@@ -153,14 +153,14 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
     case 'DEV_ADD_GLORY': {
       const p = state.players[command.playerId]
       if (!p) return reject(state, command.type, 'NO_PLAYER')
-      const next = {
-        ...state,
-        players: {
-          ...state.players,
-          [p.id]: { ...p, glory: p.glory + command.amount },
-        },
+      const next = addGlory(state, p.id, command.amount)
+      const event: GameEvent = {
+        type: 'GLORY_CHANGED',
+        playerId: p.id,
+        glory: next.players[p.id].glory,
+        delta: command.amount,
       }
-      return { state: next, events: [] }
+      return { state: append(next, [event]), events: [event] }
     }
     case 'DEV_DAMAGE_SHIP': {
       const ship = state.ships[command.shipId]
@@ -348,12 +348,13 @@ function confirmPlacement(state: GameState): EngineResult {
   const moved = moveShip(next, placed.coord, FUEL_COST_EXPLORE)
   const before = moved.state
   next = stockPlanetIfNeeded(before, placed.id, placed.coord)
-  const sector = resolveSector(next, placed.id)
   const extra: GameEvent[] = []
   if (next.planetMarkets[coordKey(placed.coord)] && !before.planetMarkets[coordKey(placed.coord)]) {
     extra.push({ type: 'PLANET_STOCKED', tileId: placed.id, coord: placed.coord })
   }
-  extra.push(sector)
+  const discovered = resolveDiscovery(next, placed.id, placed.coord)
+  next = discovered.state
+  extra.push(...discovered.events)
   next = append(next, extra)
   return { state: next, events: [...placeEvents, ...moved.events, ...extra] }
 }
@@ -504,6 +505,9 @@ function devPlace(
     next = append(next, [stocked])
     events.push(stocked)
   }
+  const discovered = resolveDiscovery(next, tileId, coord)
+  next = append(discovered.state, discovered.events)
+  events.push(...discovered.events)
   return { state: next, events }
 }
 
