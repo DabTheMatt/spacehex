@@ -47,6 +47,7 @@ export class SpaceScene {
   private riseByKey = new Map<string, { start: number; duration: number }>()
   private tileY: Record<string, number> = {}
   private flightsByTile = new Map<string, Array<{ shipId: string; from: HexCoord; to: HexCoord }>>()
+  private hideGlyphKeys = new Set<string>()
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -112,6 +113,7 @@ export class SpaceScene {
     const duration = prefersReducedMotion() ? 0 : TILE_RISE_MS
     this.riseByKey.set(key, { start: performance.now(), duration })
     this.tileY = { ...this.tileY, [key]: TILE_SLOT_Y }
+    this.hideGlyphKeys.add(key)
   }
 
   private queueStateMotions(state: GameState): void {
@@ -155,7 +157,11 @@ export class SpaceScene {
   private applySync(): void {
     if (!this.lastState || !this.lastOptions) return
     this.queueStateMotions(this.lastState)
-    this.board.sync(this.lastState, { ...this.lastOptions, tileY: this.tileY })
+    this.board.sync(this.lastState, {
+      ...this.lastOptions,
+      tileY: this.tileY,
+      hideGlyphKeys: this.hideGlyphKeys,
+    })
     this.preview.sync(this.lastState)
     this.ships.sync(this.lastState)
     this.hoverTargets.sync(this.lastState, this.lastOptions.hover ?? null)
@@ -205,8 +211,15 @@ export class SpaceScene {
     this.preview.tick(time)
     const shipsSettled = this.ships.tick(this.camera.camera)
     this.hoverTargets.tick(this.camera.camera)
+    let glyphsChanged = false
+    for (const coord of this.ships.consumeLanded()) {
+      const key = coordKey(coord)
+      if (!this.hideGlyphKeys.has(key)) continue
+      this.hideGlyphKeys.delete(key)
+      glyphsChanged = true
+    }
     this.camera.setFollow(this.ships.flyingWorld())
-    if (shipsSettled) this.applySync()
+    if (shipsSettled || glyphsChanged) this.applySync()
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)
   }

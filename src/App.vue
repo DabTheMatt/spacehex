@@ -4,6 +4,7 @@
     <TopStatus />
     <ContextPanel />
     <ActionList />
+    <EndTurnButton />
     <ExplorationControls />
     <DeveloperPanel v-if="ui.showDev" />
   </div>
@@ -15,6 +16,7 @@ import GameCanvas from './components/GameCanvas.vue'
 import TopStatus from './components/hud/TopStatus.vue'
 import ContextPanel from './components/hud/ContextPanel.vue'
 import ActionList from './components/hud/ActionList.vue'
+import EndTurnButton from './components/hud/EndTurnButton.vue'
 import ExplorationControls from './components/hud/ExplorationControls.vue'
 import DeveloperPanel from './components/panels/DeveloperPanel.vue'
 import { useUiStore } from './stores/uiStore'

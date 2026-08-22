@@ -1,9 +1,8 @@
 import * as THREE from 'three'
 import type { GameState } from '../../game/state/GameState'
-import { getTileDefinition } from '../../game/definitions/tiles'
 import { getWorldPosition } from '../../game/board/hexMath'
-import { createHexMesh, TILE_SLOT_Y, TILE_THICKNESS } from './TileRenderer'
-import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
+import { createHexMesh, TILE_SLOT_Y } from './TileRenderer'
+import { tickTileGlyphs } from './tileGlyphs'
 import { palette } from '../theme'
 import { clamp01, easeOutCubic, prefersReducedMotion, TILE_REVEAL_MS } from '../motion'
 import { coordKey } from '../../game/board/HexCoord'
@@ -32,7 +31,6 @@ export class TilePreviewRenderer {
     this.revealed = false
     this.fadeStart = performance.now()
     this.fadeDuration = prefersReducedMotion() ? 0 : TILE_REVEAL_MS
-    const def = getTileDefinition(exp.pendingTileId)
     const pos = getWorldPosition(exp.target)
     const mesh = createHexMesh({
       fill: palette.tileFill,
@@ -43,9 +41,6 @@ export class TilePreviewRenderer {
     })
     mesh.position.set(pos.x, TILE_SLOT_Y, pos.z)
     mesh.rotation.y = (exp.rotation ?? 0) * (Math.PI / 3)
-    const glyph = createTileGlyph(def, palette.ochre)
-    glyph.position.y = TILE_THICKNESS
-    mesh.add(glyph)
     this.group.add(mesh)
     this.applyOpacity(0.04)
   }

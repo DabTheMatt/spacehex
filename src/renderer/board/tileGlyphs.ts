@@ -165,10 +165,41 @@ function asteroidGlyph(color: number): THREE.Group {
       [0.18, -0.16],
     ],
   ]
-  for (const rock of rocks) g.add(poly(rock, color, true))
-  g.add(poly([[0.02, 0.02], [0.12, 0.1]], color))
-  g.add(poly([[-0.18, -0.06], [-0.08, 0.04]], color))
-  g.add(poly([[0.2, -0.06], [0.3, 0]], color))
+  const spins = [
+    { x: 0.11, y: 0.37, z: -0.08 },
+    { x: -0.19, y: -0.22, z: 0.14 },
+    { x: 0.28, y: -0.41, z: 0.06 },
+    { x: -0.09, y: 0.53, z: -0.17 },
+    { x: 0.16, y: -0.29, z: 0.31 },
+    { x: -0.33, y: 0.18, z: -0.24 },
+  ]
+  rocks.forEach((rock, index) => {
+    g.add(spinningRock(rock, color, spins[index] ?? { x: 0.2, y: 0.2, z: 0.2 }))
+  })
+  return g
+}
+
+function spinningRock(
+  points: Array<[number, number]>,
+  color: number,
+  spin: { x: number; y: number; z: number },
+): THREE.Group {
+  let cx = 0
+  let cz = 0
+  for (const [x, z] of points) {
+    cx += x
+    cz += z
+  }
+  cx /= points.length
+  cz /= points.length
+  const local = points.map(([x, z]) => [x - cx, z - cz] as [number, number])
+  const g = new THREE.Group()
+  g.position.set(cx, 0, cz)
+  g.add(poly(local, color, true))
+  g.userData.animate = 'asteroid'
+  g.userData.spinX = spin.x
+  g.userData.spinY = spin.y
+  g.userData.spinZ = spin.z
   return g
 }
 
@@ -258,6 +289,11 @@ export function createTileGlyph(def: TileDefinition, color = palette.paper): THR
 
 export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
   root.traverse((obj) => {
+    if (obj.userData.animate === 'asteroid') {
+      obj.rotation.x = time * Number(obj.userData.spinX || 0)
+      obj.rotation.y = time * Number(obj.userData.spinY || 0)
+      obj.rotation.z = time * Number(obj.userData.spinZ || 0)
+    }
     if (obj.userData.animate === 'spin') {
       obj.rotation.y = time * 0.12
     }

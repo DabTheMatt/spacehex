@@ -42,6 +42,7 @@ export class BoardRenderer {
       showExploreGhosts?: boolean
       tileY?: Record<string, number>
       hover?: BoardHover | null
+      hideGlyphKeys?: Set<string>
     },
   ): void {
     this.syncTiles(state, options)
@@ -71,6 +72,7 @@ export class BoardRenderer {
       showEdges: boolean
       selectedKey?: string | null
       tileY?: Record<string, number>
+      hideGlyphKeys?: Set<string>
     },
   ): void {
     const keep = new Set<string>()
@@ -78,11 +80,13 @@ export class BoardRenderer {
       const key = coordKey(tile.coord)
       keep.add(key)
       const selected = options.selectedKey === key
+      const hideGlyph = options.hideGlyphKeys?.has(key) === true
       const sig = [
         tile.id,
         tile.definitionId,
         tile.rotation,
         selected ? '1' : '0',
+        hideGlyph ? 'h' : '',
         options.showDebug ? 'd' : '',
         options.showCoords ? 'c' : '',
         options.showEdges ? 'e' : '',
@@ -103,9 +107,11 @@ export class BoardRenderer {
       mesh.rotation.y = tile.rotation * (Math.PI / 3)
       mesh.userData.tileCoord = tile.coord
       mesh.userData.tileKey = key
-      const glyph = createTileGlyph(def)
-      glyph.position.y = TILE_THICKNESS
-      mesh.add(glyph)
+      if (!hideGlyph) {
+        const glyph = createTileGlyph(def)
+        glyph.position.y = TILE_THICKNESS
+        mesh.add(glyph)
+      }
       if (selected) mesh.add(makeSelectionMarks())
       if (options.showDebug || options.showCoords || options.showEdges) {
         const edges = getRotatedEdges(def, tile.rotation)

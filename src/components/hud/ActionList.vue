@@ -1,5 +1,5 @@
 <template>
-  <nav v-if="actions.length" class="action-list" :class="{ 'end-turn': endTurnOnly }">
+  <nav v-if="actions.length" class="action-list">
     <button
       v-for="action in actions"
       :key="action.id"
@@ -21,24 +21,10 @@ import { useGameStore } from '@/stores/gameStore'
 
 const game = useGameStore()
 
-const endTurnOnly = computed(() => game.state.movementSpent && game.state.phase !== 'TILE_PLACEMENT')
-
 const actions = computed(() => {
   const st = game.state
   if (st.phase === 'TILE_PLACEMENT') return []
-  if (st.movementSpent) {
-    return [
-      {
-        id: 'end-turn',
-        num: '',
-        label: 'KONIEC TURY',
-        accent: true,
-        muted: false,
-        disabled: false,
-        run: () => game.dispatch({ type: 'END_TURN' }),
-      },
-    ]
-  }
+  if (st.movementSpent) return []
   const status = st.exploration.status
   return [
     {

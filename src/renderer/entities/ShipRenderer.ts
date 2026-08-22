@@ -63,6 +63,7 @@ export class ShipRenderer {
   private motion = new Map<string, ShipMotion>()
   private facing = new Map<string, number>()
   private lastXZ = new Map<string, { x: number; z: number }>()
+  private landed: HexCoord[] = []
 
   isBusy(shipId: string): boolean {
     const motion = this.motion.get(shipId)
@@ -74,6 +75,12 @@ export class ShipRenderer {
       if (motion.kind === 'hold' || motion.kind === 'fly') return true
     }
     return false
+  }
+
+  consumeLanded(): HexCoord[] {
+    const list = this.landed
+    this.landed = []
+    return list
   }
 
   /** World XZ of a ship currently in flight, if any. */
@@ -332,6 +339,7 @@ export class ShipRenderer {
       this.remember(child)
       if (moveT >= 1) {
         applyEngineBurn(child, ENGINES_OFF)
+        this.landed.push({ ...motion.to })
         this.motion.delete(shipId)
         settled = true
       }
@@ -398,45 +406,40 @@ function createNavMarker(
   g.add(hullMark(label, length, half, true))
   g.add(hullMark(label, length, half, false))
 
-  const y = HULL_HEIGHT * 0.55
-  const main = makeEnginePlume(
-    0.032,
-    0.16,
-    new THREE.Vector3(0, y, -length * 0.5 - 0.02),
+  const y = HULL_HEIGHT * 0.5
+  const main = makeThruster(
+    new THREE.Vector3(0, y, -length * 0.5),
     new THREE.Vector3(0, 0, -1),
+    'main',
   )
   g.add(main)
 
-  const port = makeEnginePlume(
-    0.014,
-    0.07,
-    new THREE.Vector3(-half * 0.92, y, 0.02),
+  const port = makeThruster(
+    new THREE.Vector3(-half, y, 0.04),
     new THREE.Vector3(-1, 0, 0),
+    'rcs',
   )
   g.add(port)
 
-  const starboard = makeEnginePlume(
-    0.014,
-    0.07,
-    new THREE.Vector3(half * 0.92, y, 0.02),
+  const starboard = makeThruster(
+    new THREE.Vector3(half, y, 0.04),
     new THREE.Vector3(1, 0, 0),
+    'rcs',
   )
   g.add(starboard)
 
   const s = Math.SQRT1_2
-  const brakePort = makeEnginePlume(
-    0.03,
-    0.15,
-    new THREE.Vector3(-half * 0.55, y, length * 0.42),
+  const brakePort = makeThruster(
+    new THREE.Vector3(-half * 0.42, y, length * 0.48),
     new THREE.Vector3(-s, 0, s),
+    'rcs',
   )
   g.add(brakePort)
 
-  const brakeStarboard = makeEnginePlume(
-    0.03,
-    0.15,
-    new THREE.Vector3(half * 0.55, y, length * 0.42),
+  const brakeStarboard = makeThruster(
+    new THREE.Vector3(half * 0.42, y, length * 0.48),
     new THREE.Vector3(s, 0, s),
+    'rcs',
   )
   g.add(brakeStarboard)
 
@@ -450,28 +453,34 @@ function hullColor(playerNo: number, active: boolean): number {
   return active ? palette.player2 : 0x4f6070
 }
 
-function makeEnginePlume(
-  radius: number,
-  length: number,
-  attach: THREE.Vector3,
+function makeThruster(
+  hullPoint: THREE.Vector3,
   exhaust: THREE.Vector3,
+  kind: 'main' | 'rcs',
 ): THREE.Group {
+  const dir = exhaust.clone().normalize()
+  const standoff = kind === 'main' ? 0.05 : 0.038
+  const nozzleWide = kind === 'main' ? 0.2 : 0.028
+  const nozzleFlat = kind === 'main' ? 0.016 : 0.014
+  const nozzleLen = kind === 'main' ? 0.042 : 0.02
+  const flameGap = kind === 'main' ? 0.022 : 0.016
+  const plumeRadius = kind === 'main' ? 0.055 : 0.012
+  const plumeLen = kind === 'main' ? 0.2 : 0.06
+
   const group = new THREE.Group()
-  group.position.copy(attach)
-  group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), exhaust.clone().normalize())
+  group.position.copy(hullPoint).addScaledVector(dir, standoff)
+  group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
 
   const nozzle = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius * 0.55, radius * 0.9, radius * 1.4, 8, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0x2c2c28,
-      side: THREE.DoubleSide,
-    }),
+    new THREE.BoxGeometry(nozzleWide, nozzleLen, nozzleFlat),
+    new THREE.MeshBasicMaterial({ color: 0x2c2c28 }),
   )
-  nozzle.position.y = -radius * 0.2
+  nozzle.position.y = nozzleLen * 0.5
   group.add(nozzle)
 
+  const plumeStart = nozzleLen + flameGap
   const mesh = new THREE.Mesh(
-    new THREE.ConeGeometry(radius, length, 10, 1, true),
+    new THREE.ConeGeometry(plumeRadius, plumeLen, 10, 1, true),
     new THREE.MeshBasicMaterial({
       color: palette.engine,
       transparent: true,
@@ -482,12 +491,12 @@ function makeEnginePlume(
       side: THREE.DoubleSide,
     }),
   )
-  mesh.position.y = length * 0.5
+  mesh.position.y = plumeStart + plumeLen * 0.5
   mesh.renderOrder = 4
   group.add(mesh)
 
   const core = new THREE.Mesh(
-    new THREE.ConeGeometry(radius * 0.4, length * 0.7, 8, 1, true),
+    new THREE.ConeGeometry(plumeRadius * 0.38, plumeLen * 0.65, 8, 1, true),
     new THREE.MeshBasicMaterial({
       color: 0xdeffff,
       transparent: true,
@@ -498,13 +507,12 @@ function makeEnginePlume(
       side: THREE.DoubleSide,
     }),
   )
-  core.position.y = length * 0.28
+  core.position.y = plumeStart + plumeLen * 0.28
   core.renderOrder = 5
   group.add(core)
 
   group.userData.plumeMesh = mesh
   group.userData.plumeCore = core
-  group.visible = true
   return group
 }
 
@@ -528,11 +536,11 @@ function applyEngineBurn(
       }
     | undefined
   if (!engines) return
-  setPlume(engines.main, burn.main, 1.45)
-  setPlume(engines.port, burn.port, 1.15)
-  setPlume(engines.starboard, burn.starboard, 1.15)
-  setPlume(engines.brakePort, burn.brakePort, 1.7)
-  setPlume(engines.brakeStarboard, burn.brakeStarboard, 1.7)
+  setPlume(engines.main, burn.main, 1.55)
+  setPlume(engines.port, burn.port, 1.2)
+  setPlume(engines.starboard, burn.starboard, 1.2)
+  setPlume(engines.brakePort, burn.brakePort, 1.2)
+  setPlume(engines.brakeStarboard, burn.brakeStarboard, 1.2)
 }
 
 function setPlume(group: THREE.Group, intensity: number, lengthScale: number): void {
@@ -550,7 +558,7 @@ function setPlume(group: THREE.Group, intensity: number, lengthScale: number): v
   const sx = 0.75 + lit * 0.55
   const sy = 0.6 + lit * lengthScale
   mesh.scale.set(sx, sy, sx)
-  group.visible = true
+  mesh.visible = lit > 0.03
 }
 
 function hullMark(label: string, length: number, half: number, port: boolean): THREE.Mesh {
