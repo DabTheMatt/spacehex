@@ -1,8 +1,6 @@
 <template>
-  <header class="top-status">
-    <span>{{ playerLabel }}</span>
-    <span>CYCLE {{ pad(game.state.round) }}</span>
-    <span>FUEL {{ pad(game.player.fuel) }}</span>
+  <header class="global-status">
+    <span>{{ left }}</span>
     <span class="muted">DECK {{ pad(game.state.explorationDeck.drawPile.length) }}</span>
   </header>
 </template>
@@ -13,9 +11,9 @@ import { useGameStore } from '@/stores/gameStore'
 
 const game = useGameStore()
 
-const playerLabel = computed(() => {
+const left = computed(() => {
   const n = game.player.id.replace(/\D/g, '') || '1'
-  return `SG-${n}`
+  return `SG-${n} / CYCLE ${pad(game.state.round)}`
 })
 
 function pad(value: number): string {

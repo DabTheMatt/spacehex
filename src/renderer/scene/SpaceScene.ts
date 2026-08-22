@@ -74,7 +74,7 @@ export class SpaceScene {
   sync(state: GameState, options: SceneOptions): void {
     this.lastState = state
     this.lastOptions = options
-    this.camera.mapRotateEnabled = true
+    this.camera.mapRotateEnabled = this.lastState.phase !== 'TILE_PLACEMENT'
     this.applySync()
   }
 

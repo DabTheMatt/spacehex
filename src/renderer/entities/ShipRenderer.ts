@@ -440,11 +440,9 @@ function makeThruster(
   kind: 'main' | 'rcs',
 ): THREE.Group {
   const dir = exhaust.clone().normalize()
-  const standoff = kind === 'main' ? 0.05 : 0.038
-  const nozzleWide = kind === 'main' ? 0.2 : 0.028
-  const nozzleFlat = kind === 'main' ? 0.016 : 0.014
-  const nozzleLen = kind === 'main' ? 0.042 : 0.02
-  const flameGap = kind === 'main' ? 0.022 : 0.016
+  const standoff = kind === 'main' ? 0.09 : 0.055
+  const nozzleLen = kind === 'main' ? 0.03 : 0.02
+  const flameGap = kind === 'main' ? 0.028 : 0.018
   const plumeRadius = kind === 'main' ? 0.055 : 0.012
   const plumeLen = kind === 'main' ? 0.2 : 0.06
 
@@ -452,10 +450,16 @@ function makeThruster(
   group.position.copy(hullPoint).addScaledVector(dir, standoff)
   group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
 
-  const nozzle = new THREE.Mesh(
-    new THREE.BoxGeometry(nozzleWide, nozzleLen, nozzleFlat),
-    new THREE.MeshBasicMaterial({ color: 0x2c2c28 }),
-  )
+  const nozzle =
+    kind === 'main'
+      ? new THREE.Mesh(
+          new THREE.CylinderGeometry(plumeRadius * 1.05, plumeRadius * 1.22, nozzleLen, 24, 1, false),
+          new THREE.MeshBasicMaterial({ color: 0x2c2c28 }),
+        )
+      : new THREE.Mesh(
+          new THREE.BoxGeometry(0.028, nozzleLen, 0.014),
+          new THREE.MeshBasicMaterial({ color: 0x2c2c28 }),
+        )
   nozzle.position.y = nozzleLen * 0.5
   group.add(nozzle)
 

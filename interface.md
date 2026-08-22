@@ -1,50 +1,91 @@
-# SPACE HEX — UI + Typography
+# SPACE HEX — UI / UX IMPLEMENTATION GUIDELINES
 
-Źródło prawdy dla interfejsu Prototype v0.1. Szczegóły implementacyjne: **MAP FIRST. UI SECOND.**
+Dokument zastępuje wcześniejsze wytyczne UI. Źródło prawdy dla ekranu Prototype v0.1.
 
-Interfejs zajmuje ok. 10% uwagi. 90% należy do mapy.
+> Interfejs nie powinien być rozrzucony po wszystkich krawędziach ekranu. Głównym centrum sterowania ma być jeden dolny COMMAND BAR.
 
-Pełna specyfikacja (paleta, typografia, layout, zakazy) jest w tym pliku i ma być stosowana zamiast ad hoc stylów w komponentach.
+## 1. Główna zasada
 
-## Tokeny
+SPACE HEX jest przede wszystkim mapą. Pusta przestrzeń jest celowa.
 
-```css
---color-background: #0B0C0C;
---color-primary: #D8D0BD;
---color-muted: #77756E;
---color-accent: #B58A4B;
---font-ui: "IBM Plex Mono", monospace;
---font-display: "Cormorant Garamond", serif;
+Hierarchia: MAPA → OBIEKTY → AKTYWNY STATEK / HEX → COMMAND BAR → INFORMACJE GLOBALNE. Orientacyjnie 90% mapa, 10% UI.
+
+Warstwy ekranu: **Global Status** (góra) → **Game Map** → **Command Bar** (dół).
+
+## 2. Charakter
+
+Terminal nawigacyjny / dokumentacja techniczna / stary system kartograficzny / instrument pokładowy. Nie klasyczny HUD sci-fi.
+
+## 3. Zakazy
+
+Brak neonów, cyjanu sci-fi, glow, bloom, gradientów, glassmorphism, dużych paneli i kart, wielu ramek, hologramów, rozbudowanych tooltipów na mapie, dużych ikon, bibliotek ikon, szczegółowych modeli jako markerów.
+
+## 4. Global Status
+
+Tylko dane rozgrywki, np. `SG-1 / CYCLE 02` i `DECK 21`. Bez FUEL / HULL / CARGO.
+
+## 5. Command Bar
+
+Lekki pasek na dole. Zawsze odpowiada: co jest zaznaczone, jaki jest stan, co mogę zrobić. Zmienia treść z kontekstem. Nie osobne okna.
+
+Stan statku (poziomo na szerokim ekranie):
+
+```text
+MEWA / SG-1      HULL 03/03      FUEL 04      PCH 00
+01 MOVE          02 EXPLORE      03 STAY                    09 END TURN
 ```
 
-Accent jest jedynym kolorem aktywnym UI. Nie neon, glow, gradient, glass, hologram, HUD sci-fi.
+Zaznaczony kafel: ta sama belka pokazuje nazwę i typ. **Nie implementować fikcyjnych akcji** (SCAN, APPROACH, SALVAGE, DOCK) dopóki nie ma ich w silniku.
 
-## Typografia
+## 6. Tryby (jawne)
 
-- UI, liczby, akcje: **IBM Plex Mono** (Regular / Medium / SemiBold), `font-variant-numeric: tabular-nums`
-- Nazwy wyjątkowych miejsc (oszczędnie): **Cormorant Garamond**
-- Skala: 11 / 13 / 14 / 18 / 26 px
-- Nagłówki: uppercase, tracking 0.08–0.16em
+`IDLE` | `OBJECT_SELECTED` | `MOVE_TARGETING` | `EXPLORE_EDGE_SELECTION` | `EXPLORE_ROTATION`
 
-## Layout
+- MOVE: `NAVIGATION / SELECT DESTINATION` · ESC CANCEL. Mapa pokazuje cele.
+- EXPLORE: `EXPLORATION / SELECT EDGE` · ESC CANCEL.
+- Obrót: `EXPLORATION / ORIENT SECTOR` · Q/E ROTATE · ENTER CONFIRM. Snap wyłącznie co 60°.
 
-Mapa = prawie cały viewport. Brak dashboardu i dużych kart.
+END TURN (`09`) jest w Command Bar, po prawej. Nie samotny napis na środku.
 
-- Góra: lekki TopStatus (tekst, bez tła)
-- Lewy dół: ContextPanel (zaznaczony obiekt)
-- Prawy dół: ActionList (`01  MOVE`)
-- Eksploracja: ExplorationControls tylko w fazie układania kafla
+## 7. Mapa
 
-Przyciski = `numer + tekst`, hover: accent lub kreska, selected: accent. Bez dużych rectangle buttonów.
+Hexy identyczne; grafika dopasowuje się do hexa. UI na mapie: tylko selection, kierunek, zasięg, ghost eksploracji. Bez tabel HULL/FUEL obok statku.
 
-## Zaznaczenie hexa
+Zaznaczenie hexa: cienki ochrowy obrys / ticki narożników, osobna warstwa, bez fillu.
 
-Cienki ochrowy kontur / znaczniki narożników. Nie wypełniać kafla, nie zmieniać geometrii heksów.
+Marker statku: prosty geometria, kolor gracza, ochra dla aktywnego.
 
-## Statek na mapie
+## 8. Typografia i tokeny
 
-Prosty ochrowy znacznik nawigacyjny. Numer gracza **czarny**, leży na górnej płaszczyźnie kadłuba.
+IBM Plex Mono dla UI. Cormorant Garamond tylko dla wyjątkowych odkryć, nie dla nazwy statku.
 
-## Animacje
+```css
+:root {
+  --color-background: #0B0C0C;
+  --color-primary: #D8D0BD;
+  --color-muted: #77756E;
+  --color-accent: #B58A4B;
+  --font-ui: "IBM Plex Mono", monospace;
+  --font-display: "Cormorant Garamond", serif;
+  --font-micro: 9px;
+  --font-xs: 10px;
+  --font-sm: 11px;
+  --font-md: 13px;
+  --font-lg: 15px;
+  --font-display-size: 24px;
+  --transition-fast: 120ms;
+  --transition-normal: 180ms;
+  --transition-slow: 220ms;
+  --line-width: 1px;
+}
+```
 
-120 / 180 / 220 ms, mechaniczne. `prefers-reduced-motion: reduce`. Obrót kafla wyłącznie skokami 60°.
+Nazwa statku: `MEWA / SG-1`, Medium, ~14px, tracking 0.10em. Uppercase dla akcji i parametrów. Tabular nums. Hover: accent lub kreska, bez glow i scale. Focus: cienki ochrowy outline. Disabled: muted, opacity 0.45.
+
+## 9. Architektura komponentów
+
+`GameHUD` → `GlobalStatus` + `CommandBar`. UI ekranowe niezależne od kamery.
+
+Kryterium: screenshot wygląda jak samotna mapa, potem jak aplikacja.
+
+> ONE MAP. ONE CONTEXT. ONE COMMAND BAR.

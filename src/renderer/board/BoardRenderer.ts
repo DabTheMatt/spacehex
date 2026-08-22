@@ -20,12 +20,14 @@ import { canExploreDirection } from '../../game/rules/exploration'
 import { canMoveTo } from '../../game/rules/movement'
 import { activeShip } from '../../game/rules/fuel'
 import type { BoardHover } from '../../ui/boardHover'
+import { clamp01, easeOutCubic, prefersReducedMotion, TILE_GLYPH_FADE_MS } from '../motion'
 
 export class BoardRenderer {
   readonly group = new THREE.Group()
   private tiles = new THREE.Group()
   private markers = new THREE.Group()
   private tileCache = new Map<string, { mesh: THREE.Group; sig: string }>()
+  private glyphFade = new Map<string, { start: number; duration: number }>()
 
   constructor() {
     this.group.add(this.tiles)
@@ -56,6 +58,7 @@ export class BoardRenderer {
   }
 
   tick(time: number): void {
+    this.advanceGlyphFades(performance.now())
     tickTileGlyphs(this.tiles, time)
   }
 
@@ -86,7 +89,6 @@ export class BoardRenderer {
         tile.definitionId,
         tile.rotation,
         selected ? '1' : '0',
-        hideGlyph ? 'h' : '',
         options.showDebug ? 'd' : '',
         options.showCoords ? 'c' : '',
         options.showEdges ? 'e' : '',
@@ -95,6 +97,7 @@ export class BoardRenderer {
       if (existing?.sig === sig) {
         const pos = getWorldPosition(tile.coord)
         existing.mesh.position.set(pos.x, options.tileY?.[key] ?? TILE_SETTLED_Y, pos.z)
+        this.syncGlyphFade(key, existing.mesh, hideGlyph)
         continue
       }
       if (existing) {
@@ -107,11 +110,11 @@ export class BoardRenderer {
       mesh.rotation.y = tile.rotation * (Math.PI / 3)
       mesh.userData.tileCoord = tile.coord
       mesh.userData.tileKey = key
-      if (!hideGlyph) {
-        const glyph = createTileGlyph(def, palette.paper, tile.id)
-        glyph.position.y = TILE_THICKNESS
-        mesh.add(glyph)
-      }
+      const glyph = createTileGlyph(def, palette.paper, tile.id)
+      glyph.position.y = TILE_THICKNESS
+      mesh.userData.glyph = glyph
+      mesh.add(glyph)
+      this.syncGlyphFade(key, mesh, hideGlyph, true)
       if (selected) mesh.add(makeSelectionMarks())
       if (options.showDebug || options.showCoords || options.showEdges) {
         const edges = getRotatedEdges(def, tile.rotation)
@@ -130,6 +133,50 @@ export class BoardRenderer {
       if (keep.has(key)) continue
       this.tiles.remove(entry.mesh)
       this.tileCache.delete(key)
+      this.glyphFade.delete(key)
+    }
+  }
+
+  private syncGlyphFade(key: string, mesh: THREE.Group, hide: boolean, created = false): void {
+    const glyph = mesh.userData.glyph as THREE.Object3D | undefined
+    if (!glyph) return
+    if (hide) {
+      this.glyphFade.delete(key)
+      mesh.userData.glyphReady = false
+      setGlyphOpacity(glyph, 0)
+      return
+    }
+    if (mesh.userData.glyphReady) {
+      setGlyphOpacity(glyph, 1)
+      return
+    }
+    if (created && !this.glyphFade.has(key)) {
+      mesh.userData.glyphReady = true
+      setGlyphOpacity(glyph, 1)
+      return
+    }
+    if (!this.glyphFade.has(key)) {
+      this.glyphFade.set(key, {
+        start: performance.now(),
+        duration: prefersReducedMotion() ? 0 : TILE_GLYPH_FADE_MS,
+      })
+      setGlyphOpacity(glyph, 0)
+    }
+  }
+
+  private advanceGlyphFades(now: number): void {
+    for (const [key, fade] of [...this.glyphFade.entries()]) {
+      const mesh = this.tileCache.get(key)?.mesh
+      const glyph = mesh?.userData.glyph as THREE.Object3D | undefined
+      if (!mesh || !glyph) {
+        this.glyphFade.delete(key)
+        continue
+      }
+      const t = fade.duration <= 0 ? 1 : clamp01((now - fade.start) / fade.duration)
+      setGlyphOpacity(glyph, easeOutCubic(t))
+      if (t < 1) continue
+      mesh.userData.glyphReady = true
+      this.glyphFade.delete(key)
     }
   }
 
@@ -194,4 +241,19 @@ export class BoardRenderer {
   tileMeshes(): THREE.Object3D[] {
     return this.tiles.children
   }
+}
+
+function setGlyphOpacity(root: THREE.Object3D, opacity: number): void {
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh
+    const mat = mesh.material
+    if (!mat) return
+    const list = Array.isArray(mat) ? mat : [mat]
+    for (const item of list) {
+      const material = item as THREE.Material & { opacity?: number }
+      material.transparent = true
+      material.depthWrite = false
+      if (typeof material.opacity === 'number') material.opacity = opacity
+    }
+  })
 }

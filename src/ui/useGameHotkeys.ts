@@ -9,6 +9,16 @@ export function useGameHotkeys(): void {
     if (ev.repeat || isTypingTarget(ev.target)) return
 
     if (game.state.phase === 'TILE_PLACEMENT') {
+      if (ev.code === 'KeyQ') {
+        ev.preventDefault()
+        game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'LEFT' })
+        return
+      }
+      if (ev.code === 'KeyE') {
+        ev.preventDefault()
+        game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' })
+        return
+      }
       if (ev.code === 'KeyF' || ev.key === 'Enter') {
         ev.preventDefault()
         game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
@@ -25,9 +35,12 @@ export function useGameHotkeys(): void {
     const action = actionHotkey(ev.code)
     if (!action) return
     ev.preventDefault()
-    if (action === 'MOVE') {
+    if (action === 'END_TURN') {
       if (game.state.movementSpent) game.dispatch({ type: 'END_TURN' })
-      else game.dispatch({ type: 'BEGIN_MOVE' })
+      return
+    }
+    if (action === 'MOVE') {
+      game.dispatch({ type: 'BEGIN_MOVE' })
       return
     }
     if (action === 'EXPLORE') {

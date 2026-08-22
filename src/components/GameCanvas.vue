@@ -149,7 +149,7 @@ function onUp(ev: PointerEvent): void {
 
   const tile = scene.pickTile(ev.clientX, ev.clientY)
   ui.selectedTile = tile
-  if (tile) ui.selectedShipId = null
+  ui.selectedShipId = null
 }
 
 function previewBusy(): boolean {
@@ -159,11 +159,7 @@ function previewBusy(): boolean {
 onMounted(() => {
   if (!canvasEl.value) return
   scene = new SpaceScene(canvasEl.value)
-  scene.preview.onRevealed = () => {
-    if (game.state.phase === 'TILE_PLACEMENT') {
-      game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
-    }
-  }
+  scene.preview.onRevealed = null
   resize()
   ui.selectedShipId = game.ship.id
   focusShip(game.ship.id)

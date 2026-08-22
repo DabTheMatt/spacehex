@@ -25,6 +25,7 @@ describe('actionHotkey', () => {
     expect(actionHotkey('Digit1')).toBe('MOVE')
     expect(actionHotkey('Digit2')).toBe('EXPLORE')
     expect(actionHotkey('Digit3')).toBe('STAY')
+    expect(actionHotkey('Digit9')).toBe('END_TURN')
     expect(actionHotkey('Numpad2')).toBe('EXPLORE')
     expect(actionHotkey('KeyW')).toBeNull()
   })

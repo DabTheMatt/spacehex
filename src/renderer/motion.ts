@@ -1,5 +1,6 @@
 export const TILE_RISE_MS = 1400
 export const TILE_REVEAL_MS = 2000
+export const TILE_GLYPH_FADE_MS = 800
 export const SHIP_TURN_MS = 1600
 export const SHIP_RCS_KICK_MS = 520
 export const SHIP_RCS_COUNTER_MS = 480

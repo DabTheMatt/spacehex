@@ -1,11 +1,7 @@
 <template>
   <div class="app-shell">
     <GameCanvas />
-    <TopStatus />
-    <ContextPanel />
-    <ActionList />
-    <EndTurnButton />
-    <ExplorationControls />
+    <GameHUD />
     <DeveloperPanel v-if="ui.showDev" />
   </div>
 </template>
@@ -13,11 +9,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import GameCanvas from './components/GameCanvas.vue'
-import TopStatus from './components/hud/TopStatus.vue'
-import ContextPanel from './components/hud/ContextPanel.vue'
-import ActionList from './components/hud/ActionList.vue'
-import EndTurnButton from './components/hud/EndTurnButton.vue'
-import ExplorationControls from './components/hud/ExplorationControls.vue'
+import GameHUD from './components/hud/GameHUD.vue'
 import DeveloperPanel from './components/panels/DeveloperPanel.vue'
 import { useUiStore } from './stores/uiStore'
 import { useGameHotkeys } from './ui/useGameHotkeys'
