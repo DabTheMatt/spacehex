@@ -4,6 +4,7 @@ import { getWorldPosition } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { palette } from '../theme'
 import { isTypingTarget } from '../../ui/actionHotkeys'
+import { clamp01, easeInOutSmooth, lerp, prefersReducedMotion, CAMERA_FOCUS_MS } from '../motion'
 
 const WASD_SPEED = 6
 const MAP_ROTATE_SPEED = 1.15
@@ -15,6 +16,14 @@ export class CameraController {
   private panX = 0
   private panY = 0
   private grabbing = false
+  private panAnim: {
+    start: number
+    duration: number
+    fromTarget: THREE.Vector3
+    toTarget: THREE.Vector3
+    fromPos: THREE.Vector3
+    toPos: THREE.Vector3
+  } | null = null
   mapRotateEnabled = true
   private keys = { w: false, a: false, s: false, d: false, q: false, e: false }
   private lastTick = performance.now()
@@ -47,10 +56,29 @@ export class CameraController {
   }
 
   focus(coord: HexCoord, height = 7): void {
+    this.panAnim = null
     const { x, z } = getWorldPosition(coord)
     this.controls.target.set(x, 0, z)
     const offset = new THREE.Vector3(0, height, height * 1.1)
     this.camera.position.copy(this.controls.target).add(offset)
+  }
+
+  /** Keep current angle and distance; glide the look-at to a hex. */
+  panTo(coord: HexCoord): void {
+    const { x, z } = getWorldPosition(coord)
+    const toTarget = new THREE.Vector3(x, 0, z)
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const toPos = toTarget.clone().add(offset)
+    if (this.controls.target.distanceTo(toTarget) < 0.12) return
+    const instant = prefersReducedMotion()
+    this.panAnim = {
+      start: performance.now(),
+      duration: instant ? 0 : CAMERA_FOCUS_MS,
+      fromTarget: this.controls.target.clone(),
+      toTarget,
+      fromPos: this.camera.position.clone(),
+      toPos,
+    }
   }
 
   focusPair(a: HexCoord, b: HexCoord): void {
@@ -63,6 +91,7 @@ export class CameraController {
   }
 
   beginPan(clientX: number, clientY: number): void {
+    this.panAnim = null
     this.grabbing = true
     this.panX = clientX
     this.panY = clientY
@@ -108,15 +137,37 @@ export class CameraController {
     const now = performance.now()
     const dt = Math.min(0.05, (now - this.lastTick) / 1000)
     this.lastTick = now
+    if (this.keys.w || this.keys.a || this.keys.s || this.keys.d || this.keys.q || this.keys.e) {
+      this.panAnim = null
+    }
+    this.applyFocusPan(now)
     this.applyWasd(dt)
     this.applyMapRotate(dt)
-    if (!this.grabbing) this.controls.update()
+    if (!this.grabbing && !this.panAnim) this.controls.update()
   }
 
   dispose(): void {
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
     this.controls.dispose()
+  }
+
+  private applyFocusPan(now: number): void {
+    const anim = this.panAnim
+    if (!anim || this.grabbing) return
+    const t = anim.duration <= 0 ? 1 : clamp01((now - anim.start) / anim.duration)
+    const e = easeInOutSmooth(t)
+    this.controls.target.set(
+      lerp(anim.fromTarget.x, anim.toTarget.x, e),
+      lerp(anim.fromTarget.y, anim.toTarget.y, e),
+      lerp(anim.fromTarget.z, anim.toTarget.z, e),
+    )
+    this.camera.position.set(
+      lerp(anim.fromPos.x, anim.toPos.x, e),
+      lerp(anim.fromPos.y, anim.toPos.y, e),
+      lerp(anim.fromPos.z, anim.toPos.z, e),
+    )
+    if (t >= 1) this.panAnim = null
   }
 
   private applyWasd(dt: number): void {

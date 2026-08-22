@@ -66,6 +66,13 @@ export class ShipRenderer {
     return motion?.kind === 'hold' || motion?.kind === 'fly'
   }
 
+  anyBusy(): boolean {
+    for (const motion of this.motion.values()) {
+      if (motion.kind === 'hold' || motion.kind === 'fly') return true
+    }
+    return false
+  }
+
   hold(shipId: string, coord: HexCoord): void {
     this.motion.set(shipId, { kind: 'hold', coord })
   }
@@ -511,7 +518,7 @@ function createActiveCallout(label: string, fuel: number, hull: number, maxHull:
     }),
   )
   sprite.center.set(0, 0)
-  sprite.scale.set(0.72, 0.42, 1)
+  sprite.scale.set(0.84, 0.46, 1)
   g.add(sprite)
 
   const line = new THREE.Line(
@@ -553,8 +560,8 @@ function makeCalloutTexture(
   maxHull: number,
   glory: number,
 ): THREE.CanvasTexture {
-  const w = 256
-  const h = 148
+  const w = 280
+  const h = 156
   const canvas = document.createElement('canvas')
   canvas.width = w
   canvas.height = h
@@ -562,20 +569,36 @@ function makeCalloutTexture(
   if (ctx) {
     ctx.clearRect(0, 0, w, h)
     ctx.strokeStyle = '#D8D0BD'
-    ctx.lineWidth = 2
-    ctx.strokeRect(10, 10, w - 20, h - 20)
+    ctx.lineWidth = 1
+    ctx.strokeRect(12.5, 12.5, w - 25, h - 25)
     ctx.fillStyle = '#D8D0BD'
-    ctx.font = '600 28px "IBM Plex Mono", monospace'
+    ctx.font = '600 26px "IBM Plex Mono", monospace'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
-    ctx.fillText(label, 24, 38)
-    drawPips(ctx, 24, 72, 6, fuel, 14, 6)
-    drawPips(ctx, 24, 94, Math.max(1, maxHull), hull, 14, 6)
-    drawPips(ctx, 24, 116, Math.max(glory, 1), glory, 10, 5)
+    ctx.fillText(label, 24, 36)
+    ctx.font = '500 16px "IBM Plex Mono", monospace'
+    drawStatRow(ctx, 24, 68, 'FUEL', 6, fuel, 12, 5)
+    drawStatRow(ctx, 24, 92, 'HULL', Math.max(1, maxHull), hull, 12, 5)
+    drawStatRow(ctx, 24, 116, 'GLORY', Math.max(glory, 4), glory, 10, 4)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
   return tex
+}
+
+function drawStatRow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  name: string,
+  count: number,
+  filled: number,
+  size: number,
+  gap: number,
+): void {
+  ctx.fillStyle = '#D8D0BD'
+  ctx.fillText(name, x, y)
+  drawPips(ctx, x + 70, y, count, filled, size, gap)
 }
 
 function drawPips(
