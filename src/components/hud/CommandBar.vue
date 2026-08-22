@@ -85,7 +85,7 @@ const params = computed(() => {
 })
 
 const hint = computed(() => {
-  if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE   ·   TILE RISES ON ARRIVAL'
+  if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE'
   return ''
 })
 

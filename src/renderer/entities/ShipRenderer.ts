@@ -16,6 +16,7 @@ import {
   lerpAngle,
   prefersReducedMotion,
   shipEngineBurn,
+  shipsTooClose,
   shortestAngleDelta,
   SHIP_BRAKE_MS,
   SHIP_FLIGHT_MS,
@@ -43,6 +44,8 @@ type FlyMotion = {
   endYaw: number
   yawDelta: number
   start: number
+  pauseAccum: number
+  lastTick: number
   turnMs: number
   igniteMs: number
   moveMs: number
@@ -117,13 +120,6 @@ export class ShipRenderer {
     return parked ? coordKey(parked) === coordKey(coord) : false
   }
 
-  isAnyoneFlyingTo(coord: HexCoord): boolean {
-    for (const motion of this.motion.values()) {
-      if (motion.kind === 'fly' && coordKey(motion.to) === coordKey(coord)) return true
-    }
-    return false
-  }
-
   fly(shipId: string, from: HexCoord, to: HexCoord): void {
     const fromW = getWorldPosition(from)
     const toW = getWorldPosition(to)
@@ -144,6 +140,8 @@ export class ShipRenderer {
       endYaw,
       yawDelta,
       start: performance.now(),
+      pauseAccum: 0,
+      lastTick: performance.now(),
       turnMs: instant ? 0 : SHIP_TURN_MS,
       igniteMs: instant ? 0 : SHIP_MAIN_IGNITE_MS,
       moveMs: instant ? 0 : SHIP_FLIGHT_MS,
@@ -155,47 +153,40 @@ export class ShipRenderer {
       const parked = this.visualPark.get(ship.id)
       if (parked && coordKey(parked) === coordKey(ship.coord)) this.visualPark.delete(ship.id)
     }
-    const parked = new Map<string, ShipState[]>()
-    const flying: ShipState[] = []
+
+    const groups = new Map<string, { coord: HexCoord; ships: ShipState[]; yaw: number }>()
     for (const ship of Object.values(state.ships)) {
-      const coord = this.parkedCoord(ship)
-      if (!coord) {
-        flying.push(ship)
-        continue
-      }
+      const motion = this.motion.get(ship.id)
+      const coord = motion?.kind === 'fly' ? motion.to : this.parkedCoord(ship) ?? ship.coord
       const key = coordKey(coord)
-      const list = parked.get(key) ?? []
-      list.push(ship)
-      parked.set(key, list)
+      const flyerYaw = motion?.kind === 'fly' ? motion.endYaw : null
+      const existing = groups.get(key)
+      if (existing) {
+        existing.ships.push(ship)
+        if (flyerYaw !== null) existing.yaw = flyerYaw
+      } else {
+        groups.set(key, {
+          coord,
+          ships: [ship],
+          yaw: flyerYaw ?? this.visualYaw(state.log, ship.id, coord),
+        })
+      }
     }
-    for (const list of parked.values()) {
-      list.sort((a, b) => a.id.localeCompare(b.id))
+    for (const group of groups.values()) {
+      group.ships.sort((a, b) => a.id.localeCompare(b.id))
     }
 
     const targets = new Map<string, { x: number; z: number }>()
-    for (const list of parked.values()) {
-      const coord = list[0] ? this.parkedCoord(list[0]) : null
-      if (!coord) continue
-      const yaw = this.stackYaw(state, list, coord)
-      list.forEach((ship, index) => {
-        targets.set(ship.id, stackWorld(coord, list.length, index, yaw))
+    for (const group of groups.values()) {
+      group.ships.forEach((ship, index) => {
+        const slot = stackWorld(group.coord, group.ships.length, index, group.yaw)
+        targets.set(ship.id, slot)
+        const motion = this.motion.get(ship.id)
+        if (motion?.kind === 'fly') {
+          motion.toX = slot.x
+          motion.toZ = slot.z
+        }
       })
-    }
-    for (const ship of flying) {
-      const motion = this.motion.get(ship.id)
-      if (!motion || motion.kind !== 'fly') continue
-      const destKey = coordKey(motion.to)
-      const mates = [...(parked.get(destKey) ?? []), ...flying.filter((other) => {
-        const otherMotion = this.motion.get(other.id)
-        return otherMotion?.kind === 'fly' && coordKey(otherMotion.to) === destKey
-      })]
-      mates.sort((a, b) => a.id.localeCompare(b.id))
-      const index = Math.max(0, mates.findIndex((mate) => mate.id === ship.id))
-      const destYaw = motion.endYaw
-      const slot = stackWorld(motion.to, mates.length, index, destYaw)
-      motion.toX = slot.x
-      motion.toZ = slot.z
-      targets.set(ship.id, slot)
     }
 
     this.group.clear()
@@ -247,10 +238,6 @@ export class ShipRenderer {
     return this.visualPark.get(ship.id) ?? ship.coord
   }
 
-  private stackYaw(state: GameState, group: ShipState[], coord: HexCoord): number {
-    return this.visualYaw(state.log, group[0]?.id ?? '', coord)
-  }
-
   private maybeSlide(
     shipId: string,
     from: { x: number; z: number },
@@ -280,7 +267,7 @@ export class ShipRenderer {
   private visualYaw(log: GameEvent[], shipId: string, fallbackCoord: HexCoord): number {
     const motion = this.motion.get(shipId)
     if (motion?.kind === 'fly') {
-      const elapsed = performance.now() - motion.start
+      const elapsed = performance.now() - motion.start - motion.pauseAccum
       const turnT = motion.turnMs <= 0 ? 1 : clamp01(elapsed / motion.turnMs)
       return lerpAngle(motion.startYaw, motion.endYaw, easeInOutCubic(turnT))
     }
@@ -311,14 +298,17 @@ export class ShipRenderer {
         child.position.x = lerp(motion.fromX, motion.toX, e)
         child.position.z = lerp(motion.fromZ, motion.toZ, e)
         child.position.y = BASE_HOVER
+        applyEngineBurn(child, slideBurn(this.facing.get(shipId) ?? 0, motion, t))
         this.remember(child)
         if (t >= 1) {
+          applyEngineBurn(child, ENGINES_OFF)
           this.motion.delete(shipId)
           settled = true
         }
         continue
       }
-      const elapsed = now - motion.start
+      motion.lastTick = motion.lastTick || now
+      const elapsed = now - motion.start - motion.pauseAccum
       const turnT = motion.turnMs <= 0 ? 1 : clamp01(elapsed / motion.turnMs)
       const yaw = lerpAngle(motion.startYaw, motion.endYaw, easeInOutCubic(turnT))
       child.quaternion.setFromAxisAngle(Y_AXIS, yaw)
@@ -338,6 +328,7 @@ export class ShipRenderer {
       if (turnT < 1) {
         child.position.x = motion.fromX
         child.position.z = motion.fromZ
+        motion.lastTick = now
         this.remember(child)
         continue
       }
@@ -348,16 +339,28 @@ export class ShipRenderer {
         child.position.z = motion.fromZ
         child.quaternion.setFromAxisAngle(Y_AXIS, motion.endYaw)
         this.facing.set(shipId, motion.endYaw)
+        motion.lastTick = now
         this.remember(child)
         continue
       }
 
-      const moveT = motion.moveMs <= 0 ? 1 : clamp01((afterTurn - motion.igniteMs) / motion.moveMs)
+      const moveElapsed = afterTurn - motion.igniteMs
+      const moveT = motion.moveMs <= 0 ? 1 : clamp01(moveElapsed / motion.moveMs)
       const e = easeInOutSmooth(moveT)
-      child.position.x = lerp(motion.fromX, motion.toX, e)
-      child.position.z = lerp(motion.fromZ, motion.toZ, e)
+      const nextX = lerp(motion.fromX, motion.toX, e)
+      const nextZ = lerp(motion.fromZ, motion.toZ, e)
+      if (this.blockedAt(shipId, nextX, nextZ)) {
+        motion.pauseAccum += now - motion.lastTick
+        motion.lastTick = now
+        applyEngineBurn(child, ENGINES_OFF)
+        this.remember(child)
+        continue
+      }
+      child.position.x = nextX
+      child.position.z = nextZ
       child.quaternion.setFromAxisAngle(Y_AXIS, motion.endYaw)
       this.facing.set(shipId, motion.endYaw)
+      motion.lastTick = now
       this.remember(child)
       if (moveT >= 1) {
         applyEngineBurn(child, ENGINES_OFF)
@@ -370,10 +373,36 @@ export class ShipRenderer {
     return settled
   }
 
+  private blockedAt(shipId: string, x: number, z: number): boolean {
+    for (const other of this.group.children) {
+      const otherId = other.userData.shipId as string
+      if (otherId === shipId) continue
+      if (shipsTooClose(x, z, other.position.x, other.position.z)) return true
+    }
+    return false
+  }
+
   private remember(child: THREE.Object3D): void {
     const shipId = child.userData.shipId as string
     this.lastXZ.set(shipId, { x: child.position.x, z: child.position.z })
   }
+}
+
+function slideBurn(
+  yaw: number,
+  motion: SlideMotion,
+  t: number,
+): { main: number; port: number; starboard: number; brakePort: number; brakeStarboard: number } {
+  if (t >= 1) return ENGINES_OFF
+  const rightX = Math.cos(yaw)
+  const rightZ = -Math.sin(yaw)
+  const alongRight = (motion.toX - motion.fromX) * rightX + (motion.toZ - motion.fromZ) * rightZ
+  if (Math.abs(alongRight) < 0.01) return ENGINES_OFF
+  const braking = t > 0.62
+  if (alongRight > 0) {
+    return braking ? { ...ENGINES_OFF, starboard: 0.85 } : { ...ENGINES_OFF, port: 0.95 }
+  }
+  return braking ? { ...ENGINES_OFF, port: 0.85 } : { ...ENGINES_OFF, starboard: 0.95 }
 }
 
 function stackWorld(
@@ -603,10 +632,10 @@ function hullMark(label: string, length: number, half: number, port: boolean): T
   const up = new THREE.Vector3(0, 1, 0)
   const outward = new THREE.Vector3().crossVectors(along, up).normalize()
   if ((port && outward.x > 0) || (!port && outward.x < 0)) outward.negate()
-  pos.addScaledVector(outward, 0.003)
+  pos.addScaledVector(outward, 0.004)
 
-  const width = Math.min(0.09, edgeLen * 0.22)
-  const height = HULL_HEIGHT * 0.58
+  const width = Math.min(0.16, edgeLen * 0.4)
+  const height = HULL_HEIGHT * 0.86
   const mesh = createHullNumber(label, width, height)
   const xAxis = new THREE.Vector3().crossVectors(up, outward).normalize()
   const yAxis = new THREE.Vector3().crossVectors(outward, xAxis).normalize()
@@ -623,14 +652,10 @@ function createHullNumber(label: string, width: number, height: number): THREE.M
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, 256, 96)
-    ctx.font = '800 48px "IBM Plex Mono", monospace'
+    ctx.font = '700 62px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = 10
-    ctx.strokeStyle = css.ink
-    ctx.strokeText(label, 128, 50)
-    ctx.fillStyle = css.ivory
+    ctx.fillStyle = css.dusk
     ctx.fillText(label, 128, 50)
   }
   const tex = new THREE.CanvasTexture(canvas)

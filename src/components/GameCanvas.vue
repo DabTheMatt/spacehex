@@ -130,7 +130,9 @@ function onUp(ev: PointerEvent): void {
     }
     if (hover.kind === 'EXPLORE') {
       game.dispatch({ type: 'START_EXPLORATION', direction: hover.direction })
+      game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
       ui.hover = null
+      return
     }
   }
 
@@ -149,12 +151,6 @@ function onUp(ev: PointerEvent): void {
 onMounted(() => {
   if (!canvasEl.value) return
   scene = new SpaceScene(canvasEl.value)
-  scene.onShipLanded = (coord) => {
-    if (game.state.phase !== 'TILE_PLACEMENT') return
-    const target = game.state.exploration.target
-    if (!target || coord.q !== target.q || coord.r !== target.r) return
-    game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
-  }
   scene.preview.onRevealed = null
   resize()
   ui.selectedShipId = game.ship.id

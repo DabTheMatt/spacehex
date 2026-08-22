@@ -9,6 +9,8 @@ export const SHIP_FLIGHT_MS = 2400
 export const SHIP_BRAKE_MS = 720
 export const SHIP_SLIDE_MS = 1000
 export const CAMERA_FOCUS_MS = 1100
+/** Minimum center-to-center XZ distance so two hulls do not overlap. */
+export const SHIP_CLEARANCE = 0.38
 
 export interface EngineBurn {
   main: number
@@ -86,6 +88,18 @@ export function shipEngineBurn(options: {
 
 export function clamp01(t: number): number {
   return Math.min(1, Math.max(0, t))
+}
+
+export function shipsTooClose(
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  clearance = SHIP_CLEARANCE,
+): boolean {
+  const dx = ax - bx
+  const dz = az - bz
+  return dx * dx + dz * dz < clearance * clearance
 }
 
 export function easeOutCubic(t: number): number {

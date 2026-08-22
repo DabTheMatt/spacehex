@@ -7,8 +7,10 @@ import {
   lerp,
   lerpAngle,
   shipEngineBurn,
+  shipsTooClose,
   shortestAngleDelta,
   SHIP_BRAKE_MS,
+  SHIP_CLEARANCE,
   SHIP_MAIN_IGNITE_MS,
   SHIP_RCS_COUNTER_MS,
   SHIP_RCS_KICK_MS,
@@ -130,5 +132,14 @@ describe('placement motion', () => {
     })
     expect(brakes.brakePort).toBeGreaterThan(0.5)
     expect(brakes.brakeStarboard).toBeGreaterThan(0.5)
+  })
+})
+
+describe('ship clearance', () => {
+  it('keeps hulls from overlapping at the clearance radius', () => {
+    expect(shipsTooClose(0, 0, 0.1, 0)).toBe(true)
+    expect(shipsTooClose(0, 0, 1, 0)).toBe(false)
+    expect(shipsTooClose(0, 0, SHIP_CLEARANCE, 0)).toBe(false)
+    expect(shipsTooClose(0, 0, SHIP_CLEARANCE * 0.5, 0)).toBe(true)
   })
 })

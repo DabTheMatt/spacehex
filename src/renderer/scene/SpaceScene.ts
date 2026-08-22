@@ -8,11 +8,10 @@ import { ShipRenderer } from '../entities/ShipRenderer'
 import { HoverTargetRenderer } from '../entities/HoverTargetRenderer'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
-import { coordKey, parseCoordKey } from '../../game/board/HexCoord'
+import { coordKey } from '../../game/board/HexCoord'
 import { userDataFromHits } from './pickHelpers'
 import type { BoardHover } from '../../ui/boardHover'
 import { TILE_SETTLED_Y, TILE_SLOT_Y } from '../board/TileRenderer'
-import { activeShip } from '../../game/rules/fuel'
 import {
   clamp01,
   easeOutCubic,
@@ -39,7 +38,6 @@ export class SpaceScene {
   readonly ships: ShipRenderer
   readonly hoverTargets: HoverTargetRenderer
   readonly raycaster = new THREE.Raycaster()
-  onShipLanded: ((coord: HexCoord) => void) | null = null
   private disposed = false
   private lastState: GameState | null = null
   private lastOptions: SceneOptions | null = null
@@ -50,6 +48,7 @@ export class SpaceScene {
   private tileY: Record<string, number> = {}
   private flightsByTile = new Map<string, Array<{ shipId: string; from: HexCoord; to: HexCoord }>>()
   private hideGlyphKeys = new Set<string>()
+  private revealWhenSettled = new Set<string>()
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -152,30 +151,11 @@ export class SpaceScene {
         continue
       }
       if (this.ships.isBusy(ship.id)) continue
-      const destKey = coordKey(dest)
-      if (this.riseByKey.has(destKey)) {
-        this.ships.hold(ship.id, prev)
-        const queued = this.flightsByTile.get(destKey) ?? []
-        queued.push({ shipId: ship.id, from: prev, to: dest })
-        this.flightsByTile.set(destKey, queued)
-      } else {
-        this.ships.fly(ship.id, prev, dest)
-      }
+      this.ships.fly(ship.id, prev, dest)
       this.prevShipCoords.set(ship.id, dest)
     }
 
-    this.beginExploreFlight(state)
     this.prevTileKeys = new Set(tileKeys)
-  }
-
-  private beginExploreFlight(state: GameState): void {
-    if (state.phase !== 'TILE_PLACEMENT' || !state.exploration.target) return
-    const ship = activeShip(state)
-    const dest = state.exploration.target
-    if (this.ships.isFlyingTo(ship.id, dest) || this.ships.isParkedAt(ship.id, dest)) return
-    if (this.ships.isBusy(ship.id)) return
-    const from = this.prevShipCoords.get(ship.id) ?? ship.coord
-    this.ships.fly(ship.id, from, dest)
   }
 
   private applySync(): void {
@@ -191,7 +171,8 @@ export class SpaceScene {
     this.hoverTargets.sync(this.lastState, this.lastOptions.hover ?? null)
   }
 
-  private advanceRise(now: number): void {
+  private advanceRise(now: number): boolean {
+    let revealed = false
     for (const [key, rise] of [...this.riseByKey.entries()]) {
       const t = rise.duration <= 0 ? 1 : clamp01((now - rise.start) / rise.duration)
       const y = lerp(TILE_SLOT_Y, TILE_SETTLED_Y, easeOutCubic(t))
@@ -203,13 +184,16 @@ export class SpaceScene {
       this.board.setTileY(key, TILE_SETTLED_Y)
       const flights = this.flightsByTile.get(key) ?? []
       this.flightsByTile.delete(key)
-      if (flights.length === 0 && !this.ships.isAnyoneFlyingTo(parseCoordKey(key))) {
-        this.hideGlyphKeys.delete(key)
-      }
       for (const flight of flights) {
         this.ships.fly(flight.shipId, flight.from, flight.to)
       }
+      if (this.revealWhenSettled.has(key)) {
+        this.revealWhenSettled.delete(key)
+        this.hideGlyphKeys.delete(key)
+        revealed = true
+      }
     }
+    return revealed
   }
 
   private intersectAll(clientX: number, clientY: number, objects: THREE.Object3D[]): THREE.Intersection[] {
@@ -236,6 +220,7 @@ export class SpaceScene {
     this.tileY = {}
     this.flightsByTile.clear()
     this.hideGlyphKeys.clear()
+    this.revealWhenSettled.clear()
     this.ships.reset()
   }
 
@@ -243,7 +228,7 @@ export class SpaceScene {
     if (this.disposed) return
     requestAnimationFrame(this.loop)
     const now = performance.now()
-    this.advanceRise(now)
+    const riseRevealed = this.advanceRise(now)
     const time = now / 1000
     this.board.tick(time)
     this.preview.tick(time)
@@ -251,14 +236,17 @@ export class SpaceScene {
     this.hoverTargets.tick(this.camera.camera)
     let glyphsChanged = false
     for (const coord of this.ships.consumeLanded()) {
-      this.onShipLanded?.(coord)
       const key = coordKey(coord)
       if (!this.hideGlyphKeys.has(key)) continue
+      if (this.riseByKey.has(key)) {
+        this.revealWhenSettled.add(key)
+        continue
+      }
       this.hideGlyphKeys.delete(key)
       glyphsChanged = true
     }
     this.camera.setFollow(this.ships.flyingWorld())
-    if (shipsSettled || glyphsChanged) this.applySync()
+    if (shipsSettled || glyphsChanged || riseRevealed) this.applySync()
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)
   }
