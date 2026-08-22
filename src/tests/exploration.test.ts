@@ -73,15 +73,32 @@ describe('exploration engine', () => {
     expect(state.board.tiles[key].definitionId).toBe(top)
     expect(state.ships['mewa-1'].coord).toEqual(getNeighbor({ q: 0, r: 0 }, 0))
     expect(state.phase).toBe('PLAYER_TURN')
-    expect(state.movementSpent).toBe(true)
+    expect(state.activePlayerId).toBe('player-2')
+    expect(state.movementSpent).toBe(false)
+    expect(confirmed.events.some((e) => e.type === 'TURN_ENDED')).toBe(true)
     expect(Object.keys(state.board.tiles)).toHaveLength(2)
+  })
+
+  it('ends the turn after moving onto a discovered hex', () => {
+    let state = createInitialState('move-turn')
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'void-1',
+      coord: { q: 1, r: 0 },
+      rotation: 0,
+    }).state
+    const moved = applyCommand(state, { type: 'DECLARE_MOVE', target: { q: 1, r: 0 } })
+    expect(moved.state.ships['mewa-1'].coord).toEqual({ q: 1, r: 0 })
+    expect(moved.state.activePlayerId).toBe('player-2')
+    expect(moved.state.movementSpent).toBe(false)
+    expect(moved.events.some((e) => e.type === 'SHIP_MOVED')).toBe(true)
+    expect(moved.events.some((e) => e.type === 'TURN_ENDED')).toBe(true)
   })
 
   it('does not allow placing on an occupied hex via move-as-explore', () => {
     let state = createInitialState('blocked')
     state = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 }).state
     state = applyCommand(state, { type: 'CONFIRM_TILE_PLACEMENT' }).state
-    state = applyCommand(state, { type: 'END_TURN' }).state
     const result = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 })
     expect(result.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(true)
   })

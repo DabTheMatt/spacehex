@@ -50,23 +50,29 @@ function evaGlyph(color: number): THREE.Group {
   g.add(poly([[-0.22, -0.16], [-0.22, 0.16]], color))
   g.add(poly([[-0.22, 0], [0.18, 0]], color))
 
-  const light = new THREE.Mesh(
-    new THREE.CircleGeometry(0.035, 16),
-    new THREE.MeshBasicMaterial({
-      color: palette.ochre,
-      transparent: true,
-      opacity: 0.7,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  )
-  light.rotation.x = -Math.PI / 2
-  light.position.set(0.4, Y + 0.004, 0)
-  light.userData.animate = 'pulse'
-  g.add(light)
-  const ring = circle(0.055, color, 18)
-  ring.position.set(0.4, 0, 0)
-  g.add(ring)
+  const count = 5
+  for (let i = 0; i < count; i++) {
+    const t = i / (count - 1)
+    const x = -0.22 + t * 0.5
+    for (const side of [-1, 1]) {
+      const lamp = new THREE.Mesh(
+        new THREE.CircleGeometry(0.022, 10),
+        new THREE.MeshBasicMaterial({
+          color: palette.ochre,
+          transparent: true,
+          opacity: 0.18,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        }),
+      )
+      lamp.rotation.x = -Math.PI / 2
+      lamp.position.set(x, Y + 0.004, side * 0.09)
+      lamp.userData.animate = 'runway'
+      lamp.userData.runwayIndex = i
+      lamp.userData.runwayCount = count
+      g.add(lamp)
+    }
+  }
   return g
 }
 
@@ -82,15 +88,16 @@ function planetGlyph(color: number, size: 'L' | 'M' | 'S'): THREE.Group {
   const spin = new THREE.Group()
   spin.userData.animate = 'spin'
   if (size === 'L') {
-    spin.add(circle(0.46, color, 48))
-    spin.add(ellipse(0.68, 0.2, color))
-    spin.add(ellipse(0.62, 0.16, color))
-    spin.add(arc(0.28, -0.5, 2.5, color))
-    const moon = circle(0.12, color, 20)
-    moon.position.set(0.62, 0, 0.38)
+    // Keep the spinning graphic inside the hex apothem (~0.83 at HEX_SIZE 1).
+    spin.add(circle(0.28, color, 48))
+    spin.add(ellipse(0.42, 0.13, color))
+    spin.add(ellipse(0.38, 0.1, color))
+    spin.add(arc(0.16, -0.5, 2.5, color))
+    const moon = circle(0.07, color, 20)
+    moon.position.set(0.34, 0, 0.12)
     spin.add(moon)
-    spin.add(poly([[-0.2, -0.08], [0.22, 0.12]], color))
-    spin.add(poly([[-0.12, 0.18], [0.18, 0.28]], color))
+    spin.add(poly([[-0.14, -0.06], [0.16, 0.08]], color))
+    spin.add(poly([[-0.08, 0.12], [0.12, 0.18]], color))
   } else if (size === 'M') {
     spin.add(circle(0.3, color, 40))
     spin.add(arc(0.18, 0.2, 3.4, color))
@@ -259,6 +266,17 @@ export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
       if (!Array.isArray(mat) && 'opacity' in mat) {
         mat.transparent = true
         mat.opacity = 0.2 + 0.6 * (0.5 + 0.5 * Math.sin(time * 1.35))
+      }
+    }
+    if (obj.userData.animate === 'runway' && obj instanceof THREE.Mesh) {
+      const mat = obj.material
+      if (!Array.isArray(mat) && 'opacity' in mat) {
+        const count = Number(obj.userData.runwayCount) || 5
+        const index = Number(obj.userData.runwayIndex) || 0
+        const chase = Math.floor(time * 6) % count
+        const prev = (chase + count - 1) % count
+        mat.transparent = true
+        mat.opacity = index === chase ? 1 : index === prev ? 0.4 : 0.12
       }
     }
   })

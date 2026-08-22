@@ -74,7 +74,7 @@ export class SpaceScene {
     this.lastState = state
     this.lastOptions = options
     this.camera.mapRotateEnabled = true
-    this.camera.setOrbitEnabled(!options.hover)
+    this.camera.setOrbitEnabled(true)
     this.applySync()
   }
 

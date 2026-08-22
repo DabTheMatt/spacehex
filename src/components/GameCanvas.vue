@@ -17,7 +17,6 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { SpaceScene } from '@/renderer/scene/SpaceScene'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
-import { getNeighbor } from '@/game/board/hexMath'
 import { coordKey } from '@/game/board/HexCoord'
 
 const DRAG_PX = 12
@@ -56,17 +55,14 @@ function resize(): void {
 
 function updateHover(clientX: number, clientY: number): void {
   if (!scene || game.state.phase === 'TILE_PLACEMENT') return
-  const next = scene.pickHover(clientX, clientY)
-  ui.hover = next
-  scene.camera.setOrbitEnabled(!next)
+  ui.hover = scene.pickHover(clientX, clientY)
 }
 
 function confirmHover(): void {
   const hover = ui.hover
   if (!hover || game.state.phase === 'TILE_PLACEMENT') return
   if (hover.kind === 'STAY') {
-    if (game.state.movementSpent) game.dispatch({ type: 'END_TURN' })
-    else game.dispatch({ type: 'SKIP_MOVEMENT' })
+    game.dispatch({ type: 'SKIP_MOVEMENT' })
     ui.hover = null
     return
   }
@@ -126,21 +122,15 @@ function onUp(ev: PointerEvent): void {
 
   if (ev.button === 2) {
     ev.preventDefault()
+    return
+  }
+
+  if (ev.button === 0 && ui.hover && !previewBusy()) {
     confirmHover()
     return
   }
 
   const status = game.state.exploration.status
-  if (status === 'SELECTING_MOVE') {
-    const picked = scene.pickDirection(ev.clientX, ev.clientY)
-    if (!picked) return
-    game.dispatch({
-      type: 'DECLARE_MOVE',
-      target: getNeighbor(game.ship.coord, picked.direction),
-    })
-    return
-  }
-
   if (status === 'SELECTING_DIRECTION') {
     const ghost = scene.pickDirection(ev.clientX, ev.clientY)
     if (ghost) {
@@ -159,6 +149,10 @@ function onUp(ev: PointerEvent): void {
   const tile = scene.pickTile(ev.clientX, ev.clientY)
   ui.selectedTile = tile
   if (tile) ui.selectedShipId = null
+}
+
+function previewBusy(): boolean {
+  return game.state.phase === 'TILE_PLACEMENT'
 }
 
 onMounted(() => {
