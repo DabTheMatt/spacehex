@@ -5,12 +5,12 @@ import { CameraController, makeLights } from './CameraController'
 import { BoardRenderer } from '../board/BoardRenderer'
 import { TilePreviewRenderer } from '../board/TilePreviewRenderer'
 import { ShipRenderer } from '../entities/ShipRenderer'
-import { HexActionRenderer, type HexActionId } from '../entities/HexActionRenderer'
+import { HoverTargetRenderer } from '../entities/HoverTargetRenderer'
 import { palette } from '../theme'
-import { activeShip } from '../../game/rules/fuel'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
 import { userDataFromHits } from './pickHelpers'
+import type { BoardHover } from '../../ui/boardHover'
 import { TILE_SETTLED_Y, TILE_SLOT_Y } from '../board/TileRenderer'
 import {
   clamp01,
@@ -26,6 +26,9 @@ export interface SceneOptions {
   showEdges: boolean
   selectedKey?: string | null
   showExploreGhosts?: boolean
+  hover?: BoardHover | null
+  peekTileId?: string | null
+  hoverRotation?: number
 }
 
 export class SpaceScene {
@@ -35,7 +38,7 @@ export class SpaceScene {
   readonly board: BoardRenderer
   readonly preview: TilePreviewRenderer
   readonly ships: ShipRenderer
-  readonly hexActions: HexActionRenderer
+  readonly hoverTargets: HoverTargetRenderer
   readonly raycaster = new THREE.Raycaster()
   private disposed = false
   private lastState: GameState | null = null
@@ -59,8 +62,8 @@ export class SpaceScene {
     this.board = new BoardRenderer()
     this.preview = new TilePreviewRenderer()
     this.ships = new ShipRenderer()
-    this.hexActions = new HexActionRenderer()
-    this.scene.add(this.board.group, this.preview.group, this.ships.group, this.hexActions.group)
+    this.hoverTargets = new HoverTargetRenderer()
+    this.scene.add(this.board.group, this.preview.group, this.ships.group, this.hoverTargets.group)
     this.loop()
   }
 
@@ -72,7 +75,9 @@ export class SpaceScene {
   sync(state: GameState, options: SceneOptions): void {
     this.lastState = state
     this.lastOptions = options
-    this.camera.mapRotateEnabled = state.phase !== 'TILE_PLACEMENT'
+    this.camera.mapRotateEnabled =
+      state.phase !== 'TILE_PLACEMENT' && options.hover?.kind !== 'EXPLORE'
+    this.camera.setOrbitEnabled(!options.hover)
     this.applySync()
   }
 
@@ -84,9 +89,14 @@ export class SpaceScene {
     }
   }
 
-  pickHexAction(clientX: number, clientY: number): HexActionId | null {
-    const hits = this.intersectAll(clientX, clientY, this.hexActions.pickables())
-    return userDataFromHits<HexActionId>(hits, 'hexAction') ?? null
+  pickHover(clientX: number, clientY: number): BoardHover | null {
+    const hits = this.intersectAll(clientX, clientY, this.hoverTargets.pickables())
+    return userDataFromHits<BoardHover>(hits, 'boardHover') ?? null
+  }
+
+  pickRotateControl(clientX: number, clientY: number): boolean {
+    const hits = this.intersectAll(clientX, clientY, this.hoverTargets.rotatePickables())
+    return userDataFromHits<boolean>(hits, 'rotateControl') === true
   }
 
   pickDirection(clientX: number, clientY: number): { direction: number } | null {
@@ -155,9 +165,17 @@ export class SpaceScene {
     if (!this.lastState || !this.lastOptions) return
     this.queueStateMotions(this.lastState)
     this.board.sync(this.lastState, { ...this.lastOptions, tileY: this.tileY })
-    this.preview.sync(this.lastState)
+    const peek =
+      this.lastOptions.hover?.kind === 'EXPLORE' && this.lastOptions.peekTileId
+        ? {
+            coord: this.lastOptions.hover.coord,
+            tileId: this.lastOptions.peekTileId,
+            rotation: this.lastOptions.hoverRotation ?? 0,
+          }
+        : null
+    this.preview.sync(this.lastState, peek)
     this.ships.sync(this.lastState)
-    this.hexActions.sync(this.lastState, this.ships.isBusy(activeShip(this.lastState).id))
+    this.hoverTargets.sync(this.lastState, this.lastOptions.hover ?? null)
   }
 
   private advanceRise(now: number): void {
@@ -203,7 +221,7 @@ export class SpaceScene {
     this.board.tick(time)
     this.preview.tick(time)
     const shipsSettled = this.ships.tick(time)
-    this.hexActions.tick(this.camera.camera)
+    this.hoverTargets.tick(this.camera.camera)
     if (shipsSettled) this.applySync()
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)

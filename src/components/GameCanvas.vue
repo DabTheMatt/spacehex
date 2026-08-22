@@ -7,6 +7,8 @@
     @pointermove="onMove"
     @pointerup="onUp"
     @pointercancel="onUp"
+    @pointerleave="onLeave"
+    @contextmenu.prevent
   />
 </template>
 
@@ -17,7 +19,8 @@ import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { getNeighbor } from '@/game/board/hexMath'
 import { coordKey } from '@/game/board/HexCoord'
-import type { HexActionId } from '@/renderer/entities/HexActionRenderer'
+import { wrapRotation } from '@/game/board/tileRotation'
+import { hoverKey } from '@/ui/boardHover'
 
 const DRAG_PX = 12
 
@@ -28,26 +31,11 @@ let scene: SpaceScene | null = null
 let downX = 0
 let downY = 0
 let dragging = false
+let rotateClick = false
 
-function showExploreGhosts(): boolean {
-  return game.state.exploration.status === 'SELECTING_DIRECTION'
-}
-
-function runHexAction(action: HexActionId): void {
-  if (action === 'MOVE') {
-    if (game.state.movementSpent) game.dispatch({ type: 'END_TURN' })
-    else game.dispatch({ type: 'BEGIN_MOVE' })
-    return
-  }
-  if (action === 'EXPLORE') {
-    game.dispatch({ type: 'BEGIN_EXPLORATION' })
-    return
-  }
-  if (action === 'STAY') {
-    game.dispatch({ type: 'SKIP_MOVEMENT' })
-    return
-  }
-  game.dispatch({ type: 'END_TURN' })
+function peekTileId(): string | null {
+  if (ui.hover?.kind !== 'EXPLORE') return null
+  return game.state.explorationDeck.drawPile[0] ?? null
 }
 
 function sync(): void {
@@ -57,7 +45,10 @@ function sync(): void {
     showCoords: ui.showCoords,
     showEdges: ui.showEdges,
     selectedKey: ui.selectedTile ? coordKey(ui.selectedTile) : null,
-    showExploreGhosts: showExploreGhosts(),
+    showExploreGhosts: game.state.exploration.status === 'SELECTING_DIRECTION',
+    hover: ui.hover,
+    peekTileId: peekTileId(),
+    hoverRotation: ui.hoverRotation,
   })
 }
 
@@ -73,26 +64,85 @@ function resize(): void {
   scene.resize(parent.clientWidth, parent.clientHeight)
 }
 
+function updateHover(clientX: number, clientY: number): void {
+  if (!scene || game.state.phase === 'TILE_PLACEMENT') return
+  if (scene.pickRotateControl(clientX, clientY)) {
+    scene.camera.setOrbitEnabled(false)
+    return
+  }
+  const next = scene.pickHover(clientX, clientY)
+  const prevKey = hoverKey(ui.hover)
+  const nextKey = hoverKey(next)
+  if (prevKey !== nextKey) ui.hoverRotation = 0
+  ui.hover = next
+  scene.camera.setOrbitEnabled(!next)
+}
+
+function confirmHover(): void {
+  const hover = ui.hover
+  if (!hover || game.state.phase === 'TILE_PLACEMENT') return
+  if (hover.kind === 'STAY') {
+    if (game.state.movementSpent) game.dispatch({ type: 'END_TURN' })
+    else game.dispatch({ type: 'SKIP_MOVEMENT' })
+    ui.hover = null
+    return
+  }
+  if (hover.kind === 'MOVE') {
+    game.dispatch({ type: 'DECLARE_MOVE', target: hover.coord })
+    ui.hover = null
+    return
+  }
+  const wanted = ui.hoverRotation
+  game.dispatch({ type: 'START_EXPLORATION', direction: hover.direction })
+  if (!game.state.exploration.pendingTileId) return
+  let guard = 0
+  while ((game.state.exploration.rotation ?? 0) !== wanted && guard < 6) {
+    game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' })
+    guard += 1
+  }
+  game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
+  ui.hover = null
+  ui.hoverRotation = 0
+}
+
+function onLeave(): void {
+  if (dragging) return
+  ui.hover = null
+  scene?.camera.setOrbitEnabled(true)
+}
+
 function onDown(ev: PointerEvent): void {
   downX = ev.clientX
   downY = ev.clientY
   dragging = false
+  rotateClick = false
   canvasEl.value?.focus()
   if (ev.button === 0) {
+    if (scene?.pickRotateControl(ev.clientX, ev.clientY)) {
+      rotateClick = true
+      return
+    }
     canvasEl.value?.setPointerCapture(ev.pointerId)
+  }
+  if (ev.button === 2) {
+    ev.preventDefault()
   }
 }
 
 function onMove(ev: PointerEvent): void {
-  if (!scene || (ev.buttons & 1) === 0) return
-  const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY)
-  if (!dragging && dist > DRAG_PX) {
-    dragging = true
-    scene.camera.beginPan(downX, downY)
-    scene.camera.updatePan(ev.clientX, ev.clientY)
+  if (!scene) return
+  if ((ev.buttons & 1) === 1 && !rotateClick) {
+    const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY)
+    if (!dragging && dist > DRAG_PX) {
+      dragging = true
+      scene.camera.beginPan(downX, downY)
+      scene.camera.updatePan(ev.clientX, ev.clientY)
+      return
+    }
+    if (dragging) scene.camera.updatePan(ev.clientX, ev.clientY)
     return
   }
-  if (dragging) scene.camera.updatePan(ev.clientX, ev.clientY)
+  if (ev.buttons === 0) updateHover(ev.clientX, ev.clientY)
 }
 
 function onUp(ev: PointerEvent): void {
@@ -103,11 +153,23 @@ function onUp(ev: PointerEvent): void {
     canvasEl.value?.releasePointerCapture(ev.pointerId)
   }
   dragging = false
-  if (wasDrag) return
+  if (wasDrag) {
+    rotateClick = false
+    return
+  }
 
-  const hexAction = scene.pickHexAction(ev.clientX, ev.clientY)
-  if (hexAction) {
-    runHexAction(hexAction)
+  if (ev.button === 0 && rotateClick) {
+    rotateClick = false
+    if (ui.hover?.kind === 'EXPLORE') {
+      ui.hoverRotation = wrapRotation(ui.hoverRotation + 1)
+    }
+    return
+  }
+  rotateClick = false
+
+  if (ev.button === 2) {
+    ev.preventDefault()
+    confirmHover()
     return
   }
 
@@ -167,7 +229,16 @@ watch(
 )
 
 watch(
-  () => [game.state, ui.showDebug, ui.showCoords, ui.showEdges, ui.selectedTile, ui.selectedShipId],
+  () => [
+    game.state,
+    ui.showDebug,
+    ui.showCoords,
+    ui.showEdges,
+    ui.selectedTile,
+    ui.selectedShipId,
+    ui.hover,
+    ui.hoverRotation,
+  ],
   () => sync(),
   { deep: true },
 )
@@ -177,6 +248,8 @@ watch(
   () => {
     ui.selectedShipId = game.ship.id
     ui.selectedTile = null
+    ui.hover = null
+    ui.hoverRotation = 0
   },
 )
 </script>

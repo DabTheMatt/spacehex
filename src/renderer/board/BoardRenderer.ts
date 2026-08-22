@@ -18,6 +18,7 @@ import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
 import { canExploreDirection } from '../../game/rules/exploration'
 import { activeShip } from '../../game/rules/fuel'
+import type { BoardHover } from '../../ui/boardHover'
 
 export class BoardRenderer {
   readonly group = new THREE.Group()
@@ -38,6 +39,7 @@ export class BoardRenderer {
       selectedKey?: string | null
       showExploreGhosts?: boolean
       tileY?: Record<string, number>
+      hover?: BoardHover | null
     },
   ): void {
     this.tiles.clear()
@@ -73,6 +75,10 @@ export class BoardRenderer {
 
     this.drawActionMarkers(state)
     if (options.showExploreGhosts) this.drawExploreGhosts(state)
+    else if (options.hover?.kind === 'EXPLORE') this.drawHoverGhost(options.hover.direction, options.hover.coord)
+    if (options.hover?.kind === 'MOVE' || options.hover?.kind === 'STAY') {
+      this.drawHoverGhost(-1, options.hover.coord)
+    }
   }
 
   tick(time: number): void {
@@ -104,6 +110,13 @@ export class BoardRenderer {
     }
   }
 
+  private drawHoverGhost(direction: number, coord: { q: number; r: number }): void {
+    const ghost = makeDashedHexGhost(direction)
+    const pos = getWorldPosition(coord)
+    ghost.position.set(pos.x, TILE_SETTLED_Y, pos.z)
+    this.markers.add(ghost)
+  }
+
   private drawExploreGhosts(state: GameState): void {
     if (state.phase === 'TILE_PLACEMENT' || state.movementSpent) return
     if (state.exploration.status !== 'SELECTING_DIRECTION') return
@@ -111,10 +124,7 @@ export class BoardRenderer {
     for (let dir = 0; dir < 6; dir++) {
       if (!canExploreDirection(state, dir)) continue
       const target = getNeighbor(origin, dir)
-      const ghost = makeDashedHexGhost(dir)
-      const pos = getWorldPosition(target)
-      ghost.position.set(pos.x, TILE_SETTLED_Y, pos.z)
-      this.markers.add(ghost)
+      this.drawHoverGhost(dir, target)
     }
   }
 

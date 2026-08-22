@@ -36,6 +36,7 @@ export class CameraController {
     this.controls.mouseButtons.LEFT = null
     this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY
     this.controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE
+    this.controls.enableRotate = true
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
   }
@@ -82,6 +83,10 @@ export class CameraController {
 
   get panning(): boolean {
     return this.grab !== null
+  }
+
+  setOrbitEnabled(enabled: boolean): void {
+    this.controls.enableRotate = enabled
   }
 
   tick(): void {
