@@ -37,7 +37,10 @@ export function useGameHotkeys(): void {
     const action = actionHotkey(ev.code)
     if (!action) return
     ev.preventDefault()
-    if (action === 'END_TURN' && game.state.movementSpent) {
+    if (
+      action === 'END_TURN' &&
+      (game.state.movementSpent || (game.player.attacksThisTurn ?? 0) > 0)
+    ) {
       game.dispatch({ type: 'END_TURN' })
     }
   }
