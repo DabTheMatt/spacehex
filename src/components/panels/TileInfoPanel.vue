@@ -40,7 +40,7 @@ const info = computed(() => {
     ? game.state.players[tile.discoveredByPlayerId]?.name ?? tile.discoveredByPlayerId
     : 'start'
   return {
-    label: def.label,
+    label: tile.designation || def.label,
     type: def.type,
     key,
     rotationDeg: tile.rotation * 60,

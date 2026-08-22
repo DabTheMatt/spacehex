@@ -1,8 +1,8 @@
 import type { ShipClass } from './ships'
 import type { TileType } from '../board/tileRotation'
 
-/** Container colors on the board. Buy/sell price comes from supply, not a fixed list. */
-export const RESOURCE_IDS = ['RED', 'GREEN', 'BLUE'] as const
+/** Container types. Board colors: ore red, biomass green, ice blue. */
+export const RESOURCE_IDS = ['ORE', 'BIOMASS', 'ICE'] as const
 export type ResourceId = (typeof RESOURCE_IDS)[number]
 
 export interface ResourceLot {
@@ -19,9 +19,9 @@ export interface PlanetMarket {
 }
 
 export const RESOURCE_LABEL: Record<ResourceId, string> = {
-  RED: 'RED',
-  GREEN: 'GREEN',
-  BLUE: 'BLUE',
+  ORE: 'ORE',
+  BIOMASS: 'BIOMASS',
+  ICE: 'ICE',
 }
 
 export const STARTING_CREDITS = 10
@@ -68,7 +68,7 @@ export const GREEK_LETTERS = [
 export const LATIN_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 export function emptyCargo(): Record<ResourceId, number> {
-  return { RED: 0, GREEN: 0, BLUE: 0 }
+  return { ORE: 0, BIOMASS: 0, ICE: 0 }
 }
 
 export function cargoUsed(cargo: Record<ResourceId, number>): number {

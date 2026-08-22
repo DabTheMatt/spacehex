@@ -14,8 +14,8 @@ import {
   TILE_THICKNESS,
 } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
-import { createPlanetOverlay, tickPlanetLod, createEdgeLabel } from './planetLots'
-import { buyPrice } from '../../game/rules/planetMarket'
+import { createPlanetOverlay, tickPlanetLod, createEdgeLabel, createEvaOverlay } from './planetLots'
+import { buyPrice, evaSellParts, isEvaHex } from '../../game/rules/planetMarket'
 import { RESOURCE_IDS } from '../../game/definitions/resources'
 import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
@@ -90,6 +90,7 @@ export class BoardRenderer {
       keep.add(key)
       const selected = options.selectedKey === key
       const hideGlyph = options.hideGlyphKeys?.has(key) === true
+      const def = getTileDefinition(tile.definitionId)
       const market = state.planetMarkets[key]
       const marketSig = market
         ? [
@@ -97,6 +98,17 @@ export class BoardRenderer {
             market.lots.map((lot) => `${lot.id}:${lot.amount}:${buyPrice(state, lot.id)}`).join(','),
           ].join(':')
         : ''
+      const ship = activeShip(state)
+      const evaSig =
+        def.type === 'EVA_1'
+          ? [
+              tile.designation,
+              isEvaHex(ship.coord) ? 'docked' : 'away',
+              RESOURCE_IDS.map(
+                (id) => `${id}:${ship.cargo[id]}:${formatParts(evaSellParts(state, id))}`,
+              ).join(','),
+            ].join(':')
+          : tile.designation
       const sig = [
         tile.id,
         tile.definitionId,
@@ -106,6 +118,7 @@ export class BoardRenderer {
         options.showCoords ? 'c' : '',
         options.showEdges ? 'e' : '',
         marketSig,
+        evaSig,
       ].join('|')
       const existing = this.tileCache.get(key)
       if (existing?.sig === sig) {
@@ -117,7 +130,6 @@ export class BoardRenderer {
       if (existing) {
         this.tiles.remove(existing.mesh)
       }
-      const def = getTileDefinition(tile.definitionId)
       const pos = getWorldPosition(tile.coord)
       const mesh = createHexMesh({ fill: palette.tileFill, stroke: palette.ivory, y: TILE_SETTLED_Y })
       mesh.position.set(pos.x, options.tileY?.[key] ?? TILE_SETTLED_Y, pos.z)
@@ -131,9 +143,20 @@ export class BoardRenderer {
           RESOURCE_IDS.map((id) => [id, buyPrice(state, id)]),
         ) as Record<(typeof RESOURCE_IDS)[number], number>
         glyph.add(createPlanetOverlay(market, tile.coord, prices))
+      } else {
+        glyph.add(
+          createEdgeLabel(tile.designation, {
+            coord: tile.coord,
+            clickable: true,
+            width: def.type === 'EVA_1' ? 0.92 : 0.72,
+          }),
+        )
       }
       if (def.type === 'EVA_1') {
-        glyph.add(createEdgeLabel('EVA-1 Space Station', { width: 0.92 }))
+        const quotes = Object.fromEntries(
+          RESOURCE_IDS.map((id) => [id, evaSellParts(state, id)]),
+        ) as Record<(typeof RESOURCE_IDS)[number], ReturnType<typeof evaSellParts>>
+        glyph.add(createEvaOverlay(tile.coord, ship.cargo, quotes, isEvaHex(ship.coord)))
       }
       mesh.userData.glyph = glyph
       mesh.add(glyph)
@@ -266,6 +289,10 @@ export class BoardRenderer {
   tileMeshes(): THREE.Object3D[] {
     return this.tiles.children
   }
+}
+
+function formatParts(parts: { spot: number; margin: number; total: number }): string {
+  return `${parts.spot}+${parts.margin}=${parts.total}`
 }
 
 function setGlyphOpacity(root: THREE.Object3D, opacity: number): void {

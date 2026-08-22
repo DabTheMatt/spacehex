@@ -17,7 +17,8 @@ import { canMoveTo } from '../rules/movement'
 import { canExploreDirection } from '../rules/exploration'
 import { resolveCombatOnEntry } from '../rules/combat'
 import { resolveDiscovery, addGlory } from '../rules/glory'
-import { buyResource, stockPlanetIfNeeded } from '../rules/planetMarket'
+import { buyResource, sellResource, stockPlanetIfNeeded } from '../rules/planetMarket'
+import { rollSectorName } from '../definitions/sectorNames'
 import type { ResourceId } from '../definitions/resources'
 import type { HexCoord } from '../board/HexCoord'
 import type { PlacedTile } from '../board/Tile'
@@ -41,6 +42,7 @@ export function createInitialState(seed: string): GameState {
     rotation: 0,
     discoveredByPlayerId: null,
     discoveredRound: 0,
+    designation: rollSectorName(seed, EVA_TILE_ID, 'EVA_1', null),
   }
 
   const players: GameState['players'] = {
@@ -144,6 +146,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return skipMovement(state)
     case 'BUY_RESOURCE':
       return buyResourceCommand(state, command.coord, command.resource)
+    case 'SELL_RESOURCE':
+      return sellResourceCommand(state, command.resource)
     case 'END_TURN':
       return endTurn(state)
     case 'DEV_ADD_FUEL':
@@ -316,14 +320,14 @@ function confirmPlacement(state: GameState): EngineResult {
     return reject(state, 'CONFIRM_TILE_PLACEMENT', validation.reason ?? 'INVALID')
   }
 
-  const placed: PlacedTile = {
-    id: exp.pendingTileId,
-    definitionId: exp.pendingTileId,
-    coord: exp.target,
+  const placed: PlacedTile = makePlacedTile(
+    state,
+    exp.pendingTileId,
+    exp.target,
     rotation,
-    discoveredByPlayerId: state.activePlayerId,
-    discoveredRound: state.round,
-  }
+    state.activePlayerId,
+    state.round,
+  )
 
   const placeEvents: GameEvent[] = [
     { type: 'TILE_PLACED', tileId: placed.id, coord: placed.coord },
@@ -420,6 +424,46 @@ function buyResourceCommand(
   return { state: append(result.state, events), events }
 }
 
+function sellResourceCommand(state: GameState, resource: ResourceId): EngineResult {
+  if (!requireTurn(state)) return reject(state, 'SELL_RESOURCE', 'NOT_IN_TURN')
+  const result = sellResource(state, resource)
+  if (!result.ok) return reject(state, 'SELL_RESOURCE', result.reason)
+  const player = activePlayer(result.state)
+  const events: GameEvent[] = [
+    {
+      type: 'RESOURCE_SOLD',
+      playerId: player.id,
+      resource,
+      qty: result.qty,
+      spot: result.spot,
+      margin: result.margin,
+      total: result.total,
+    },
+    { type: 'CREDITS_CHANGED', playerId: player.id, credits: player.credits },
+  ]
+  return { state: append(result.state, events), events }
+}
+
+function makePlacedTile(
+  state: GameState,
+  tileId: string,
+  coord: HexCoord,
+  rotation: number,
+  discovererId: string | null,
+  discoveredRound: number | null,
+): PlacedTile {
+  const definition = getTileDefinition(tileId)
+  return {
+    id: tileId,
+    definitionId: tileId,
+    coord,
+    rotation: wrapRotation(rotation),
+    discoveredByPlayerId: discovererId,
+    discoveredRound,
+    designation: rollSectorName(state.seed, tileId, definition.type, discovererId),
+  }
+}
+
 function endTurn(state: GameState): EngineResult {
   if (state.phase === 'TILE_PLACEMENT') {
     return reject(state, 'END_TURN', 'MUST_PLACE_TILE')
@@ -479,14 +523,14 @@ function devPlace(
     return reject(state, 'DEV_PLACE_TILE', 'OCCUPIED')
   }
   getTileDefinition(tileId)
-  const placed: PlacedTile = {
-    id: tileId,
-    definitionId: tileId,
+  const placed: PlacedTile = makePlacedTile(
+    state,
+    tileId,
     coord,
-    rotation: wrapRotation(rotation),
-    discoveredByPlayerId: state.activePlayerId,
-    discoveredRound: state.round,
-  }
+    rotation,
+    state.activePlayerId,
+    state.round,
+  )
   const deck = {
     ...state.explorationDeck,
     drawPile: state.explorationDeck.drawPile.filter((id) => id !== tileId),

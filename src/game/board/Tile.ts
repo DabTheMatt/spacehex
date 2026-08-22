@@ -8,4 +8,5 @@ export interface PlacedTile {
   rotation: Rotation
   discoveredByPlayerId: string | null
   discoveredRound: number | null
+  designation: string
 }

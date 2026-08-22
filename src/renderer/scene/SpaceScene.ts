@@ -122,6 +122,11 @@ export class SpaceScene {
     return userDataFromHits<{ coord: HexCoord; resource: ResourceId }>(hits, 'buyLot') ?? null
   }
 
+  pickSell(clientX: number, clientY: number): { resource: ResourceId } | null {
+    const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
+    return userDataFromHits<{ resource: ResourceId }>(hits, 'sellLot') ?? null
+  }
+
   pickPlanetName(clientX: number, clientY: number): HexCoord | null {
     const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
     return userDataFromHits<HexCoord>(hits, 'planetName') ?? null

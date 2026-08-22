@@ -7,16 +7,19 @@ import { HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { clamp01 } from '../motion'
 
+import type { SellQuoteParts } from '../../game/rules/planetMarket'
+import { formatSellParts } from '../../game/rules/planetMarket'
+
 const RESOURCE_COLOR: Record<ResourceId, number> = {
-  RED: palette.resourceRed,
-  GREEN: palette.resourceGreen,
-  BLUE: palette.resourceBlue,
+  ORE: palette.resourceRed,
+  BIOMASS: palette.resourceGreen,
+  ICE: palette.resourceBlue,
 }
 
 const RESOURCE_CSS: Record<ResourceId, string> = {
-  RED: css.resourceRed,
-  GREEN: css.resourceGreen,
-  BLUE: css.resourceBlue,
+  ORE: css.resourceRed,
+  BIOMASS: css.resourceGreen,
+  ICE: css.resourceBlue,
 }
 
 /** Name sits on +Z so inspect can put that edge at screen-bottom. */
@@ -24,12 +27,15 @@ const NAME_ANGLE = Math.PI / 2
 const NAME_PLANE_H = 0.08
 const TILE_RADIUS = HEX_SIZE * 0.96
 const FLAT_EDGE = TILE_RADIUS * (Math.sqrt(3) / 2)
-/** Gap from the tile edge to the name equals one name-row height. */
-const NAME_R = FLAT_EDGE - NAME_PLANE_H * 0.45
-const TOP_Z = -HEX_SIZE * 0.68
-const HEX_SPACING = 0.2
+/** Keep the designation inside the outline, a step in from the flat. */
+const NAME_R = FLAT_EDGE - NAME_PLANE_H * 1.35
+/** Same gap above (name) and below (price) the resource hex. */
+const LABEL_GAP = 0.1
+const TOP_Z = -(FLAT_EDGE - 0.28)
+const HEX_SPACING = 0.18
 const CLOSE_DIST = 4.2
 const FAR_DIST = 6.0
+const EVA_PAD_R = 0.2
 
 export function planetInspectTheta(tileRotation: number): number {
   return tileRotation * (Math.PI / 3)
@@ -86,10 +92,10 @@ export function createPlanetOverlay(
     cluster.position.set(x, TILE_THICKNESS + 0.035, TOP_Z)
     cluster.add(stockHex(id, amount))
     const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id])
-    name.position.set(0, 0.01, -0.11)
+    name.position.set(0, 0.01, -LABEL_GAP)
     cluster.add(name)
     const tag = priceTag(`${buyPrice[id]}CR`, css.priceYellow)
-    tag.position.set(0, 0.01, 0.088)
+    tag.position.set(0, 0.01, LABEL_GAP)
     cluster.add(tag)
     if (amount > 0) {
       const hit = new THREE.Mesh(
@@ -114,6 +120,47 @@ export function createPlanetOverlay(
   g.add(close, far)
   g.userData.closeLod = close
   g.userData.farLod = far
+  return g
+}
+
+export function createEvaOverlay(
+  _coord: HexCoord,
+  cargo: Record<ResourceId, number>,
+  quotes: Record<ResourceId, SellQuoteParts>,
+  canSell: boolean,
+): THREE.Group {
+  const g = new THREE.Group()
+  g.userData.evaOverlay = true
+  RESOURCE_IDS.forEach((id, index) => {
+    const angle = (Math.PI * 2 * index) / 3 + Math.PI / 2
+    const cluster = new THREE.Group()
+    cluster.position.set(Math.cos(angle) * EVA_PAD_R, TILE_THICKNESS + 0.035, Math.sin(angle) * EVA_PAD_R)
+    const qty = cargo[id] ?? 0
+    cluster.add(stockHex(id, qty))
+    const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id])
+    name.position.set(0, 0.01, -LABEL_GAP)
+    cluster.add(name)
+    const tag = priceTag(formatSellParts(quotes[id]), css.priceYellow)
+    tag.position.set(0, 0.01, LABEL_GAP)
+    cluster.add(tag)
+    if (canSell && qty > 0) {
+      const hit = new THREE.Mesh(
+        new THREE.CircleGeometry(0.12, 12),
+        new THREE.MeshBasicMaterial({
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      )
+      hit.rotation.x = -Math.PI / 2
+      hit.position.y = 0.02
+      hit.userData.sellLot = { resource: id }
+      hit.userData.pickOnly = true
+      cluster.add(hit)
+    }
+    g.add(cluster)
+  })
   return g
 }
 
@@ -318,7 +365,7 @@ function caption(text: string, color: string): THREE.Mesh {
 }
 
 function priceTag(text: string, color: string): THREE.Mesh {
-  return textPlane(text, color, 0.2, 0.05)
+  return textPlane(text, color, text.includes('+') ? 0.34 : 0.2, 0.05)
 }
 
 function textPlane(text: string, color: string, width: number, height: number): THREE.Mesh {

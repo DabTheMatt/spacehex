@@ -14,6 +14,7 @@ export type GameCommand =
   | { type: 'CONFIRM_TILE_PLACEMENT' }
   | { type: 'SKIP_MOVEMENT' }
   | { type: 'BUY_RESOURCE'; coord: HexCoord; resource: ResourceId }
+  | { type: 'SELL_RESOURCE'; resource: ResourceId }
   | { type: 'END_TURN' }
   | { type: 'DEV_ADD_FUEL'; playerId: string; amount: number }
   | { type: 'DEV_REMOVE_FUEL'; playerId: string; amount: number }

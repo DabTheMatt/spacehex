@@ -15,6 +15,15 @@ export type GameEvent =
   | { type: 'SECTOR_RESOLVED'; tileId: string; note: string }
   | { type: 'PLANET_STOCKED'; tileId: string; coord: HexCoord }
   | { type: 'RESOURCE_BOUGHT'; playerId: string; resource: ResourceId; price: number; coord: HexCoord }
+  | {
+      type: 'RESOURCE_SOLD'
+      playerId: string
+      resource: ResourceId
+      qty: number
+      spot: number
+      margin: number
+      total: number
+    }
   | { type: 'CREDITS_CHANGED'; playerId: string; credits: number }
   | { type: 'COMBAT_RESOLVED'; attackerId: string; defenderId: string; damage: number }
   | { type: 'GLORY_CHANGED'; playerId: string; glory: number; delta: number }

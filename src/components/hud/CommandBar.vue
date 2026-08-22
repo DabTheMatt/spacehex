@@ -1,8 +1,8 @@
 <template>
   <footer class="command-bar">
     <section class="hud-pane hud-pane--planet">
-      <div class="hud-pane__label muted">PLANET</div>
-      <div v-if="planet" class="hud-pane__id">{{ planet.designation }}</div>
+      <div class="hud-pane__label muted">{{ paneLabel }}</div>
+      <div v-if="stationName" class="hud-pane__id">{{ stationName }}</div>
       <div v-else class="hud-pane__empty muted">NONE</div>
       <div v-if="planetLots.length" class="hud-pane__lots">
         <span
@@ -64,7 +64,7 @@ import {
   RESOURCE_IDS,
   RESOURCE_LABEL,
 } from '@/game/definitions/resources'
-import { buyPrice, evaSellQuote } from '@/game/rules/planetMarket'
+import { buyPrice, evaSellParts, formatSellParts, isEvaHex } from '@/game/rules/planetMarket'
 
 const game = useGameStore()
 const ui = useUiStore()
@@ -80,7 +80,22 @@ const planet = computed(() => {
   return market ?? null
 })
 
+const stationName = computed(() => {
+  if (planet.value) return planet.value.designation
+  const tile = game.state.board.tiles[coordKey(planetCoord.value)]
+  return tile?.designation ?? ''
+})
+
+const paneLabel = computed(() => (isEvaHex(planetCoord.value) ? 'STATION' : 'PLANET'))
+
 const planetLots = computed(() => {
+  if (isEvaHex(planetCoord.value)) {
+    const cargo = game.ship.cargo
+    return RESOURCE_IDS.map((id) => ({
+      id,
+      text: `${RESOURCE_LABEL[id]} ×${cargo[id]}  ${formatSellParts(evaSellParts(game.state, id))}`,
+    }))
+  }
   const market = planet.value
   if (!market) return []
   return market.lots.map((lot) => ({
@@ -91,6 +106,11 @@ const planetLots = computed(() => {
 
 const planetHint = computed(() => {
   if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE'
+  if (isEvaHex(planetCoord.value)) {
+    const here = isEvaHex(game.ship.coord)
+    if (!here) return 'DOCK TO SELL'
+    return 'CLICK PRICE TO SELL'
+  }
   if (!planet.value) return ''
   const coord = planetCoord.value
   const here = game.ship.coord.q === coord.q && game.ship.coord.r === coord.r
@@ -123,7 +143,7 @@ const cargoRows = computed(() => {
   if (!ship) return []
   return RESOURCE_IDS.filter((id) => ship.cargo[id] > 0).map((id) => ({
     id,
-    text: `${RESOURCE_LABEL[id]} ×${ship.cargo[id]}  ${evaSellQuote(game.state, id)}CR EVA`,
+    text: `${RESOURCE_LABEL[id]} ×${ship.cargo[id]}  ${formatSellParts(evaSellParts(game.state, id))}`,
   }))
 })
 

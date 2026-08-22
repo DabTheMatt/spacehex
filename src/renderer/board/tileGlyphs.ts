@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { TileType } from '../../game/board/tileRotation'
 import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
-import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, evaDockAngle } from './evaDocks'
+import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
 const Y = 0.012
@@ -53,21 +53,26 @@ function arc(
 
 function evaGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
-  g.add(circle(0.4, color, 56))
-  g.add(circle(0.26, color, 40, 0.85))
-  const core: Array<[number, number]> = []
+  const core = new THREE.Group()
+  const hex: Array<[number, number]> = []
   for (let i = 0; i < 6; i++) {
     const a = (Math.PI / 3) * i + Math.PI / 6
-    core.push([Math.cos(a) * 0.13, Math.sin(a) * 0.13])
+    hex.push([Math.cos(a) * 0.13, Math.sin(a) * 0.13])
   }
-  g.add(poly(core, color, true))
-  g.add(poly([[-0.07, 0], [0.07, 0]], color))
-  g.add(poly([[0, -0.07], [0, 0.07]], color))
+  core.add(poly(hex, color, true))
+  core.add(poly([[-0.07, 0], [0.07, 0]], color))
+  core.add(poly([[0, -0.07], [0, 0.07]], color))
+
+  const hub = new THREE.Group()
+  hub.userData.animate = 'evaHub'
+  hub.add(circle(0.4, color, 56))
+  hub.add(circle(0.26, color, 40, 0.85))
+  hub.add(arc(0.33, 0.4, 2.2, color, 18))
   for (let k = 0; k < EVA_DOCK_COUNT; k++) {
     const a = evaDockAngle(k)
     const inner = 0.26
     const outer = EVA_DOCK_RADIUS
-    g.add(
+    hub.add(
       poly(
         [
           [Math.cos(a) * inner, Math.sin(a) * inner],
@@ -76,11 +81,30 @@ function evaGlyph(color: number): THREE.Group {
         color,
       ),
     )
-    const dock = circle(0.045, color, 16)
+    const dock = new THREE.Group()
     dock.position.set(Math.cos(a) * outer, 0, Math.sin(a) * outer)
-    g.add(dock)
+    dock.add(circle(0.045, color, 16))
+    for (let p = 0; p < 3; p++) {
+      const pa = (Math.PI * 2 * p) / 3
+      const dot = new THREE.Mesh(
+        new THREE.CircleGeometry(0.007, 10),
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.2,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      )
+      dot.rotation.x = -Math.PI / 2
+      dot.position.set(Math.cos(pa) * 0.018, Y + 0.002, Math.sin(pa) * 0.018)
+      dot.userData.animate = 'evaPulse'
+      dot.userData.pulseIndex = p
+      dock.add(dot)
+    }
+    hub.add(dock)
   }
-  g.add(arc(0.33, 0.4, 2.2, color, 18))
+  g.add(core, hub)
   return g
 }
 
@@ -327,6 +351,20 @@ export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
     }
     if (obj.userData.animate === 'moon') {
       obj.rotation.y = (time / 12) * Math.PI * 2
+    }
+    if (obj.userData.animate === 'evaHub') {
+      obj.rotation.y = time * EVA_HUB_SPIN
+    }
+    if (obj.userData.animate === 'evaPulse' && obj instanceof THREE.Mesh) {
+      const mat = obj.material
+      if (!Array.isArray(mat) && 'opacity' in mat) {
+        const count = 3
+        const index = Number(obj.userData.pulseIndex) || 0
+        const chase = Math.floor(time * 2.4) % count
+        const prev = (chase + count - 1) % count
+        mat.transparent = true
+        mat.opacity = index === chase ? 1 : index === prev ? 0.4 : 0.12
+      }
     }
     if (obj.userData.animate === 'pulse' && obj instanceof THREE.Mesh) {
       const mat = obj.material

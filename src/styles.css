@@ -195,15 +195,15 @@ body,
   text-transform: uppercase;
 }
 
-.cargo--red {
+.cargo--ore {
   color: #c45c4a;
 }
 
-.cargo--green {
+.cargo--biomass {
   color: #6a9a62;
 }
 
-.cargo--blue {
+.cargo--ice {
   color: #5a7ea8;
 }
 

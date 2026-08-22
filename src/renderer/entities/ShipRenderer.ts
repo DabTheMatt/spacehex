@@ -8,7 +8,7 @@ import { coordKey } from '../../game/board/HexCoord'
 import { SHIP_DEFINITIONS } from '../../game/definitions/ships'
 import { palette, css } from '../theme'
 import { TILE_THICKNESS } from '../board/TileRenderer'
-import { evaDockIndexForPlayer, evaDockLocal, isEvaCoord } from '../board/evaDocks'
+import { evaDockIndexForPlayer, evaDockWorldOffset, evaHubAngleAt, isEvaCoord } from '../board/evaDocks'
 import {
   clamp01,
   easeInOutCubic,
@@ -69,6 +69,7 @@ export class ShipRenderer {
   private lastXZ = new Map<string, { x: number; z: number }>()
   private visualPark = new Map<string, HexCoord>()
   private landed: HexCoord[] = []
+  private hubTime = 0
 
   isBusy(shipId: string): boolean {
     const motion = this.motion.get(shipId)
@@ -183,7 +184,7 @@ export class ShipRenderer {
     const targets = new Map<string, { x: number; z: number }>()
     for (const group of groups.values()) {
       group.ships.forEach((ship) => {
-        const slot = parkWorld(group.coord, ship, group.ships, group.yaw)
+        const slot = parkWorld(group.coord, ship, group.ships, group.yaw, this.hubTime)
         targets.set(ship.id, slot)
       })
     }
@@ -196,7 +197,7 @@ export class ShipRenderer {
       const flying = this.motion.get(ship.id)?.kind === 'fly'
       let yaw = this.visualYaw(state.log, ship.id, coord)
       if (!flying && isEvaCoord(coord)) {
-        yaw = evaDockLocal(evaDockIndexForPlayer(ship.playerId)).yaw
+        yaw = evaDockWorldOffset(evaDockIndexForPlayer(ship.playerId), evaHubAngleAt(this.hubTime)).yaw
       }
       if (!flying) this.facing.set(ship.id, yaw)
       const playerNo = Number(ship.playerId.replace(/\D/g, '')) || 1
@@ -209,17 +210,37 @@ export class ShipRenderer {
       wrapper.quaternion.setFromAxisAngle(Y_AXIS, yaw)
       wrapper.position.set(last.x, BASE_HOVER, last.z)
       wrapper.userData.shipId = ship.id
+      wrapper.userData.playerId = ship.playerId
       wrapper.userData.hullHeight = HULL_HEIGHT
       wrapper.userData.shipCoord = coord
       this.group.add(wrapper)
-      this.maybeSlide(ship.id, last, target)
+      if (flying || !isEvaCoord(coord)) {
+        this.maybeSlide(ship.id, last, target)
+      } else {
+        wrapper.position.set(target.x, BASE_HOVER, target.z)
+        this.lastXZ.set(ship.id, { x: target.x, z: target.z })
+        if (this.motion.get(ship.id)?.kind === 'slide') this.motion.delete(ship.id)
+      }
     }
     this.applyMotion(performance.now())
   }
 
   tick(_camera: THREE.Camera, time = 0): boolean {
+    this.hubTime = time
     const settled = this.applyMotion(performance.now())
     for (const child of this.group.children) {
+      const shipId = child.userData.shipId as string
+      const coord = child.userData.shipCoord as HexCoord | undefined
+      const playerId = child.userData.playerId as string | undefined
+      const motion = this.motion.get(shipId)
+      if (coord && playerId && isEvaCoord(coord) && motion?.kind !== 'fly' && motion?.kind !== 'hold') {
+        const pos = getWorldPosition(coord)
+        const dock = evaDockWorldOffset(evaDockIndexForPlayer(playerId), evaHubAngleAt(time))
+        child.position.set(pos.x + dock.x, BASE_HOVER, pos.z + dock.z)
+        child.quaternion.setFromAxisAngle(Y_AXIS, dock.yaw)
+        this.facing.set(shipId, dock.yaw)
+        this.lastXZ.set(shipId, { x: child.position.x, z: child.position.z })
+      }
       const beacon = child.userData.beacon as THREE.Mesh | undefined
       if (!beacon) continue
       const mat = beacon.material
@@ -413,10 +434,11 @@ function parkWorld(
   ship: ShipState,
   group: ShipState[],
   yaw: number,
+  time: number,
 ): { x: number; z: number } {
   const pos = getWorldPosition(coord)
   if (isEvaCoord(coord)) {
-    const dock = evaDockLocal(evaDockIndexForPlayer(ship.playerId))
+    const dock = evaDockWorldOffset(evaDockIndexForPlayer(ship.playerId), evaHubAngleAt(time))
     return { x: pos.x + dock.x, z: pos.z + dock.z }
   }
   const index = group.findIndex((item) => item.id === ship.id)

@@ -3,9 +3,14 @@ import type { HexCoord } from '../../game/board/HexCoord'
 export const EVA_DOCK_RADIUS = 0.46
 export const EVA_DOCK_PHASE = Math.PI / 6
 export const EVA_DOCK_COUNT = 3
+export const EVA_HUB_SPIN = 0.22
 
 export function isEvaCoord(coord: HexCoord): boolean {
   return coord.q === 0 && coord.r === 0
+}
+
+export function evaHubAngleAt(time: number): number {
+  return time * EVA_HUB_SPIN
 }
 
 export function evaDockAngle(index: number): number {
@@ -19,6 +24,21 @@ export function evaDockLocal(index: number): { x: number; z: number; yaw: number
     x: Math.cos(a) * EVA_DOCK_RADIUS,
     z: Math.sin(a) * EVA_DOCK_RADIUS,
     yaw: Math.atan2(Math.cos(a), Math.sin(a)),
+  }
+}
+
+/** Match Three.js Group.rotation.y so parked ships stay on the spinning airlocks. */
+export function evaDockWorldOffset(
+  index: number,
+  hubAngle: number,
+): { x: number; z: number; yaw: number } {
+  const local = evaDockLocal(index)
+  const c = Math.cos(hubAngle)
+  const s = Math.sin(hubAngle)
+  return {
+    x: local.x * c + local.z * s,
+    z: -local.x * s + local.z * c,
+    yaw: local.yaw + hubAngle,
   }
 }
 

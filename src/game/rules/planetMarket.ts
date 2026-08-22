@@ -9,8 +9,6 @@ import {
   CARGO_CAPACITY,
   cargoUsed,
   emptyCargo,
-  GREEK_LETTERS,
-  LATIN_LETTERS,
   MAX_BUYS_PER_TURN,
   planetSizeCode,
   priceFromSupply,
@@ -18,16 +16,19 @@ import {
   type PlanetMarket,
   type ResourceId,
 } from '../definitions/resources'
+import { rollSectorName } from '../definitions/sectorNames'
 import { activePlayer, activeShip } from './fuel'
+
+export type SellQuoteParts = { spot: number; margin: number; total: number }
+
+export function formatSellParts(parts: SellQuoteParts): string {
+  return `${parts.spot}+${parts.margin}=${parts.total}CR`
+}
 
 export function rollResourceAmount(size: 1 | 2 | 3, rng: RNG): number {
   if (size === 1) return rng.nextInt(3)
   if (size === 2) return rng.nextInt(4)
   return 1 + rng.nextInt(4)
-}
-
-export function discovererSlot(playerId: string | null | undefined): 1 | 2 {
-  return playerId === 'player-2' ? 2 : 1
 }
 
 export function rollPlanetMarket(
@@ -44,11 +45,9 @@ export function rollPlanetMarket(
     counts[id] = rollResourceAmount(size, rng)
   }
   if (RESOURCE_IDS.every((id) => counts[id] === 0)) {
-    counts.RED = 1
+    counts.ORE = 1
   }
-  const greek = GREEK_LETTERS[rng.nextInt(GREEK_LETTERS.length)]
-  const latin = LATIN_LETTERS[rng.nextInt(LATIN_LETTERS.length)]
-  const designation = `SG${discovererSlot(discovererId)}-${size}-${greek}-${latin}`
+  const designation = rollSectorName(seed, tileId, def.type, discovererId)
   const lots = RESOURCE_IDS.map((id) => ({ id, amount: counts[id] }))
   const homeColors = RESOURCE_IDS.filter((id) => counts[id] > 0)
   return { tileId, designation, lots, homeColors }
@@ -99,16 +98,67 @@ export function nearestHomeworldDistance(
   return Math.min(...homes.map((home) => hexDistance(from, home)))
 }
 
+export function sellQuoteParts(
+  state: GameState,
+  from: HexCoord,
+  resource: ResourceId,
+): SellQuoteParts {
+  const spot = buyPrice(state, resource)
+  const margin = nearestHomeworldDistance(state, from, resource)
+  return { spot, margin, total: spot + margin }
+}
+
 /** Sale quote: supply price + 1 CR per hex to the nearest homeworld of that color. */
 export function sellQuote(state: GameState, from: HexCoord, resource: ResourceId): number {
-  return buyPrice(state, resource) + nearestHomeworldDistance(state, from, resource)
+  return sellQuoteParts(state, from, resource).total
 }
 
 export const EVA_COORD: HexCoord = { q: 0, r: 0 }
 
-/** Estimated sale at EVA-1 (transport margin from the mothership hex). */
 export function evaSellQuote(state: GameState, resource: ResourceId): number {
   return sellQuote(state, EVA_COORD, resource)
+}
+
+export function evaSellParts(state: GameState, resource: ResourceId) {
+  return sellQuoteParts(state, EVA_COORD, resource)
+}
+
+export function isEvaHex(coord: HexCoord): boolean {
+  return coord.q === EVA_COORD.q && coord.r === EVA_COORD.r
+}
+
+export function sellResource(
+  state: GameState,
+  resource: ResourceId,
+):
+  | { ok: true; state: GameState; qty: number; spot: number; margin: number; total: number }
+  | { ok: false; reason: string } {
+  const ship = activeShip(state)
+  if (!isEvaHex(ship.coord)) return { ok: false, reason: 'NOT_AT_EVA' }
+  const qty = ship.cargo[resource] ?? 0
+  if (qty <= 0) return { ok: false, reason: 'NO_CARGO' }
+  const player = activePlayer(state)
+  const parts = evaSellParts(state, resource)
+  const payout = parts.total * qty
+  return {
+    ok: true,
+    qty,
+    ...parts,
+    state: {
+      ...state,
+      players: {
+        ...state.players,
+        [player.id]: { ...player, credits: player.credits + payout },
+      },
+      ships: {
+        ...state.ships,
+        [ship.id]: {
+          ...ship,
+          cargo: { ...ship.cargo, [resource]: 0 },
+        },
+      },
+    },
+  }
 }
 
 export function buyResource(
