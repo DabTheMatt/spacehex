@@ -14,7 +14,7 @@ import {
   TILE_THICKNESS,
 } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
-import { createPlanetOverlay } from './planetLots'
+import { createPlanetOverlay, tickPlanetLod } from './planetLots'
 import { buyPrice } from '../../game/rules/planetMarket'
 import { RESOURCE_IDS } from '../../game/definitions/resources'
 import { palette } from '../theme'
@@ -61,9 +61,10 @@ export class BoardRenderer {
     }
   }
 
-  tick(time: number): void {
+  tick(time: number, camera: THREE.Camera): void {
     this.advanceGlyphFades(performance.now())
     tickTileGlyphs(this.tiles, time)
+    tickPlanetLod(this.tiles, camera)
   }
 
   setTileY(key: string, y: number): void {
@@ -90,11 +91,9 @@ export class BoardRenderer {
       const selected = options.selectedKey === key
       const hideGlyph = options.hideGlyphKeys?.has(key) === true
       const market = state.planetMarkets[key]
-      const inspecting = options.inspectKey === key
       const marketSig = market
         ? [
             market.designation,
-            inspecting ? 'i' : '',
             market.lots.map((lot) => `${lot.id}:${lot.amount}:${buyPrice(state, lot.id)}`).join(','),
           ].join(':')
         : ''
@@ -131,12 +130,7 @@ export class BoardRenderer {
         const prices = Object.fromEntries(
           RESOURCE_IDS.map((id) => [id, buyPrice(state, id)]),
         ) as Record<(typeof RESOURCE_IDS)[number], number>
-        glyph.add(
-          createPlanetOverlay(market, tile.coord, {
-            showPrices: inspecting,
-            buyPrice: prices,
-          }),
-        )
+        glyph.add(createPlanetOverlay(market, tile.coord, prices))
       }
       mesh.userData.glyph = glyph
       mesh.add(glyph)
@@ -169,9 +163,11 @@ export class BoardRenderer {
     if (hide) {
       this.glyphFade.delete(key)
       mesh.userData.glyphReady = false
+      glyph.userData.overlayHidden = true
       setGlyphOpacity(glyph, 0)
       return
     }
+    glyph.userData.overlayHidden = false
     if (mesh.userData.glyphReady) {
       setGlyphOpacity(glyph, 1)
       return
@@ -271,7 +267,7 @@ export class BoardRenderer {
 
 function setGlyphOpacity(root: THREE.Object3D, opacity: number): void {
   root.traverse((obj) => {
-    if (obj.userData.pickOnly) return
+    if (obj.userData.pickOnly || obj.userData.lod) return
     const mesh = obj as THREE.Mesh
     const mat = mesh.material
     if (!mat) return

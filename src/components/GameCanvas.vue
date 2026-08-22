@@ -131,17 +131,10 @@ function onUp(ev: PointerEvent): void {
     return
   }
 
-  if (ui.inspectPlanet) {
-    const buy = scene.pickBuy(ev.clientX, ev.clientY)
-    if (
-      buy &&
-      game.state.phase === 'PLAYER_TURN' &&
-      buy.coord.q === ui.inspectPlanet.q &&
-      buy.coord.r === ui.inspectPlanet.r
-    ) {
-      game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })
-      return
-    }
+  const buy = scene.pickBuy(ev.clientX, ev.clientY)
+  if (buy && game.state.phase === 'PLAYER_TURN') {
+    game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })
+    return
   }
 
   const hover = scene.pickHover(ev.clientX, ev.clientY)

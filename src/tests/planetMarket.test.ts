@@ -6,6 +6,7 @@ import {
   nearestHomeworldDistance,
   rollPlanetMarket,
   sellQuote,
+  evaSellQuote,
 } from '../game/rules/planetMarket'
 import {
   cargoUsed,
@@ -131,6 +132,7 @@ describe('planet markets', () => {
     state = withLots(state, coordKey({ q: 2, r: 0 }), { RED: 0, GREEN: 0, BLUE: 0 }, ['GREEN'])
     expect(boardSupply(state, 'GREEN')).toBe(0)
     expect(sellQuote(state, { q: 0, r: 0 }, 'GREEN')).toBe(10 + 2)
+    expect(evaSellQuote(state, 'GREEN')).toBe(12)
   })
 })
 

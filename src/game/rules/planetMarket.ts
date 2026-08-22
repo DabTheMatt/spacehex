@@ -104,6 +104,13 @@ export function sellQuote(state: GameState, from: HexCoord, resource: ResourceId
   return buyPrice(state, resource) + nearestHomeworldDistance(state, from, resource)
 }
 
+export const EVA_COORD: HexCoord = { q: 0, r: 0 }
+
+/** Estimated sale at EVA-1 (transport margin from the mothership hex). */
+export function evaSellQuote(state: GameState, resource: ResourceId): number {
+  return sellQuote(state, EVA_COORD, resource)
+}
+
 export function buyResource(
   state: GameState,
   coord: HexCoord,

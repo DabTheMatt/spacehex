@@ -4,7 +4,7 @@ import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { palette } from '../theme'
 import { isTypingTarget } from '../../ui/actionHotkeys'
-import { clamp01, easeInOutSmooth, lerp, prefersReducedMotion, CAMERA_FOCUS_MS } from '../motion'
+import { clamp01, easeInOutSmooth, lerp, prefersReducedMotion, CAMERA_FOCUS_MS, shortestAngleDelta } from '../motion'
 
 const WASD_SPEED = 6
 const MAP_ROTATE_SPEED = 1.15
@@ -23,6 +23,19 @@ export class CameraController {
     toTarget: THREE.Vector3
     fromPos: THREE.Vector3
     toPos: THREE.Vector3
+  } | null = null
+  private orbitAnim: {
+    start: number
+    duration: number
+    fromTarget: THREE.Vector3
+    toTarget: THREE.Vector3
+    fromRadius: number
+    toRadius: number
+    fromPhi: number
+    toPhi: number
+    fromTheta: number
+    thetaDelta: number
+    lockInspect: boolean
   } | null = null
   private follow: { x: number; z: number } | null = null
   private followReleased = false
@@ -90,27 +103,28 @@ export class CameraController {
   inspectPlanet(coord: HexCoord, nameTheta: number): void {
     const { x, z } = getWorldPosition(coord)
     const toTarget = new THREE.Vector3(x, 0, z)
-    const phi = 0.1
-    const radius = this.inspectDistance()
-    const toPos = new THREE.Vector3(
-      x + radius * Math.sin(phi) * Math.sin(nameTheta),
-      radius * Math.cos(phi),
-      z + radius * Math.sin(phi) * Math.cos(nameTheta),
-    )
+    const fromTarget = this.controls.target.clone()
+    const offset = this.camera.position.clone().sub(fromTarget)
+    const from = new THREE.Spherical().setFromVector3(offset)
+    const toPhi = 0.14
+    const toRadius = this.inspectDistance()
     this.follow = null
     this.followReleased = true
+    this.panAnim = null
     this.inspectLimits = true
-    this.controls.minPolarAngle = 0.02
-    this.controls.maxPolarAngle = 0.32
-    this.controls.minDistance = 2.2
     const instant = prefersReducedMotion()
-    this.panAnim = {
+    this.orbitAnim = {
       start: performance.now(),
       duration: instant ? 0 : CAMERA_FOCUS_MS,
-      fromTarget: this.controls.target.clone(),
+      fromTarget,
       toTarget,
-      fromPos: this.camera.position.clone(),
-      toPos,
+      fromRadius: from.radius,
+      toRadius,
+      fromPhi: from.phi,
+      toPhi,
+      fromTheta: from.theta,
+      thetaDelta: shortestAngleDelta(from.theta, nameTheta),
+      lockInspect: true,
     }
   }
 
@@ -138,6 +152,7 @@ export class CameraController {
 
   private glideLookAt(x: number, z: number): void {
     this.follow = null
+    this.orbitAnim = null
     const toTarget = new THREE.Vector3(x, 0, z)
     const offset = this.camera.position.clone().sub(this.controls.target)
     const toPos = toTarget.clone().add(offset)
@@ -206,10 +221,11 @@ export class CameraController {
       this.breakInspect()
     }
     this.applyFocusPan(now)
+    this.applyOrbit(now)
     this.applyWasd(dt)
     this.applyMapRotate(dt)
     this.applyFollow(dt)
-    if (!this.grabbing && !this.panAnim && !this.follow) this.controls.update()
+    if (!this.grabbing && !this.panAnim && !this.orbitAnim && !this.follow) this.controls.update()
   }
 
   dispose(): void {
@@ -223,6 +239,7 @@ export class CameraController {
     this.followReleased = true
     this.follow = null
     this.panAnim = null
+    this.orbitAnim = null
   }
 
   private breakInspect(): void {
@@ -233,7 +250,7 @@ export class CameraController {
 
   private applyFollow(dt: number): void {
     const point = this.follow
-    if (!point || this.grabbing) return
+    if (!point || this.grabbing || this.orbitAnim) return
     const target = this.controls.target
     const offset = this.camera.position.clone().sub(target)
     const dx = point.x - target.x
@@ -263,6 +280,33 @@ export class CameraController {
       lerp(anim.fromPos.z, anim.toPos.z, e),
     )
     if (t >= 1) this.panAnim = null
+  }
+
+  private applyOrbit(now: number): void {
+    const anim = this.orbitAnim
+    if (!anim || this.grabbing) return
+    const t = anim.duration <= 0 ? 1 : clamp01((now - anim.start) / anim.duration)
+    const e = easeInOutSmooth(t)
+    const target = new THREE.Vector3(
+      lerp(anim.fromTarget.x, anim.toTarget.x, e),
+      lerp(anim.fromTarget.y, anim.toTarget.y, e),
+      lerp(anim.fromTarget.z, anim.toTarget.z, e),
+    )
+    const radius = lerp(anim.fromRadius, anim.toRadius, e)
+    const phi = lerp(anim.fromPhi, anim.toPhi, e)
+    const theta = anim.fromTheta + anim.thetaDelta * e
+    const offset = new THREE.Vector3().setFromSpherical(new THREE.Spherical(radius, phi, theta))
+    this.controls.target.copy(target)
+    this.camera.position.copy(target).add(offset)
+    this.camera.up.set(0, 1, 0)
+    this.camera.lookAt(target)
+    if (t < 1) return
+    this.orbitAnim = null
+    if (anim.lockInspect) {
+      this.controls.minPolarAngle = 0.02
+      this.controls.maxPolarAngle = 0.35
+      this.controls.minDistance = 2.2
+    }
   }
 
   private applyWasd(dt: number): void {

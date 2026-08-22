@@ -5,6 +5,7 @@ import { palette, css } from '../theme'
 import { TILE_THICKNESS } from './TileRenderer'
 import { HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
+import { clamp01 } from '../motion'
 
 const RESOURCE_COLOR: Record<ResourceId, number> = {
   RED: palette.resourceRed,
@@ -18,64 +19,147 @@ const RESOURCE_CSS: Record<ResourceId, string> = {
   BLUE: css.resourceBlue,
 }
 
-/** Edge mid-angles in XZ (cos, sin). Name sits on +Z so inspect can put that edge at screen-bottom. */
+/** Name sits on +Z so inspect can put that edge at screen-bottom. */
 const NAME_ANGLE = Math.PI / 2
-const STOCK_ANGLES: Record<ResourceId, number> = {
-  RED: (150 * Math.PI) / 180,
-  GREEN: (210 * Math.PI) / 180,
-  BLUE: (330 * Math.PI) / 180,
-}
-
-const EDGE_R = HEX_SIZE * 0.78
+const NAME_R = HEX_SIZE * 0.55
+const TOP_Z = -HEX_SIZE * 0.68
+const HEX_SPACING = 0.2
+const CLOSE_DIST = 5.6
+const FAR_DIST = 8.2
 
 export function planetInspectTheta(tileRotation: number): number {
   return tileRotation * (Math.PI / 3)
 }
 
+/** Classic d6 pip layout for 0–6 (higher amounts clamp to 6). */
+export function dicePips(amount: number): Array<{ x: number; z: number }> {
+  const n = Math.max(0, Math.min(6, Math.floor(amount)))
+  const d = 0.026
+  const c = { x: 0, z: 0 }
+  const tl = { x: -d, z: -d }
+  const tr = { x: d, z: -d }
+  const ml = { x: -d, z: 0 }
+  const mr = { x: d, z: 0 }
+  const bl = { x: -d, z: d }
+  const br = { x: d, z: d }
+  switch (n) {
+    case 1:
+      return [c]
+    case 2:
+      return [tl, br]
+    case 3:
+      return [tl, c, br]
+    case 4:
+      return [tl, tr, bl, br]
+    case 5:
+      return [tl, tr, c, bl, br]
+    case 6:
+      return [tl, ml, bl, tr, mr, br]
+    default:
+      return []
+  }
+}
+
 export function createPlanetOverlay(
   market: PlanetMarket,
   coord: HexCoord,
-  options: { showPrices: boolean; buyPrice: Record<ResourceId, number> },
+  buyPrice: Record<ResourceId, number>,
 ): THREE.Group {
   const g = new THREE.Group()
+  g.userData.planetOverlay = true
   g.add(planetName(market.designation, coord))
-  for (const id of RESOURCE_IDS) {
+
+  const close = new THREE.Group()
+  close.userData.lod = 'close'
+  const far = new THREE.Group()
+  far.userData.lod = 'far'
+
+  RESOURCE_IDS.forEach((id, index) => {
     const lot = market.lots.find((item) => item.id === id)
     const amount = lot?.amount ?? 0
-    const angle = STOCK_ANGLES[id]
+    const x = (index - 1) * HEX_SPACING
     const cluster = new THREE.Group()
-    cluster.position.set(Math.cos(angle) * EDGE_R, TILE_THICKNESS + 0.035, Math.sin(angle) * EDGE_R)
+    cluster.position.set(x, TILE_THICKNESS + 0.035, TOP_Z)
     cluster.add(stockHex(id, amount))
-    if (options.showPrices) {
-      const price = options.buyPrice[id]
-      const tag = priceTag(`${price}CR`, RESOURCE_CSS[id])
-      tag.position.set(0, 0.01, 0.16)
-      cluster.add(tag)
-      if (amount > 0) {
-        const hit = new THREE.Mesh(
-          new THREE.CircleGeometry(0.16, 12),
-          new THREE.MeshBasicMaterial({
-            transparent: true,
-            opacity: 0,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-          }),
-        )
-        hit.rotation.x = -Math.PI / 2
-        hit.position.y = 0.02
-        hit.userData.buyLot = { coord, resource: id }
-        hit.userData.pickOnly = true
-        cluster.add(hit)
-      }
+    const tag = priceTag(`${buyPrice[id]}CR`, RESOURCE_CSS[id])
+    tag.position.set(0, 0.01, 0.105)
+    cluster.add(tag)
+    if (amount > 0) {
+      const hit = new THREE.Mesh(
+        new THREE.CircleGeometry(0.12, 12),
+        new THREE.MeshBasicMaterial({
+          transparent: true,
+          opacity: 0,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      )
+      hit.rotation.x = -Math.PI / 2
+      hit.position.y = 0.02
+      hit.userData.buyLot = { coord, resource: id }
+      hit.userData.pickOnly = true
+      cluster.add(hit)
     }
-    g.add(cluster)
-  }
+    close.add(cluster)
+    far.add(diceCluster(id, amount, x))
+  })
+
+  g.add(close, far)
+  g.userData.closeLod = close
+  g.userData.farLod = far
   return g
+}
+
+export function tickPlanetLod(root: THREE.Object3D, camera: THREE.Camera): void {
+  const world = new THREE.Vector3()
+  root.traverse((obj) => {
+    if (!obj.userData.planetOverlay) return
+    if (isOverlayHidden(obj)) {
+      setLodOpacity(obj.userData.closeLod as THREE.Object3D | undefined, 0)
+      setLodOpacity(obj.userData.farLod as THREE.Object3D | undefined, 0)
+      return
+    }
+    obj.getWorldPosition(world)
+    const dist = camera.position.distanceTo(world)
+    const close = clamp01((FAR_DIST - dist) / (FAR_DIST - CLOSE_DIST))
+    setLodOpacity(obj.userData.closeLod as THREE.Object3D | undefined, close)
+    setLodOpacity(obj.userData.farLod as THREE.Object3D | undefined, 1 - close)
+  })
+}
+
+function isOverlayHidden(obj: THREE.Object3D): boolean {
+  let node: THREE.Object3D | null = obj
+  while (node) {
+    if (node.userData.overlayHidden) return true
+    node = node.parent
+  }
+  return false
+}
+
+function setLodOpacity(root: THREE.Object3D | undefined, opacity: number): void {
+  if (!root) return
+  root.visible = opacity > 0.02
+  root.traverse((obj) => {
+    if (obj.userData.pickOnly) {
+      obj.visible = opacity > 0.45
+      return
+    }
+    const mesh = obj as THREE.Mesh
+    const mat = mesh.material
+    if (!mat) return
+    const list = Array.isArray(mat) ? mat : [mat]
+    for (const item of list) {
+      const material = item as THREE.Material & { opacity?: number }
+      material.transparent = true
+      material.depthWrite = false
+      if (typeof material.opacity === 'number') material.opacity = opacity
+    }
+  })
 }
 
 function planetName(text: string, coord: HexCoord): THREE.Group {
   const g = new THREE.Group()
-  g.position.set(Math.cos(NAME_ANGLE) * EDGE_R, TILE_THICKNESS + 0.04, Math.sin(NAME_ANGLE) * EDGE_R)
+  g.position.set(Math.cos(NAME_ANGLE) * NAME_R, TILE_THICKNESS + 0.04, Math.sin(NAME_ANGLE) * NAME_R)
   const canvas = document.createElement('canvas')
   canvas.width = 640
   canvas.height = 80
@@ -83,7 +167,7 @@ function planetName(text: string, coord: HexCoord): THREE.Group {
   if (ctx) {
     ctx.clearRect(0, 0, 640, 80)
     ctx.fillStyle = css.ivory
-    ctx.font = '600 36px "IBM Plex Mono", "Noto Sans", sans-serif'
+    ctx.font = '400 26px "IBM Plex Mono", "Noto Sans", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(text, 320, 42)
@@ -91,7 +175,7 @@ function planetName(text: string, coord: HexCoord): THREE.Group {
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.72, 0.09),
+    new THREE.PlaneGeometry(0.7, 0.088),
     new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
@@ -104,7 +188,7 @@ function planetName(text: string, coord: HexCoord): THREE.Group {
   mesh.renderOrder = 8
   mesh.userData.planetName = coord
   const hit = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.78, 0.14),
+    new THREE.PlaneGeometry(0.76, 0.14),
     new THREE.MeshBasicMaterial({
       transparent: true,
       opacity: 0,
@@ -124,7 +208,7 @@ function stockHex(id: ResourceId, amount: number): THREE.Group {
   const g = new THREE.Group()
   const color = RESOURCE_COLOR[id]
   const shape = new THREE.Shape()
-  const r = 0.09
+  const r = 0.072
   for (let i = 0; i < 6; i++) {
     const a = (Math.PI / 3) * i
     const x = r * Math.cos(a)
@@ -146,11 +230,12 @@ function stockHex(id: ResourceId, amount: number): THREE.Group {
   hex.rotation.x = -Math.PI / 2
   g.add(hex)
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(r * 0.82, r, 6),
+    new THREE.RingGeometry(r * 0.94, r, 6),
     new THREE.MeshBasicMaterial({
       color,
       side: THREE.DoubleSide,
       depthWrite: false,
+      transparent: true,
     }),
   )
   ring.rotation.x = -Math.PI / 2
@@ -164,7 +249,7 @@ function stockHex(id: ResourceId, amount: number): THREE.Group {
   if (ctx) {
     ctx.clearRect(0, 0, 128, 128)
     ctx.fillStyle = RESOURCE_CSS[id]
-    ctx.font = '700 78px "IBM Plex Mono", monospace'
+    ctx.font = '500 72px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(String(amount), 64, 70)
@@ -172,7 +257,7 @@ function stockHex(id: ResourceId, amount: number): THREE.Group {
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
   const digit = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.14, 0.14),
+    new THREE.PlaneGeometry(0.12, 0.12),
     new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
@@ -188,23 +273,44 @@ function stockHex(id: ResourceId, amount: number): THREE.Group {
   return g
 }
 
+function diceCluster(id: ResourceId, amount: number, x: number): THREE.Group {
+  const g = new THREE.Group()
+  g.position.set(x, TILE_THICKNESS + 0.04, TOP_Z)
+  const color = RESOURCE_COLOR[id]
+  for (const pip of dicePips(amount)) {
+    const dot = new THREE.Mesh(
+      new THREE.CircleGeometry(0.012, 10),
+      new THREE.MeshBasicMaterial({
+        color,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        transparent: true,
+      }),
+    )
+    dot.rotation.x = -Math.PI / 2
+    dot.position.set(pip.x, 0.004, pip.z)
+    g.add(dot)
+  }
+  return g
+}
+
 function priceTag(text: string, color: string): THREE.Mesh {
   const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 64
+  canvas.width = 192
+  canvas.height = 48
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.clearRect(0, 0, 256, 64)
+    ctx.clearRect(0, 0, 192, 48)
     ctx.fillStyle = color
-    ctx.font = '600 28px "IBM Plex Mono", monospace'
+    ctx.font = '500 22px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(text, 128, 34)
+    ctx.fillText(text, 96, 26)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.28, 0.07),
+    new THREE.PlaneGeometry(0.2, 0.05),
     new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,

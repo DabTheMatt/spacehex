@@ -242,7 +242,7 @@ export class SpaceScene {
     const now = performance.now()
     const riseRevealed = this.advanceRise(now)
     const time = now / 1000
-    this.board.tick(time)
+    this.board.tick(time, this.camera.camera)
     this.preview.tick(time)
     const shipsSettled = this.ships.tick(this.camera.camera, time)
     this.hoverTargets.tick(time)

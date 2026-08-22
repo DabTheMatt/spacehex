@@ -1,10 +1,26 @@
 <template>
   <footer class="command-bar">
-    <div class="command-bar__context">
-      <div v-if="identity" class="command-bar__id">{{ identity }}</div>
-      <div v-if="modeLine" class="command-bar__mode">{{ modeLine }}</div>
-      <div v-if="params.length" class="command-bar__params">
-        <span v-for="row in params" :key="row.label">
+    <section class="hud-pane hud-pane--planet">
+      <div class="hud-pane__label muted">PLANET</div>
+      <div v-if="planet" class="hud-pane__id">{{ planet.designation }}</div>
+      <div v-else class="hud-pane__empty muted">NONE</div>
+      <div v-if="planetLots.length" class="hud-pane__lots">
+        <span
+          v-for="lot in planetLots"
+          :key="lot.id"
+          :class="['cargo', `cargo--${lot.id.toLowerCase()}`]"
+        >
+          {{ lot.text }}
+        </span>
+      </div>
+      <div v-if="planetHint" class="command-bar__hint muted">{{ planetHint }}</div>
+    </section>
+
+    <section class="hud-pane hud-pane--ship">
+      <div class="hud-pane__label muted">SHIP</div>
+      <div class="hud-pane__id">{{ shipId }}</div>
+      <div class="command-bar__params">
+        <span v-for="row in shipParams" :key="row.label">
           <span class="muted">{{ row.label }}</span>
           {{ row.value }}
         </span>
@@ -19,8 +35,7 @@
         </span>
       </div>
       <div v-else class="command-bar__cargo muted">HOLD EMPTY</div>
-      <div v-if="hint" class="command-bar__hint muted">{{ hint }}</div>
-    </div>
+    </section>
 
     <div class="command-bar__end">
       <button
@@ -41,7 +56,6 @@ import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { commandMode } from '@/ui/commandMode'
 import { coordKey } from '@/game/board/HexCoord'
-import { getTileDefinition } from '@/game/definitions/tiles'
 import { SHIP_DEFINITIONS } from '@/game/definitions/ships'
 import {
   CARGO_CAPACITY,
@@ -50,7 +64,7 @@ import {
   RESOURCE_IDS,
   RESOURCE_LABEL,
 } from '@/game/definitions/resources'
-import { sellQuote } from '@/game/rules/planetMarket'
+import { buyPrice, evaSellQuote } from '@/game/rules/planetMarket'
 
 const game = useGameStore()
 const ui = useUiStore()
@@ -59,51 +73,48 @@ const mode = computed(() =>
   commandMode(game.state, { shipId: ui.selectedShipId, tile: ui.selectedTile }),
 )
 
-const identity = computed(() => {
-  if (mode.value === 'EXPLORE_ROTATION') return 'EXPLORATION / ORIENT SECTOR'
-  if (mode.value !== 'OBJECT_SELECTED') return ''
-  if (ui.selectedTile) {
-    const tile = game.state.board.tiles[coordKey(ui.selectedTile)]
-    if (!tile) return ''
-    const def = getTileDefinition(tile.definitionId)
-    const market = game.state.planetMarkets[coordKey(ui.selectedTile)]
-    if (market) return market.designation
-    return `${coordKey(ui.selectedTile)} / ${def.label.toUpperCase()}`
-  }
-  const ship = ui.selectedShipId ? game.state.ships[ui.selectedShipId] : null
-  if (!ship) return ''
+const planetCoord = computed(() => ui.inspectPlanet ?? game.ship.coord)
+
+const planet = computed(() => {
+  const market = game.state.planetMarkets[coordKey(planetCoord.value)]
+  return market ?? null
+})
+
+const planetLots = computed(() => {
+  const market = planet.value
+  if (!market) return []
+  return market.lots.map((lot) => ({
+    id: lot.id,
+    text: `${RESOURCE_LABEL[lot.id]} ×${lot.amount}  ${buyPrice(game.state, lot.id)}CR`,
+  }))
+})
+
+const planetHint = computed(() => {
+  if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE'
+  if (!planet.value) return ''
+  const coord = planetCoord.value
+  const here = game.ship.coord.q === coord.q && game.ship.coord.r === coord.r
+  const left = MAX_BUYS_PER_TURN - (game.player.buysThisTurn ?? 0)
+  if (!here) return 'DOCK TO BUY'
+  return `CLICK PRICE TO BUY  ·  ${left} LEFT`
+})
+
+const shipId = computed(() => {
+  const ship = game.ship
   const n = ship.playerId.replace(/\D/g, '') || '1'
   return `${SHIP_DEFINITIONS[ship.class].id} / SG-${n}`
 })
 
-const modeLine = computed(() => {
-  if (mode.value === 'EXPLORE_ROTATION') return game.pendingDef ? game.pendingDef.type.replace(/_/g, ' ') : ''
-  return ''
-})
-
-const params = computed(() => {
-  if (mode.value === 'OBJECT_SELECTED' && ui.selectedTile) {
-    const tile = game.state.board.tiles[coordKey(ui.selectedTile)]
-    if (!tile) return []
-    const def = getTileDefinition(tile.definitionId)
-    return [
-      { label: 'TYPE', value: def.type.replace(/_/g, ' ') },
-      { label: 'ORIENT', value: `${tile.rotation * 60}°` },
-    ]
-  }
-  if (mode.value === 'OBJECT_SELECTED' && ui.selectedShipId) {
-    const ship = game.state.ships[ui.selectedShipId]
-    const player = ship ? game.state.players[ship.playerId] : null
-    if (!ship || !player) return []
-    return [
-      { label: 'HULL', value: `${pad(ship.hull)} / ${pad(ship.maxHull)}` },
-      { label: 'FUEL', value: pad(player.fuel) },
-      { label: 'CR', value: pad(player.credits) },
-      { label: 'HOLD', value: `${cargoUsed(ship.cargo)}/${CARGO_CAPACITY[ship.class]}` },
-      { label: 'PCH', value: pad(player.glory) },
-    ]
-  }
-  return []
+const shipParams = computed(() => {
+  const ship = game.ship
+  const player = game.player
+  return [
+    { label: 'HULL', value: `${pad(ship.hull)} / ${pad(ship.maxHull)}` },
+    { label: 'FUEL', value: pad(player.fuel) },
+    { label: 'CR', value: pad(player.credits) },
+    { label: 'HOLD', value: `${cargoUsed(ship.cargo)}/${CARGO_CAPACITY[ship.class]}` },
+    { label: 'PCH', value: pad(player.glory) },
+  ]
 })
 
 const cargoRows = computed(() => {
@@ -111,20 +122,8 @@ const cargoRows = computed(() => {
   if (!ship) return []
   return RESOURCE_IDS.filter((id) => ship.cargo[id] > 0).map((id) => ({
     id,
-    text: `${RESOURCE_LABEL[id]} ×${ship.cargo[id]}  ${sellQuote(game.state, ship.coord, id)}CR`,
+    text: `${RESOURCE_LABEL[id]} ×${ship.cargo[id]}  ${evaSellQuote(game.state, id)}CR EVA`,
   }))
-})
-
-const hint = computed(() => {
-  if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE'
-  if (ui.inspectPlanet) {
-    const here =
-      game.ship.coord.q === ui.inspectPlanet.q && game.ship.coord.r === ui.inspectPlanet.r
-    const left = MAX_BUYS_PER_TURN - (game.player.buysThisTurn ?? 0)
-    if (!here) return 'DOCK ON THIS PLANET TO BUY'
-    return `CLICK A PRICE TO BUY  ·  ${left} LEFT THIS TURN`
-  }
-  return 'CLICK A PLANET NAME TO INSPECT'
 })
 
 const showEndTurn = computed(
