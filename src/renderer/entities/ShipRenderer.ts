@@ -31,7 +31,8 @@ import {
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
-const RIM = HEX_SIZE * 0.28
+const PARK_RIM = HEX_SIZE * 0.42
+const DUEL_SEP = HEX_SIZE * 0.62
 const HULL_HEIGHT = 0.11
 export const BASE_HOVER = TILE_THICKNESS + 0.14
 
@@ -78,6 +79,7 @@ export class ShipRenderer {
   private hubTime = 0
   private duel = new Map<string, { x: number; z: number; yaw: number }>()
   private threatShipId: string | null = null
+  private displayedHull = new Map<string, number>()
 
   isBusy(shipId: string): boolean {
     const motion = this.motion.get(shipId)
@@ -106,12 +108,26 @@ export class ShipRenderer {
 
   setDuel(attackerId: string, defenderId: string, coord: HexCoord): void {
     const pos = getWorldPosition(coord)
-    this.duel.set(attackerId, { x: pos.x - RIM, z: pos.z, yaw: Math.PI / 2 })
-    this.duel.set(defenderId, { x: pos.x + RIM, z: pos.z, yaw: -Math.PI / 2 })
+    this.duel.set(attackerId, { x: pos.x - DUEL_SEP, z: pos.z, yaw: Math.PI / 2 })
+    this.duel.set(defenderId, { x: pos.x + DUEL_SEP, z: pos.z, yaw: -Math.PI / 2 })
   }
 
   clearDuel(): void {
     this.duel.clear()
+  }
+
+  holdHull(shipId: string, hull: number): void {
+    this.displayedHull.set(shipId, hull)
+  }
+
+  setHull(shipId: string, hull: number, maxHull: number): void {
+    this.displayedHull.set(shipId, hull)
+    const child = this.group.children.find((item) => item.userData.shipId === shipId)
+    if (child) applyHullFill(child, hullFillRatio(hull, maxHull))
+  }
+
+  clearHullOverride(): void {
+    this.displayedHull.clear()
   }
 
   setThreat(shipId: string | null): void {
@@ -129,6 +145,7 @@ export class ShipRenderer {
     this.landed = []
     this.duel.clear()
     this.threatShipId = null
+    this.displayedHull.clear()
     this.group.clear()
   }
 
@@ -255,7 +272,13 @@ export class ShipRenderer {
       const playerNo = Number(ship.playerId.replace(/\D/g, '')) || 1
       const active = state.players[state.activePlayerId]?.shipId === ship.id
       const wrapper = new THREE.Group()
-      const marker = createNavMarker(ship.class, playerNo, active, `SG-${playerNo}`)
+      const marker = createNavMarker(
+        ship.class,
+        playerNo,
+        active,
+        `SG-${playerNo}`,
+        hullFillRatio(this.displayedHull.get(ship.id) ?? ship.hull, ship.maxHull),
+      )
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
       wrapper.userData.beacon = marker.userData.beacon
@@ -600,10 +623,10 @@ function parkWorld(
   const sideX = Math.cos(yaw)
   const sideZ = -Math.sin(yaw)
   if (count <= 1) {
-    return { x: pos.x + sideX * RIM, z: pos.z + sideZ * RIM }
+    return { x: pos.x + sideX * PARK_RIM, z: pos.z + sideZ * PARK_RIM }
   }
   const side = index === 0 ? -1 : 1
-  return { x: pos.x + sideX * side * RIM, z: pos.z + sideZ * side * RIM }
+  return { x: pos.x + sideX * side * PARK_RIM, z: pos.z + sideZ * side * PARK_RIM }
 }
 
 function lastMoveYaw(log: GameEvent[], shipId: string, fallback: HexCoord): number {
@@ -625,6 +648,7 @@ function createNavMarker(
   playerNo: number,
   active: boolean,
   label: string,
+  fillRatio: number,
 ): THREE.Group {
   const color = hullColor(playerNo, active)
   const g = new THREE.Group()
@@ -635,14 +659,27 @@ function createNavMarker(
   shape.lineTo(-half, length * 0.5)
   shape.lineTo(half, length * 0.5)
   shape.closePath()
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: HULL_HEIGHT, bevelEnabled: false, steps: 1 })
   const hull = new THREE.Mesh(
-    new THREE.ExtrudeGeometry(shape, { depth: HULL_HEIGHT, bevelEnabled: false, steps: 1 }),
+    geo,
     new THREE.MeshBasicMaterial({ color, depthWrite: true, depthTest: true }),
   )
   hull.userData.hullPaint = color
+  hull.userData.hullLength = length
+  hull.userData.hullFill = true
   hull.rotation.x = -Math.PI / 2
   hull.renderOrder = 3
+  applyHullFill(hull, fillRatio)
   g.add(hull)
+
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({ color, depthWrite: false }),
+  )
+  edges.userData.hullPaint = color
+  edges.rotation.x = -Math.PI / 2
+  edges.renderOrder = 4
+  g.add(edges)
 
   g.add(hullMark(label, length, half, true))
   g.add(hullMark(label, length, half, false))
@@ -706,13 +743,29 @@ function createNavMarker(
   return g
 }
 
+function applyHullFill(root: THREE.Object3D, ratio: number): void {
+  root.traverse((obj) => {
+    if (!obj.userData.hullFill) return
+    const mesh = obj as THREE.Mesh
+    const length = Number(mesh.userData.hullLength) || 0.42
+    const r = Math.max(0, Math.min(1, ratio))
+    mesh.visible = r > 0.001
+    mesh.scale.y = r
+    mesh.position.y = (1 - r) * length * 0.5
+  })
+}
+
+export function hullFillRatio(hull: number, maxHull: number): number {
+  if (maxHull <= 0) return 0
+  return Math.max(0, Math.min(1, hull / maxHull))
+}
+
 function tintThreat(wrapper: THREE.Object3D, on: boolean): void {
   wrapper.traverse((obj) => {
-    const mesh = obj as THREE.Mesh
-    if (!mesh.isMesh || typeof mesh.userData.hullPaint !== 'number') return
-    const mat = mesh.material as THREE.MeshBasicMaterial
-    if (!mat?.color) return
-    mat.color.set(on ? palette.blood : mesh.userData.hullPaint)
+    if (typeof obj.userData.hullPaint !== 'number') return
+    const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial | THREE.LineBasicMaterial
+    if (!mat || Array.isArray(mat) || !('color' in mat)) return
+    mat.color.set(on ? palette.blood : obj.userData.hullPaint)
   })
 }
 

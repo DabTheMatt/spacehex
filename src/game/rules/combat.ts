@@ -3,7 +3,6 @@ import { COMBAT_DAMAGE, MAX_ATTACKS_PER_TURN } from '../definitions/constants'
 import type { HexCoord } from '../board/HexCoord'
 import type { GameEvent } from '../engine/events'
 import type { ShipState } from '../state/GameState'
-import { SHIP_DEFINITIONS } from '../definitions/ships'
 import { addGlory, GLORY_DAMAGE, GLORY_DESTROY } from './glory'
 import { activeShip } from './fuel'
 
@@ -47,27 +46,18 @@ export interface PlannedShot {
   damage: number
 }
 
-/** Alternate single shots, attacker first, until attack is spent or a hull hits 0. */
+/** One exchange per declaration: attacker fires once, defender answers if still up. */
 export function planDuelShots(attacker: ShipState, defender: ShipState): PlannedShot[] {
   const shots: PlannedShot[] = []
-  let aHull = attacker.hull
   let bHull = defender.hull
-  const aAtk = SHIP_DEFINITIONS[attacker.class].attack
-  const bAtk = SHIP_DEFINITIONS[defender.class].attack
-  const rounds = Math.max(aAtk, bAtk)
-  for (let i = 0; i < rounds; i++) {
-    if (i < aAtk && aHull > 0 && bHull > 0) {
-      const damage = Math.min(COMBAT_DAMAGE, bHull)
-      bHull -= damage
-      shots.push({ attackerId: attacker.id, defenderId: defender.id, damage })
-    }
-    if (bHull <= 0) break
-    if (i < bAtk && bHull > 0 && aHull > 0) {
-      const damage = Math.min(COMBAT_DAMAGE, aHull)
-      aHull -= damage
-      shots.push({ attackerId: defender.id, defenderId: attacker.id, damage })
-    }
-    if (aHull <= 0) break
+  if (attacker.hull > 0 && bHull > 0) {
+    const damage = Math.min(COMBAT_DAMAGE, bHull)
+    bHull -= damage
+    shots.push({ attackerId: attacker.id, defenderId: defender.id, damage })
+  }
+  if (bHull > 0 && defender.hull > 0 && attacker.hull > 0) {
+    const damage = Math.min(COMBAT_DAMAGE, attacker.hull)
+    shots.push({ attackerId: defender.id, defenderId: attacker.id, damage })
   }
   return shots
 }
@@ -88,6 +78,8 @@ export function resolveDeclaredCombat(
       attackerId: attacker.id,
       defenderId: defender.id,
       coord: { ...attacker.coord },
+      attackerHull: attacker.hull,
+      defenderHull: defender.hull,
     },
   ]
   let ships = { ...state.ships }

@@ -25,7 +25,7 @@ export type GameEvent =
       total: number
     }
   | { type: 'CREDITS_CHANGED'; playerId: string; credits: number }
-  | { type: 'COMBAT_STARTED'; attackerId: string; defenderId: string; coord: HexCoord }
+  | { type: 'COMBAT_STARTED'; attackerId: string; defenderId: string; coord: HexCoord; attackerHull: number; defenderHull: number }
   | { type: 'COMBAT_SHOT'; attackerId: string; defenderId: string; damage: number; hullAfter: number }
   | { type: 'COMBAT_ENDED'; attackerId: string; defenderId: string }
   | { type: 'COMBAT_RESOLVED'; attackerId: string; defenderId: string; damage: number }

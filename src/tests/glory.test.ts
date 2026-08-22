@@ -84,14 +84,19 @@ describe('declared combat', () => {
     expect(canDeclareAttack(again.state, 'mewa-2').ok).toBe(false)
   })
 
-  it('alternates shots until a hull is gone', () => {
+  it('fires one shot each way and lets the next player attack on their turn', () => {
     const state = createInitialState('duel-plan')
     const shots = planDuelShots(state.ships['mewa-1'], state.ships['mewa-2'])
+    expect(shots).toHaveLength(2)
     expect(shots[0]?.attackerId).toBe('mewa-1')
     expect(shots[1]?.attackerId).toBe('mewa-2')
-    const last = shots[shots.length - 1]
-    expect(last?.defenderId).toBe('mewa-2')
-    expect(shots.filter((shot) => shot.attackerId === 'mewa-1')).toHaveLength(3)
-    expect(shots.filter((shot) => shot.attackerId === 'mewa-2')).toHaveLength(2)
+
+    let next = applyCommand(state, { type: 'DECLARE_ATTACK', defenderId: 'mewa-2' }).state
+    expect(next.ships['mewa-1'].hull).toBe(2)
+    expect(next.ships['mewa-2'].hull).toBe(2)
+    next = applyCommand(next, { type: 'SKIP_MOVEMENT' }).state
+    next = applyCommand(next, { type: 'END_TURN' }).state
+    expect(next.activePlayerId).toBe('player-2')
+    expect(canDeclareAttack(next, 'mewa-1').ok).toBe(true)
   })
 })

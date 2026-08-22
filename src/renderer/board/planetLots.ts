@@ -31,8 +31,8 @@ const FOOT_GAP = 0.052
 const HEX_SPACING = 0.18
 const CLOSE_DIST = 4.2
 const FAR_DIST = 6.0
-/** Half of ship `BASE_HOVER` (0.24): names and markets float at mid-height. */
-export const OVERLAY_HOVER = 0.12
+/** Quarter of ship hover: 50% closer to the tile than the previous mid-height overlays. */
+export const OVERLAY_HOVER = 0.06
 
 export function planetInspectTheta(tileRotation: number): number {
   return tileRotation * (Math.PI / 3)

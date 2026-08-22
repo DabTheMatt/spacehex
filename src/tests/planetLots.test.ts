@@ -3,7 +3,7 @@ import { dicePips, EDGE_MARGIN, OVERLAY_HOVER } from '../renderer/board/planetLo
 import { BASE_HOVER } from '../renderer/entities/ShipRenderer'
 import { EVA_HUB_SPIN } from '../renderer/board/evaDocks'
 import { missileSidePoint, missileWorldPos } from '../renderer/fx/missilePath'
-import { SHIP_DEFINITIONS } from '../game/definitions/ships'
+import { hullFillRatio } from '../renderer/entities/ShipRenderer'
 
 describe('dice pips', () => {
   it('uses a six-sided die layout', () => {
@@ -22,8 +22,8 @@ describe('dice pips', () => {
     expect(EDGE_MARGIN).toBeLessThan(0.2)
   })
 
-  it('floats names and markets at half ship hover', () => {
-    expect(OVERLAY_HOVER).toBeCloseTo(BASE_HOVER * 0.5, 5)
+  it('floats names and markets closer to the tile face', () => {
+    expect(OVERLAY_HOVER).toBeCloseTo(BASE_HOVER * 0.25, 5)
   })
 })
 
@@ -55,8 +55,9 @@ describe('missiles', () => {
     expect(b.x).toBeLessThan(0)
   })
 
-  it('fires as many rockets as the ship attack value', () => {
-    expect(SHIP_DEFINITIONS.MEWA.attack).toBe(3)
-    expect(SHIP_DEFINITIONS.DRZAZGA.attack).toBe(2)
+  it('fills hull along the length by remaining hit points', () => {
+    expect(hullFillRatio(3, 3)).toBe(1)
+    expect(hullFillRatio(1, 3)).toBeCloseTo(1 / 3)
+    expect(hullFillRatio(0, 3)).toBe(0)
   })
 })
