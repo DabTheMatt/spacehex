@@ -10,6 +10,7 @@ import { palette, css } from '../theme'
 import { TILE_THICKNESS } from '../board/TileRenderer'
 import {
   clamp01,
+  easeInOutCubic,
   easeInOutSmooth,
   lerp,
   lerpAngle,
@@ -23,6 +24,8 @@ import {
   SHIP_TURN_MS,
 } from '../motion'
 
+const Y_AXIS = new THREE.Vector3(0, 1, 0)
+const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
 const SHIP_SPACING = 0.46
 const HULL_HEIGHT = 0.11
 const BASE_HOVER = TILE_THICKNESS + 0.08
@@ -97,7 +100,7 @@ export class ShipRenderer {
       endYaw,
       yawDelta,
       start: performance.now(),
-      turnMs: instant || Math.abs(yawDelta) < 0.04 ? 0 : SHIP_TURN_MS,
+      turnMs: instant ? 0 : SHIP_TURN_MS,
       igniteMs: instant ? 0 : SHIP_MAIN_IGNITE_MS,
       moveMs: instant ? 0 : SHIP_FLIGHT_MS,
     })
@@ -159,13 +162,21 @@ export class ShipRenderer {
       const marker = createNavMarker(ship.class, playerNo, active, `SG-${playerNo}`)
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
-      wrapper.rotation.y = yaw
+      wrapper.quaternion.setFromAxisAngle(Y_AXIS, yaw)
       wrapper.position.set(last.x, BASE_HOVER, last.z)
       wrapper.userData.shipId = ship.id
       wrapper.userData.hullHeight = HULL_HEIGHT
       const player = state.players[ship.playerId]
       if (active && player) {
-        const callout = createActiveCallout(`SG-${playerNo}`, player.fuel, ship.hull, ship.maxHull, player.glory)
+        const callout = createActiveCallout(
+          `SG-${playerNo}`,
+          playerNo === 1 ? css.player1 : css.player2,
+          playerNo === 1 ? palette.player1 : palette.player2,
+          player.fuel,
+          ship.hull,
+          ship.maxHull,
+          player.glory,
+        )
         wrapper.add(callout)
         wrapper.userData.callout = callout
       }
@@ -241,12 +252,12 @@ export class ShipRenderer {
       const shipId = child.userData.shipId as string
       const motion = this.motion.get(shipId)
       if (!motion) {
-        applyEngineBurn(child, { main: 0, port: 0, starboard: 0 })
+        applyEngineBurn(child, ENGINES_OFF)
         this.remember(child)
         continue
       }
       if (motion.kind === 'hold') {
-        applyEngineBurn(child, { main: 0, port: 0, starboard: 0 })
+        applyEngineBurn(child, ENGINES_OFF)
         this.remember(child)
         continue
       }
@@ -265,8 +276,9 @@ export class ShipRenderer {
       }
       const elapsed = now - motion.start
       const turnT = motion.turnMs <= 0 ? 1 : clamp01(elapsed / motion.turnMs)
-      child.rotation.y = lerpAngle(motion.startYaw, motion.endYaw, easeInOutSmooth(turnT))
-      this.facing.set(shipId, child.rotation.y)
+      const yaw = lerpAngle(motion.startYaw, motion.endYaw, easeInOutCubic(turnT))
+      child.quaternion.setFromAxisAngle(Y_AXIS, yaw)
+      this.facing.set(shipId, yaw)
       child.position.y = BASE_HOVER
 
       const burn = shipEngineBurn({
@@ -290,7 +302,7 @@ export class ShipRenderer {
       if (afterTurn < motion.igniteMs) {
         child.position.x = motion.fromX
         child.position.z = motion.fromZ
-        child.rotation.y = motion.endYaw
+        child.quaternion.setFromAxisAngle(Y_AXIS, motion.endYaw)
         this.facing.set(shipId, motion.endYaw)
         this.remember(child)
         continue
@@ -300,11 +312,11 @@ export class ShipRenderer {
       const e = easeInOutSmooth(moveT)
       child.position.x = lerp(motion.fromX, motion.toX, e)
       child.position.z = lerp(motion.fromZ, motion.toZ, e)
-      child.rotation.y = motion.endYaw
+      child.quaternion.setFromAxisAngle(Y_AXIS, motion.endYaw)
       this.facing.set(shipId, motion.endYaw)
       this.remember(child)
       if (moveT >= 1) {
-        applyEngineBurn(child, { main: 0, port: 0, starboard: 0 })
+        applyEngineBurn(child, ENGINES_OFF)
         this.motion.delete(shipId)
         settled = true
       }
@@ -382,22 +394,39 @@ function createNavMarker(
 
   const port = makeEnginePlume(
     0.012,
-    0.06,
-    new THREE.Vector3(-half * 0.82, y, -length * 0.16),
-    new THREE.Vector3(-0.42, 0, -1),
+    0.055,
+    new THREE.Vector3(-half * 0.88, y, 0.04),
+    new THREE.Vector3(-1, 0, 0),
   )
   g.add(port)
 
   const starboard = makeEnginePlume(
     0.012,
-    0.06,
-    new THREE.Vector3(half * 0.82, y, -length * 0.16),
-    new THREE.Vector3(0.42, 0, -1),
+    0.055,
+    new THREE.Vector3(half * 0.88, y, 0.04),
+    new THREE.Vector3(1, 0, 0),
   )
   g.add(starboard)
 
-  g.userData.engines = { main, port, starboard }
-  applyEngineBurn(g, { main: 0, port: 0, starboard: 0 })
+  const s = Math.SQRT1_2
+  const brakePort = makeEnginePlume(
+    0.012,
+    0.055,
+    new THREE.Vector3(-half * 0.7, y, -length * 0.22),
+    new THREE.Vector3(-s, 0, -s),
+  )
+  g.add(brakePort)
+
+  const brakeStarboard = makeEnginePlume(
+    0.012,
+    0.055,
+    new THREE.Vector3(half * 0.7, y, -length * 0.22),
+    new THREE.Vector3(s, 0, -s),
+  )
+  g.add(brakeStarboard)
+
+  g.userData.engines = { main, port, starboard, brakePort, brakeStarboard }
+  applyEngineBurn(g, ENGINES_OFF)
   return g
 }
 
@@ -434,14 +463,31 @@ function makeEnginePlume(
   return group
 }
 
-function applyEngineBurn(root: THREE.Object3D, burn: { main: number; port: number; starboard: number }): void {
+function applyEngineBurn(
+  root: THREE.Object3D,
+  burn: {
+    main: number
+    port: number
+    starboard: number
+    brakePort: number
+    brakeStarboard: number
+  },
+): void {
   const engines = root.userData.engines as
-    | { main: THREE.Group; port: THREE.Group; starboard: THREE.Group }
+    | {
+        main: THREE.Group
+        port: THREE.Group
+        starboard: THREE.Group
+        brakePort: THREE.Group
+        brakeStarboard: THREE.Group
+      }
     | undefined
   if (!engines) return
   setPlume(engines.main, burn.main, 1.35)
   setPlume(engines.port, burn.port, 1.05)
   setPlume(engines.starboard, burn.starboard, 1.05)
+  setPlume(engines.brakePort, burn.brakePort, 1.05)
+  setPlume(engines.brakeStarboard, burn.brakeStarboard, 1.05)
 }
 
 function setPlume(group: THREE.Group, intensity: number, lengthScale: number): void {
@@ -507,11 +553,19 @@ function createHullNumber(label: string, width: number, height: number): THREE.M
   )
 }
 
-function createActiveCallout(label: string, fuel: number, hull: number, maxHull: number, glory: number): THREE.Group {
+function createActiveCallout(
+  label: string,
+  ink: string,
+  accent: number,
+  fuel: number,
+  hull: number,
+  maxHull: number,
+  glory: number,
+): THREE.Group {
   const g = new THREE.Group()
   const sprite = new THREE.Sprite(
     new THREE.SpriteMaterial({
-      map: makeCalloutTexture(label, fuel, hull, maxHull, glory),
+      map: makeCalloutTexture(label, ink, fuel, hull, maxHull, glory),
       transparent: true,
       depthTest: false,
       depthWrite: false,
@@ -524,7 +578,7 @@ function createActiveCallout(label: string, fuel: number, hull: number, maxHull:
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0.4, 0.5, 0)]),
     new THREE.LineBasicMaterial({
-      color: palette.ivory,
+      color: accent,
       transparent: true,
       opacity: 0.55,
       depthTest: false,
@@ -555,6 +609,7 @@ function layoutCallout(ship: THREE.Object3D, callout: THREE.Group, camera: THREE
 
 function makeCalloutTexture(
   label: string,
+  ink: string,
   fuel: number,
   hull: number,
   maxHull: number,
@@ -568,18 +623,25 @@ function makeCalloutTexture(
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, w, h)
-    ctx.strokeStyle = '#D8D0BD'
+    ctx.strokeStyle = ink
     ctx.lineWidth = 1
+    ctx.setLineDash([5, 4])
     ctx.strokeRect(12.5, 12.5, w - 25, h - 25)
-    ctx.fillStyle = '#D8D0BD'
+    ctx.setLineDash([])
+    ctx.fillStyle = ink
+    ctx.globalAlpha = 0.12
+    for (let y = 16; y < h - 16; y += 3) {
+      ctx.fillRect(14, y, w - 28, 1)
+    }
+    ctx.globalAlpha = 1
     ctx.font = '600 26px "IBM Plex Mono", monospace'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
     ctx.fillText(label, 24, 36)
     ctx.font = '500 16px "IBM Plex Mono", monospace'
-    drawStatRow(ctx, 24, 68, 'FUEL', 6, fuel, 12, 5)
-    drawStatRow(ctx, 24, 92, 'HULL', Math.max(1, maxHull), hull, 12, 5)
-    drawStatRow(ctx, 24, 116, 'GLORY', Math.max(glory, 4), glory, 10, 4)
+    drawStatRow(ctx, ink, 24, 68, 'FUEL', 6, fuel, 12, 5)
+    drawStatRow(ctx, ink, 24, 92, 'HULL', Math.max(1, maxHull), hull, 12, 5)
+    drawStatRow(ctx, ink, 24, 116, 'GLORY', Math.max(glory, 4), glory, 10, 4)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
@@ -588,6 +650,7 @@ function makeCalloutTexture(
 
 function drawStatRow(
   ctx: CanvasRenderingContext2D,
+  ink: string,
   x: number,
   y: number,
   name: string,
@@ -596,13 +659,14 @@ function drawStatRow(
   size: number,
   gap: number,
 ): void {
-  ctx.fillStyle = '#D8D0BD'
+  ctx.fillStyle = ink
   ctx.fillText(name, x, y)
-  drawPips(ctx, x + 70, y, count, filled, size, gap)
+  drawPips(ctx, ink, x + 70, y, count, filled, size, gap)
 }
 
 function drawPips(
   ctx: CanvasRenderingContext2D,
+  ink: string,
   x: number,
   y: number,
   count: number,
@@ -614,10 +678,12 @@ function drawPips(
     const px = x + i * (size + gap)
     ctx.beginPath()
     ctx.rect(px, y - size / 2, size, size * 0.35)
-    if (i < filled) ctx.fill()
-    else {
-      ctx.strokeStyle = '#D8D0BD'
-      ctx.lineWidth = 1.5
+    if (i < filled) {
+      ctx.fillStyle = ink
+      ctx.fill()
+    } else {
+      ctx.strokeStyle = ink
+      ctx.lineWidth = 1
       ctx.stroke()
     }
   }

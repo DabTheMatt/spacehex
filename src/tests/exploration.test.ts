@@ -73,13 +73,17 @@ describe('exploration engine', () => {
     expect(state.board.tiles[key].definitionId).toBe(top)
     expect(state.ships['mewa-1'].coord).toEqual(getNeighbor({ q: 0, r: 0 }, 0))
     expect(state.phase).toBe('PLAYER_TURN')
-    expect(state.activePlayerId).toBe('player-2')
-    expect(state.movementSpent).toBe(false)
-    expect(confirmed.events.some((e) => e.type === 'TURN_ENDED')).toBe(true)
+    expect(state.activePlayerId).toBe('player-1')
+    expect(state.movementSpent).toBe(true)
+    expect(confirmed.events.some((e) => e.type === 'TURN_ENDED')).toBe(false)
     expect(Object.keys(state.board.tiles)).toHaveLength(2)
+
+    const ended = applyCommand(state, { type: 'END_TURN' })
+    expect(ended.state.activePlayerId).toBe('player-2')
+    expect(ended.events.some((e) => e.type === 'TURN_ENDED')).toBe(true)
   })
 
-  it('ends the turn after moving onto a discovered hex', () => {
+  it('moves onto a discovered hex without ending the turn', () => {
     let state = createInitialState('move-turn')
     state = applyCommand(state, {
       type: 'DEV_PLACE_TILE',
@@ -89,10 +93,12 @@ describe('exploration engine', () => {
     }).state
     const moved = applyCommand(state, { type: 'DECLARE_MOVE', target: { q: 1, r: 0 } })
     expect(moved.state.ships['mewa-1'].coord).toEqual({ q: 1, r: 0 })
-    expect(moved.state.activePlayerId).toBe('player-2')
-    expect(moved.state.movementSpent).toBe(false)
+    expect(moved.state.activePlayerId).toBe('player-1')
+    expect(moved.state.movementSpent).toBe(true)
     expect(moved.events.some((e) => e.type === 'SHIP_MOVED')).toBe(true)
-    expect(moved.events.some((e) => e.type === 'TURN_ENDED')).toBe(true)
+    expect(moved.events.some((e) => e.type === 'TURN_ENDED')).toBe(false)
+    const ended = applyCommand(moved.state, { type: 'END_TURN' })
+    expect(ended.state.activePlayerId).toBe('player-2')
   })
 
   it('does not allow placing on an occupied hex via move-as-explore', () => {
@@ -107,6 +113,7 @@ describe('exploration engine', () => {
     let state = createInitialState('p2-explore')
     state = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 }).state
     state = applyCommand(state, { type: 'CONFIRM_TILE_PLACEMENT' }).state
+    state = applyCommand(state, { type: 'END_TURN' }).state
     expect(state.activePlayerId).toBe('player-2')
     expect(state.ships['mewa-2'].coord).toEqual({ q: 0, r: 0 })
     const started = applyCommand(state, { type: 'START_EXPLORATION', direction: 2 })
@@ -115,6 +122,7 @@ describe('exploration engine', () => {
     expect(started.state.exploration.origin).toEqual({ q: 0, r: 0 })
     const placed = applyCommand(started.state, { type: 'CONFIRM_TILE_PLACEMENT' })
     expect(placed.state.ships['mewa-2'].coord).toEqual(getNeighbor({ q: 0, r: 0 }, 2))
-    expect(placed.state.activePlayerId).toBe('player-1')
+    expect(placed.state.activePlayerId).toBe('player-2')
+    expect(placed.state.movementSpent).toBe(true)
   })
 })

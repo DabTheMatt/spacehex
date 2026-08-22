@@ -181,6 +181,9 @@ watch(
   (events) => {
     if (!scene) return
     scene.handleEvents(events, game.state)
+    if (events.some((event) => event.type === 'TURN_ENDED')) {
+      scene.camera.panTo(game.ship.coord)
+    }
     sync()
   },
 )

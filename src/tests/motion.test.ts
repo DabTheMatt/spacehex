@@ -102,8 +102,9 @@ describe('placement motion', () => {
       moveMs: 900,
       yawDelta: 0.8,
     })
-    expect(burn.port).toBeGreaterThan(0.5)
-    expect(burn.starboard).toBeGreaterThan(0.5)
+    expect(burn.port).toBe(0)
+    expect(burn.brakePort).toBeGreaterThan(0.5)
+    expect(burn.brakeStarboard).toBeGreaterThan(0.5)
     expect(burn.main).toBeLessThan(0.5)
   })
 })

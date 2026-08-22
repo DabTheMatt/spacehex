@@ -11,7 +11,6 @@ import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
 import { userDataFromHits } from './pickHelpers'
 import type { BoardHover } from '../../ui/boardHover'
-import { activeShip } from '../../game/rules/fuel'
 import { TILE_SETTLED_Y, TILE_SLOT_Y } from '../board/TileRenderer'
 import {
   clamp01,
@@ -48,7 +47,6 @@ export class SpaceScene {
   private riseByKey = new Map<string, { start: number; duration: number }>()
   private tileY: Record<string, number> = {}
   private flightsByTile = new Map<string, Array<{ shipId: string; from: HexCoord; to: HexCoord }>>()
-  private pendingFocus = false
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -82,11 +80,7 @@ export class SpaceScene {
   handleEvents(events: GameEvent[], _state: GameState): void {
     for (const event of events) {
       if (event.type === 'GAME_STARTED') {
-        this.pendingFocus = false
         this.camera.focus({ q: 0, r: 0 })
-      }
-      if (event.type === 'TURN_ENDED') {
-        this.pendingFocus = true
       }
     }
   }
@@ -212,15 +206,7 @@ export class SpaceScene {
     const shipsSettled = this.ships.tick(this.camera.camera)
     this.hoverTargets.tick(this.camera.camera)
     if (shipsSettled) this.applySync()
-    this.tryFocusActive()
     this.camera.tick()
     this.renderer.render(this.scene, this.camera.camera)
-  }
-
-  private tryFocusActive(): void {
-    if (!this.pendingFocus || !this.lastState) return
-    if (this.ships.anyBusy()) return
-    this.pendingFocus = false
-    this.camera.panTo(activeShip(this.lastState).coord)
   }
 }

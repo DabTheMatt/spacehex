@@ -13,6 +13,8 @@ export interface EngineBurn {
   main: number
   port: number
   starboard: number
+  brakePort: number
+  brakeStarboard: number
 }
 
 /** Signed yaw delta, positive = right (Three.js +Y with nose along +Z). */
@@ -42,7 +44,7 @@ export function shipEngineBurn(options: {
   const brakeMs = options.brakeMs ?? SHIP_BRAKE_MS
   const turning = options.turnMs > 0 && Math.abs(options.yawDelta) > 0.04
   const left = options.yawDelta < 0
-  const off: EngineBurn = { main: 0, port: 0, starboard: 0 }
+  const off: EngineBurn = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
 
   if (turning && options.elapsed < options.turnMs) {
     if (options.elapsed <= kickMs) {
@@ -57,7 +59,7 @@ export function shipEngineBurn(options: {
   const afterTurn = options.elapsed - (turning ? options.turnMs : 0)
   if (afterTurn < options.igniteMs) {
     const ramp = options.igniteMs <= 0 ? 1 : clamp01(afterTurn / 160)
-    return { main: 0.25 + 0.75 * ramp, port: 0, starboard: 0 }
+    return { ...off, main: 0.25 + 0.75 * ramp }
   }
 
   const afterIgnite = afterTurn - options.igniteMs
@@ -66,9 +68,14 @@ export function shipEngineBurn(options: {
     const remaining = options.moveMs - afterIgnite
     if (remaining <= brakeMs) {
       const t = brakeMs <= 0 ? 1 : 1 - remaining / brakeMs
-      return { main: Math.max(0, 1 - t), port: 0.55 + 0.45 * t, starboard: 0.55 + 0.45 * t }
+      return {
+        ...off,
+        main: Math.max(0, 1 - t),
+        brakePort: 0.55 + 0.45 * t,
+        brakeStarboard: 0.55 + 0.45 * t,
+      }
     }
-    return { main: 1, port: 0, starboard: 0 }
+    return { ...off, main: 1 }
   }
   return off
 }

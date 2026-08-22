@@ -28,7 +28,7 @@ const actions = computed(() => {
     return [
       {
         id: '01',
-        label: 'END TURN',
+        label: 'KONIEC TURY',
         accent: true,
         muted: false,
         disabled: false,

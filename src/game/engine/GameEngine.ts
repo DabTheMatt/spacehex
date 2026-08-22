@@ -225,8 +225,7 @@ function declareMove(state: GameState, target: HexCoord): EngineResult {
     return reject(state, 'DECLARE_MOVE', 'ILLEGAL_MOVE')
   }
   const moved = moveShip(state, target, FUEL_COST_MOVE)
-  const ended = endTurn(moved.state)
-  return { state: ended.state, events: [...moved.events, ...ended.events] }
+  return moved
 }
 
 function startExploration(state: GameState, direction: number): EngineResult {
@@ -336,8 +335,7 @@ function confirmPlacement(state: GameState): EngineResult {
   next = moved.state
   const sector = resolveSector(next, placed.id)
   next = append(next, [sector])
-  const ended = endTurn(next)
-  return { state: ended.state, events: [...placeEvents, ...moved.events, sector, ...ended.events] }
+  return { state: next, events: [...placeEvents, ...moved.events, sector] }
 }
 
 function moveShip(state: GameState, target: HexCoord, fuelCost: number): EngineResult {
@@ -377,7 +375,7 @@ function skipMovement(state: GameState): EngineResult {
     movementSpent: true,
     exploration: { status: 'NONE' },
   }
-  return endTurn(next)
+  return { state: next, events: [] }
 }
 
 function endTurn(state: GameState): EngineResult {
