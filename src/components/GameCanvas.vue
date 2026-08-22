@@ -43,6 +43,8 @@ function sync(): void {
     showExploreGhosts: true,
     hover: ui.hover,
     inspectKey: ui.inspectPlanet ? coordKey(ui.inspectPlanet) : null,
+    showTileNames: ui.showTileNames,
+    showMarketIcons: ui.showMarketIcons,
   })
 }
 
@@ -243,6 +245,8 @@ watch(
     ui.selectedShipId,
     ui.hover,
     ui.inspectPlanet,
+    ui.showTileNames,
+    ui.showMarketIcons,
   ],
   () => sync(),
   { deep: true },
@@ -262,13 +266,27 @@ watch(
   () => ui.inspectPlanet,
   (coord) => {
     if (!scene) return
-    if (!coord) {
-      scene.camera.clearInspectLimits()
+    if (coord) {
+      ui.mapOverview = false
+      const tile = game.state.board.tiles[coordKey(coord)]
+      if (!tile) return
+      scene.camera.inspectPlanet(coord, planetInspectTheta(tile.rotation))
       return
     }
-    const tile = game.state.board.tiles[coordKey(coord)]
-    if (!tile) return
-    scene.camera.inspectPlanet(coord, planetInspectTheta(tile.rotation))
+    if (!ui.mapOverview) scene.camera.clearInspectLimits()
+  },
+)
+
+watch(
+  () => ui.mapOverview,
+  (on) => {
+    if (!scene) return
+    if (on) {
+      ui.inspectPlanet = null
+      scene.camera.showBoardOverview(Object.values(game.state.board.tiles).map((tile) => tile.coord))
+      return
+    }
+    if (scene.camera.isOverview) scene.camera.exitOverview()
   },
 )
 </script>

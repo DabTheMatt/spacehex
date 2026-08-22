@@ -7,9 +7,6 @@ import { HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { clamp01 } from '../motion'
 
-import type { SellQuoteParts } from '../../game/rules/planetMarket'
-import { formatSellParts } from '../../game/rules/planetMarket'
-
 const RESOURCE_COLOR: Record<ResourceId, number> = {
   ORE: palette.resourceRed,
   BIOMASS: palette.resourceGreen,
@@ -27,14 +24,15 @@ const NAME_ANGLE = Math.PI / 2
 const NAME_PLANE_H = 0.08
 const TILE_RADIUS = HEX_SIZE * 0.96
 const FLAT_EDGE = TILE_RADIUS * (Math.sqrt(3) / 2)
-/** Keep the designation inside the outline, a step in from the flat. */
-const NAME_R = FLAT_EDGE - NAME_PLANE_H * 1.35
-/** Same gap above (name) and below (price) the resource hex. */
-const LABEL_GAP = 0.1
-const TOP_Z = -(FLAT_EDGE - 0.28)
+/** Shared inset from the hex flat for names, resource lots, and EVA sell pads. */
+export const EDGE_MARGIN = 0.12
+const NAME_R = FLAT_EDGE - EDGE_MARGIN
+const LOT_Z = -(FLAT_EDGE - EDGE_MARGIN)
+const NAME_GAP = 0.048
+const FOOT_GAP = 0.052
 const HEX_SPACING = 0.18
 const CLOSE_DIST = 4.2
-const FAR_DIST = 6.0
+const FAR_DIST = 7.2
 
 export function planetInspectTheta(tileRotation: number): number {
   return tileRotation * (Math.PI / 3)
@@ -76,25 +74,23 @@ export function createPlanetOverlay(
 ): THREE.Group {
   const g = new THREE.Group()
   g.userData.planetOverlay = true
-  g.add(planetName(market.designation, coord))
+  g.userData.marketIcons = true
 
   const close = new THREE.Group()
   close.userData.lod = 'close'
-  const far = new THREE.Group()
-  far.userData.lod = 'far'
 
   RESOURCE_IDS.forEach((id, index) => {
     const lot = market.lots.find((item) => item.id === id)
     const amount = lot?.amount ?? 0
     const x = (index - 1) * HEX_SPACING
     const cluster = new THREE.Group()
-    cluster.position.set(x, TILE_THICKNESS + 0.035, TOP_Z)
+    cluster.position.set(x, TILE_THICKNESS + 0.035, LOT_Z)
     cluster.add(stockHex(id, amount))
-    const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id])
-    name.position.set(0, 0.01, -LABEL_GAP)
+    const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id], 0.24, 0.058)
+    name.position.set(0, 0.01, -NAME_GAP)
     cluster.add(name)
     const tag = priceTag(`${buyPrice[id]}CR`, css.priceYellow)
-    tag.position.set(0, 0.01, LABEL_GAP)
+    tag.position.set(0, 0.01, FOOT_GAP)
     cluster.add(tag)
     if (amount > 0) {
       const hit = new THREE.Mesh(
@@ -113,35 +109,32 @@ export function createPlanetOverlay(
       cluster.add(hit)
     }
     close.add(cluster)
-    far.add(diceCluster(id, amount, x))
   })
 
-  g.add(close, far)
+  g.add(close)
   g.userData.closeLod = close
-  g.userData.farLod = far
   return g
 }
 
 export function createEvaOverlay(
   _coord: HexCoord,
   cargo: Record<ResourceId, number>,
-  quotes: Record<ResourceId, SellQuoteParts>,
   canSell: boolean,
 ): THREE.Group {
   const g = new THREE.Group()
   g.userData.evaOverlay = true
+  g.userData.marketIcons = true
+  const close = new THREE.Group()
+  close.userData.lod = 'close'
   RESOURCE_IDS.forEach((id, index) => {
     const x = (index - 1) * HEX_SPACING
     const cluster = new THREE.Group()
-    cluster.position.set(x, TILE_THICKNESS + 0.035, TOP_Z)
+    cluster.position.set(x, TILE_THICKNESS + 0.035, LOT_Z)
     const qty = cargo[id] ?? 0
     cluster.add(stockSquare(id, qty))
-    const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id])
-    name.position.set(0, 0.01, -LABEL_GAP)
+    const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id], 0.24, 0.058)
+    name.position.set(0, 0.01, -NAME_GAP)
     cluster.add(name)
-    const tag = priceTag(formatSellParts(quotes[id]), css.priceYellow)
-    tag.position.set(0, 0.01, LABEL_GAP)
-    cluster.add(tag)
     if (canSell && qty > 0) {
       const hit = new THREE.Mesh(
         new THREE.PlaneGeometry(0.16, 0.16),
@@ -158,25 +151,28 @@ export function createEvaOverlay(
       hit.userData.pickOnly = true
       cluster.add(hit)
     }
-    g.add(cluster)
+    close.add(cluster)
   })
+  const exchange = caption('GIEŁDA SUROWCE', css.priceYellow, 0.62, 0.05)
+  exchange.position.set(0, TILE_THICKNESS + 0.045, LOT_Z + FOOT_GAP)
+  close.add(exchange)
+  g.add(close)
+  g.userData.closeLod = close
   return g
 }
 
 export function tickPlanetLod(root: THREE.Object3D, camera: THREE.Camera): void {
   const world = new THREE.Vector3()
   root.traverse((obj) => {
-    if (!obj.userData.planetOverlay) return
+    if (!obj.userData.planetOverlay && !obj.userData.evaOverlay) return
     if (isOverlayHidden(obj)) {
       setLodOpacity(obj.userData.closeLod as THREE.Object3D | undefined, 0)
-      setLodOpacity(obj.userData.farLod as THREE.Object3D | undefined, 0)
       return
     }
     obj.getWorldPosition(world)
     const dist = camera.position.distanceTo(world)
     const close = clamp01((FAR_DIST - dist) / (FAR_DIST - CLOSE_DIST))
     setLodOpacity(obj.userData.closeLod as THREE.Object3D | undefined, close)
-    setLodOpacity(obj.userData.farLod as THREE.Object3D | undefined, 1 - close)
   })
 }
 
@@ -210,15 +206,12 @@ function setLodOpacity(root: THREE.Object3D | undefined, opacity: number): void 
   })
 }
 
-function planetName(text: string, coord: HexCoord): THREE.Group {
-  return createEdgeLabel(text, { coord, clickable: true })
-}
-
 export function createEdgeLabel(
   text: string,
   options: { coord?: HexCoord; clickable?: boolean; width?: number } = {},
 ): THREE.Group {
   const g = new THREE.Group()
+  g.userData.tileName = true
   g.position.set(Math.cos(NAME_ANGLE) * NAME_R, TILE_THICKNESS + 0.04, Math.sin(NAME_ANGLE) * NAME_R)
   const width = options.width ?? 0.7
   const canvas = document.createElement('canvas')
@@ -397,47 +390,32 @@ function stockSquare(id: ResourceId, amount: number): THREE.Group {
   return g
 }
 
-function diceCluster(id: ResourceId, amount: number, x: number): THREE.Group {
-  const g = new THREE.Group()
-  g.position.set(x, TILE_THICKNESS + 0.04, TOP_Z)
-  const color = RESOURCE_COLOR[id]
-  for (const pip of dicePips(amount)) {
-    const dot = new THREE.Mesh(
-      new THREE.CircleGeometry(0.012, 10),
-      new THREE.MeshBasicMaterial({
-        color,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        transparent: true,
-      }),
-    )
-    dot.rotation.x = -Math.PI / 2
-    dot.position.set(pip.x, 0.004, pip.z)
-    g.add(dot)
-  }
-  return g
-}
-
-function caption(text: string, color: string): THREE.Mesh {
-  return textPlane(text, color, 0.18, 0.045)
+function caption(text: string, color: string, width = 0.24, height = 0.058): THREE.Mesh {
+  return textPlane(text, color, width, height, 28)
 }
 
 function priceTag(text: string, color: string): THREE.Mesh {
-  return textPlane(text, color, text.includes('+') ? 0.42 : 0.2, 0.05)
+  return textPlane(text, color, 0.2, 0.045, 22)
 }
 
-function textPlane(text: string, color: string, width: number, height: number): THREE.Mesh {
+function textPlane(
+  text: string,
+  color: string,
+  width: number,
+  height: number,
+  fontSize = 22,
+): THREE.Mesh {
   const canvas = document.createElement('canvas')
-  canvas.width = 256
-  canvas.height = 64
+  canvas.width = 512
+  canvas.height = 80
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.clearRect(0, 0, 256, 64)
+    ctx.clearRect(0, 0, 512, 80)
     ctx.fillStyle = color
-    ctx.font = '500 22px "IBM Plex Mono", monospace'
+    ctx.font = `600 ${fontSize}px "IBM Plex Mono", monospace`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(text, 128, 34)
+    ctx.fillText(text, 256, 42)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true

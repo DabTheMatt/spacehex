@@ -29,6 +29,8 @@ export interface SceneOptions {
   showExploreGhosts?: boolean
   hover?: BoardHover | null
   inspectKey?: string | null
+  showTileNames?: boolean
+  showMarketIcons?: boolean
 }
 
 export class SpaceScene {

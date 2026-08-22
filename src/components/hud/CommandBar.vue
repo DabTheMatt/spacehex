@@ -109,7 +109,7 @@ const planetHint = computed(() => {
   if (isEvaHex(planetCoord.value)) {
     const here = isEvaHex(game.ship.coord)
     if (!here) return 'DOCK TO SELL'
-    return 'CLICK PRICE TO SELL'
+    return 'CLICK SQUARE TO SELL'
   }
   if (!planet.value) return ''
   const coord = planetCoord.value

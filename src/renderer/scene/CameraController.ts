@@ -39,6 +39,13 @@ export class CameraController {
   private follow: { x: number; z: number } | null = null
   private followReleased = false
   private inspectLimits = false
+  private overview = false
+  private overviewRestore: {
+    target: THREE.Vector3
+    radius: number
+    phi: number
+    theta: number
+  } | null = null
   onBreakInspect: (() => void) | null = null
   mapRotateEnabled = true
   private keys = { w: false, a: false, s: false, d: false, q: false, e: false }
@@ -52,7 +59,7 @@ export class CameraController {
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.08
     this.controls.minDistance = 2.4
-    this.controls.maxDistance = 140
+    this.controls.maxDistance = 400
     this.controls.minPolarAngle = 0.04
     this.controls.maxPolarAngle = Math.PI / 2 - 0.06
     this.controls.zoomSpeed = 1.35
@@ -100,6 +107,8 @@ export class CameraController {
    * `nameTheta` is OrbitControls azimuth so the camera sits on the name edge.
    */
   inspectPlanet(coord: HexCoord, nameTheta: number): void {
+    this.overview = false
+    this.overviewRestore = null
     const { x, z } = getWorldPosition(coord)
     const toTarget = new THREE.Vector3(x, 0, z)
     const fromTarget = this.controls.target.clone()
@@ -123,6 +132,92 @@ export class CameraController {
       toPhi,
       fromTheta: from.theta,
       thetaDelta: shortestAngleDelta(from.theta, nameTheta),
+    }
+  }
+
+  get isOverview(): boolean {
+    return this.overview
+  }
+
+  toggleBoardOverview(coords: HexCoord[]): boolean {
+    if (this.overview) {
+      this.exitOverview()
+      return false
+    }
+    this.showBoardOverview(coords)
+    return true
+  }
+
+  showBoardOverview(coords: HexCoord[]): void {
+    this.clearInspectLimits()
+    this.onBreakInspect?.()
+    this.follow = null
+    this.followReleased = true
+    this.panAnim = null
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const from = new THREE.Spherical().setFromVector3(offset)
+    if (!this.overview) {
+      this.overviewRestore = {
+        target: this.controls.target.clone(),
+        radius: from.radius,
+        phi: from.phi,
+        theta: from.theta,
+      }
+    }
+    this.overview = true
+    const pads = coords.length ? coords : [{ q: 0, r: 0 }]
+    let minX = Infinity
+    let maxX = -Infinity
+    let minZ = Infinity
+    let maxZ = -Infinity
+    for (const coord of pads) {
+      const p = getWorldPosition(coord)
+      minX = Math.min(minX, p.x - HEX_SIZE)
+      maxX = Math.max(maxX, p.x + HEX_SIZE)
+      minZ = Math.min(minZ, p.z - HEX_SIZE)
+      maxZ = Math.max(maxZ, p.z + HEX_SIZE)
+    }
+    const width = Math.max(2.4, maxX - minX)
+    const depth = Math.max(2.4, maxZ - minZ)
+    const vFov = (this.camera.fov * Math.PI) / 180
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * Math.max(0.35, this.camera.aspect))
+    const dist = Math.max(depth / 2 / Math.tan(vFov / 2), width / 2 / Math.tan(hFov / 2)) * 1.22
+    const phi = 0.07
+    const instant = prefersReducedMotion()
+    this.orbitAnim = {
+      start: performance.now(),
+      duration: instant ? 0 : CAMERA_FOCUS_MS,
+      fromTarget: this.controls.target.clone(),
+      toTarget: new THREE.Vector3((minX + maxX) / 2, 0, (minZ + maxZ) / 2),
+      fromRadius: from.radius,
+      toRadius: dist / Math.cos(phi),
+      fromPhi: from.phi,
+      toPhi: phi,
+      fromTheta: from.theta,
+      thetaDelta: shortestAngleDelta(from.theta, 0),
+    }
+  }
+
+  exitOverview(): void {
+    if (!this.overview) return
+    this.overview = false
+    const saved = this.overviewRestore
+    this.overviewRestore = null
+    if (!saved) return
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const from = new THREE.Spherical().setFromVector3(offset)
+    const instant = prefersReducedMotion()
+    this.orbitAnim = {
+      start: performance.now(),
+      duration: instant ? 0 : CAMERA_FOCUS_MS,
+      fromTarget: this.controls.target.clone(),
+      toTarget: saved.target.clone(),
+      fromRadius: from.radius,
+      toRadius: saved.radius,
+      fromPhi: from.phi,
+      toPhi: saved.phi,
+      fromTheta: from.theta,
+      thetaDelta: shortestAngleDelta(from.theta, saved.theta),
     }
   }
 

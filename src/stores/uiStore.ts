@@ -15,6 +15,9 @@ export const useUiStore = defineStore('ui', () => {
   const hover = ref<BoardHover | null>(null)
   const hoverRotation = ref(0)
   const inspectPlanet = ref<HexCoord | null>(null)
+  const mapOverview = ref(false)
+  const showTileNames = ref(true)
+  const showMarketIcons = ref(true)
   const notice = ref<string | null>(null)
   let noticeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -38,6 +41,9 @@ export const useUiStore = defineStore('ui', () => {
     hover,
     hoverRotation,
     inspectPlanet,
+    mapOverview,
+    showTileNames,
+    showMarketIcons,
     notice,
     flashNotice,
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dicePips } from '../renderer/board/planetLots'
+import { dicePips, EDGE_MARGIN } from '../renderer/board/planetLots'
 
 describe('dice pips', () => {
   it('uses a six-sided die layout', () => {
@@ -11,5 +11,10 @@ describe('dice pips', () => {
     expect(dicePips(5)).toHaveLength(5)
     expect(dicePips(6)).toHaveLength(6)
     expect(dicePips(9)).toHaveLength(6)
+  })
+
+  it('keeps a shared inset from the hex flat', () => {
+    expect(EDGE_MARGIN).toBeGreaterThan(0.05)
+    expect(EDGE_MARGIN).toBeLessThan(0.2)
   })
 })

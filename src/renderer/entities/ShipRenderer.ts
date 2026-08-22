@@ -25,6 +25,7 @@ import {
   SHIP_FLIGHT_MS,
   SHIP_MAIN_IGNITE_MS,
   SHIP_SLIDE_MS,
+  SHIP_APPROACH_MS,
   SHIP_TURN_MS,
 } from '../motion'
 
@@ -59,8 +60,11 @@ type SlideMotion = {
   fromZ: number
   toX: number
   toZ: number
+  startYaw: number
+  endYaw: number
   start: number
   duration: number
+  followDock?: string
 }
 type ShipMotion = HoldMotion | FlyMotion | SlideMotion
 
@@ -216,12 +220,13 @@ export class ShipRenderer {
       wrapper.userData.hullHeight = HULL_HEIGHT
       wrapper.userData.shipCoord = coord
       this.group.add(wrapper)
-      if (flying || !isEvaCoord(coord)) {
-        this.maybeSlide(ship.id, last, target)
+      if (flying) {
+        continue
+      }
+      if (isEvaCoord(coord)) {
+        this.parkAtEva(ship.id, ship.playerId, last, target, yaw)
       } else {
-        wrapper.position.set(target.x, BASE_HOVER, target.z)
-        this.lastXZ.set(ship.id, { x: target.x, z: target.z })
-        if (this.motion.get(ship.id)?.kind === 'slide') this.motion.delete(ship.id)
+        this.maybeSlide(ship.id, last, target)
       }
     }
     this.applyMotion(performance.now())
@@ -264,6 +269,36 @@ export class ShipRenderer {
     return this.visualPark.get(ship.id) ?? ship.coord
   }
 
+  private parkAtEva(
+    shipId: string,
+    playerId: string,
+    from: { x: number; z: number },
+    dock: { x: number; z: number },
+    startYaw: number,
+  ): void {
+    const motion = this.motion.get(shipId)
+    if (motion?.kind === 'fly' || motion?.kind === 'hold') return
+    const dist = Math.hypot(dock.x - from.x, dock.z - from.z)
+    const dockYaw = evaDockWorldOffset(evaDockIndexForPlayer(playerId), evaHubAngleAt(this.hubTime)).yaw
+    if (dist < 0.03) {
+      if (motion?.kind === 'slide') this.motion.delete(shipId)
+      return
+    }
+    if (motion?.kind === 'slide' && motion.followDock === playerId) return
+    this.motion.set(shipId, {
+      kind: 'slide',
+      fromX: from.x,
+      fromZ: from.z,
+      toX: dock.x,
+      toZ: dock.z,
+      startYaw,
+      endYaw: dockYaw,
+      start: performance.now(),
+      duration: prefersReducedMotion() ? 0 : SHIP_APPROACH_MS,
+      followDock: playerId,
+    })
+  }
+
   private maybeSlide(
     shipId: string,
     from: { x: number; z: number },
@@ -279,12 +314,15 @@ export class ShipRenderer {
     ) {
       return
     }
+    const yaw = this.facing.get(shipId) ?? 0
     this.motion.set(shipId, {
       kind: 'slide',
       fromX: from.x,
       fromZ: from.z,
       toX: to.x,
       toZ: to.z,
+      startYaw: yaw,
+      endYaw: yaw,
       start: performance.now(),
       duration: prefersReducedMotion() ? 0 : SHIP_SLIDE_MS,
     })
@@ -319,12 +357,25 @@ export class ShipRenderer {
         continue
       }
       if (motion.kind === 'slide') {
+        if (motion.followDock) {
+          const pos = getWorldPosition({ q: 0, r: 0 })
+          const dock = evaDockWorldOffset(
+            evaDockIndexForPlayer(motion.followDock),
+            evaHubAngleAt(this.hubTime),
+          )
+          motion.toX = pos.x + dock.x
+          motion.toZ = pos.z + dock.z
+          motion.endYaw = dock.yaw
+        }
         const t = motion.duration <= 0 ? 1 : clamp01((now - motion.start) / motion.duration)
         const e = easeInOutSmooth(t)
         child.position.x = lerp(motion.fromX, motion.toX, e)
         child.position.z = lerp(motion.fromZ, motion.toZ, e)
         child.position.y = BASE_HOVER
-        applyEngineBurn(child, slideBurn(this.facing.get(shipId) ?? 0, motion, t))
+        const yaw = lerpAngle(motion.startYaw, motion.endYaw, e)
+        child.quaternion.setFromAxisAngle(Y_AXIS, yaw)
+        this.facing.set(shipId, yaw)
+        applyEngineBurn(child, slideBurn(yaw, motion, t))
         this.remember(child)
         if (t >= 1) {
           applyEngineBurn(child, ENGINES_OFF)
@@ -613,9 +664,9 @@ function makeThruster(
   kind: 'main' | 'rcs',
 ): THREE.Group {
   const dir = exhaust.clone().normalize()
-  const standoff = kind === 'main' ? 0.09 : 0.055
-  const plumeRadius = kind === 'main' ? 0.055 : 0.012
-  const plumeLen = kind === 'main' ? 0.2 : 0.06
+  const standoff = kind === 'main' ? 0.06 : 0.055
+  const plumeRadius = kind === 'main' ? 0.028 : 0.012
+  const plumeLen = kind === 'main' ? 0.1 : 0.06
 
   const group = new THREE.Group()
   group.position.copy(hullPoint).addScaledVector(dir, standoff)

@@ -49,6 +49,8 @@ export class BoardRenderer {
       hover?: BoardHover | null
       hideGlyphKeys?: Set<string>
       inspectKey?: string | null
+      showTileNames?: boolean
+      showMarketIcons?: boolean
     },
   ): void {
     this.syncTiles(state, options)
@@ -82,6 +84,8 @@ export class BoardRenderer {
       tileY?: Record<string, number>
       hideGlyphKeys?: Set<string>
       inspectKey?: string | null
+      showTileNames?: boolean
+      showMarketIcons?: boolean
     },
   ): void {
     const keep = new Set<string>()
@@ -122,6 +126,8 @@ export class BoardRenderer {
         options.showEdges ? 'e' : '',
         marketSig,
         evaSig,
+        options.showTileNames === false ? 'nn' : 'n',
+        options.showMarketIcons === false ? 'nm' : 'm',
       ].join('|')
       const existing = this.tileCache.get(key)
       if (existing?.sig === sig) {
@@ -141,12 +147,7 @@ export class BoardRenderer {
       mesh.userData.tileKey = key
       const glyph = createTileGlyph(def, palette.paper, tile.id)
       glyph.position.y = TILE_THICKNESS
-      if (market) {
-        const prices = Object.fromEntries(
-          RESOURCE_IDS.map((id) => [id, buyPrice(state, id)]),
-        ) as Record<(typeof RESOURCE_IDS)[number], number>
-        glyph.add(createPlanetOverlay(market, tile.coord, prices))
-      } else {
+      if (options.showTileNames !== false) {
         glyph.add(
           createEdgeLabel(tile.designation, {
             coord: tile.coord,
@@ -155,11 +156,14 @@ export class BoardRenderer {
           }),
         )
       }
-      if (def.type === 'EVA_1') {
-        const quotes = Object.fromEntries(
-          RESOURCE_IDS.map((id) => [id, evaSellParts(state, id)]),
-        ) as Record<(typeof RESOURCE_IDS)[number], ReturnType<typeof evaSellParts>>
-        glyph.add(createEvaOverlay(tile.coord, ship?.cargo ?? emptyCargo(), quotes, atEva))
+      if (market && options.showMarketIcons !== false) {
+        const prices = Object.fromEntries(
+          RESOURCE_IDS.map((id) => [id, buyPrice(state, id)]),
+        ) as Record<(typeof RESOURCE_IDS)[number], number>
+        glyph.add(createPlanetOverlay(market, tile.coord, prices))
+      }
+      if (def.type === 'EVA_1' && options.showMarketIcons !== false) {
+        glyph.add(createEvaOverlay(tile.coord, ship?.cargo ?? emptyCargo(), atEva))
       }
       mesh.userData.glyph = glyph
       mesh.add(glyph)
