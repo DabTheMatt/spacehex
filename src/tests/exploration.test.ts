@@ -102,4 +102,19 @@ describe('exploration engine', () => {
     const result = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 })
     expect(result.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(true)
   })
+
+  it('lets player 2 explore a free neighbor after player 1 has moved', () => {
+    let state = createInitialState('p2-explore')
+    state = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 }).state
+    state = applyCommand(state, { type: 'CONFIRM_TILE_PLACEMENT' }).state
+    expect(state.activePlayerId).toBe('player-2')
+    expect(state.ships['mewa-2'].coord).toEqual({ q: 0, r: 0 })
+    const started = applyCommand(state, { type: 'START_EXPLORATION', direction: 2 })
+    expect(started.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(false)
+    expect(started.state.phase).toBe('TILE_PLACEMENT')
+    expect(started.state.exploration.origin).toEqual({ q: 0, r: 0 })
+    const placed = applyCommand(started.state, { type: 'CONFIRM_TILE_PLACEMENT' })
+    expect(placed.state.ships['mewa-2'].coord).toEqual(getNeighbor({ q: 0, r: 0 }, 2))
+    expect(placed.state.activePlayerId).toBe('player-1')
+  })
 })

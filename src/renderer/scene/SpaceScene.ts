@@ -44,9 +44,9 @@ export class SpaceScene {
   private primed = false
   private prevShipCoords = new Map<string, HexCoord>()
   private prevTileKeys = new Set<string>()
-  private rise: { key: string; start: number; duration: number } | null = null
+  private riseByKey = new Map<string, { start: number; duration: number }>()
   private tileY: Record<string, number> = {}
-  private queuedFlights: Array<{ shipId: string; from: HexCoord; to: HexCoord }> = []
+  private flightsByTile = new Map<string, Array<{ shipId: string; from: HexCoord; to: HexCoord }>>()
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
@@ -78,10 +78,14 @@ export class SpaceScene {
     this.applySync()
   }
 
-  handleEvents(events: GameEvent[], _state: GameState): void {
+  handleEvents(events: GameEvent[], state: GameState): void {
     for (const event of events) {
       if (event.type === 'GAME_STARTED') {
         this.camera.focus({ q: 0, r: 0 })
+      }
+      if (event.type === 'TURN_ENDED') {
+        const ship = state.ships[state.players[state.activePlayerId]?.shipId ?? '']
+        if (ship) this.camera.focus(ship.coord)
       }
     }
   }
@@ -109,9 +113,9 @@ export class SpaceScene {
   }
 
   private beginRise(key: string): void {
-    if (this.rise?.key === key || this.tileY[key] !== undefined) return
+    if (this.riseByKey.has(key) || this.tileY[key] !== undefined) return
     const duration = prefersReducedMotion() ? 0 : TILE_RISE_MS
-    this.rise = { key, start: performance.now(), duration }
+    this.riseByKey.set(key, { start: performance.now(), duration })
     this.tileY = { ...this.tileY, [key]: TILE_SLOT_Y }
   }
 
@@ -139,18 +143,18 @@ export class SpaceScene {
       if (prev.q === ship.coord.q && prev.r === ship.coord.r) continue
       if (this.ships.isBusy(ship.id)) continue
       const destKey = coordKey(ship.coord)
-      if (this.rise && this.rise.key === destKey) {
+      if (this.riseByKey.has(destKey)) {
         this.ships.hold(ship.id, prev)
-        this.queuedFlights.push({ shipId: ship.id, from: prev, to: { ...ship.coord } })
+        const queued = this.flightsByTile.get(destKey) ?? []
+        queued.push({ shipId: ship.id, from: prev, to: { ...ship.coord } })
+        this.flightsByTile.set(destKey, queued)
       } else {
         this.ships.fly(ship.id, prev, ship.coord)
       }
+      this.prevShipCoords.set(ship.id, { ...ship.coord })
     }
 
     this.prevTileKeys = new Set(tileKeys)
-    this.prevShipCoords = new Map(
-      Object.values(state.ships).map((ship) => [ship.id, { ...ship.coord }]),
-    )
   }
 
   private applySync(): void {
@@ -163,20 +167,20 @@ export class SpaceScene {
   }
 
   private advanceRise(now: number): void {
-    if (!this.rise) return
-    const t = this.rise.duration <= 0 ? 1 : clamp01((now - this.rise.start) / this.rise.duration)
-    const y = lerp(TILE_SLOT_Y, TILE_SETTLED_Y, easeOutCubic(t))
-    this.tileY = { ...this.tileY, [this.rise.key]: y }
-    this.board.setTileY(this.rise.key, y)
-    if (t < 1) return
-    const key = this.rise.key
-    this.rise = null
-    delete this.tileY[key]
-    this.board.setTileY(key, TILE_SETTLED_Y)
-    const flights = this.queuedFlights
-    this.queuedFlights = []
-    for (const flight of flights) {
-      this.ships.fly(flight.shipId, flight.from, flight.to)
+    for (const [key, rise] of [...this.riseByKey.entries()]) {
+      const t = rise.duration <= 0 ? 1 : clamp01((now - rise.start) / rise.duration)
+      const y = lerp(TILE_SLOT_Y, TILE_SETTLED_Y, easeOutCubic(t))
+      this.tileY = { ...this.tileY, [key]: y }
+      this.board.setTileY(key, y)
+      if (t < 1) continue
+      this.riseByKey.delete(key)
+      delete this.tileY[key]
+      this.board.setTileY(key, TILE_SETTLED_Y)
+      const flights = this.flightsByTile.get(key) ?? []
+      this.flightsByTile.delete(key)
+      for (const flight of flights) {
+        this.ships.fly(flight.shipId, flight.from, flight.to)
+      }
     }
   }
 

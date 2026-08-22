@@ -1,12 +1,12 @@
-export const TILE_RISE_MS = 900
-export const TILE_REVEAL_MS = 1500
-export const SHIP_TURN_MS = 980
-export const SHIP_RCS_KICK_MS = 340
-export const SHIP_RCS_COUNTER_MS = 300
+export const TILE_RISE_MS = 1400
+export const TILE_REVEAL_MS = 2000
+export const SHIP_TURN_MS = 1600
+export const SHIP_RCS_KICK_MS = 520
+export const SHIP_RCS_COUNTER_MS = 480
 export const SHIP_MAIN_IGNITE_MS = 1000
-export const SHIP_FLIGHT_MS = 1600
-export const SHIP_BRAKE_MS = 480
-export const SHIP_SLIDE_MS = 700
+export const SHIP_FLIGHT_MS = 2400
+export const SHIP_BRAKE_MS = 720
+export const SHIP_SLIDE_MS = 1000
 
 export interface EngineBurn {
   main: number
@@ -84,6 +84,12 @@ export function easeOutCubic(t: number): number {
 export function easeInOutCubic(t: number): number {
   const x = clamp01(t)
   return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2
+}
+
+/** Slow start and finish — ship burns and coasts instead of popping. */
+export function easeInOutSmooth(t: number): number {
+  const x = clamp01(t)
+  return x * x * x * (x * (x * 6 - 15) + 10)
 }
 
 export function lerp(a: number, b: number, t: number): number {

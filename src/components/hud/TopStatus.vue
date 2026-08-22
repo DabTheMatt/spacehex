@@ -15,7 +15,7 @@ const game = useGameStore()
 
 const playerLabel = computed(() => {
   const n = game.player.id.replace(/\D/g, '') || '1'
-  return `P${n} / MEWA`
+  return `SG-${n}`
 })
 
 function pad(value: number): string {

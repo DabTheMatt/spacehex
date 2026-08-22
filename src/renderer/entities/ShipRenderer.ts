@@ -10,7 +10,7 @@ import { palette, css } from '../theme'
 import { TILE_THICKNESS } from '../board/TileRenderer'
 import {
   clamp01,
-  easeInOutCubic,
+  easeInOutSmooth,
   lerp,
   lerpAngle,
   prefersReducedMotion,
@@ -24,8 +24,8 @@ import {
 } from '../motion'
 
 const SHIP_SPACING = 0.46
-const HULL_HEIGHT = 0.055
-const BASE_HOVER = TILE_THICKNESS + 0.12
+const HULL_HEIGHT = 0.11
+const BASE_HOVER = TILE_THICKNESS + 0.08
 
 type HoldMotion = { kind: 'hold'; coord: HexCoord }
 type FlyMotion = {
@@ -149,12 +149,11 @@ export class ShipRenderer {
       const playerNo = Number(ship.playerId.replace(/\D/g, '')) || 1
       const active = state.players[state.activePlayerId]?.shipId === ship.id
       const wrapper = new THREE.Group()
-      const marker = createNavMarker(ship.class, active, String(playerNo))
+      const marker = createNavMarker(ship.class, playerNo, active, `SG-${playerNo}`)
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
       wrapper.rotation.y = yaw
       wrapper.position.set(last.x, BASE_HOVER, last.z)
-      wrapper.userData.bob = { baseY: BASE_HOVER, phase: playerNo * 1.7 }
       wrapper.userData.shipId = ship.id
       wrapper.userData.shipCoord = coord
       this.group.add(wrapper)
@@ -163,17 +162,8 @@ export class ShipRenderer {
     this.applyMotion(performance.now())
   }
 
-  tick(time: number): boolean {
-    const settled = this.applyMotion(performance.now())
-    const reduce = prefersReducedMotion()
-    for (const child of this.group.children) {
-      const moving = this.motion.get(child.userData.shipId as string)
-      if (moving?.kind === 'fly' || moving?.kind === 'slide') continue
-      const bob = child.userData.bob as { baseY: number; phase: number } | undefined
-      if (!bob) continue
-      child.position.y = reduce ? bob.baseY : bob.baseY + Math.sin(time * 0.4 + bob.phase) * 0.028
-    }
-    return settled
+  tick(_time: number): boolean {
+    return this.applyMotion(performance.now())
   }
 
   pickables(): THREE.Object3D[] {
@@ -243,7 +233,7 @@ export class ShipRenderer {
       }
       if (motion.kind === 'slide') {
         const t = motion.duration <= 0 ? 1 : clamp01((now - motion.start) / motion.duration)
-        const e = easeInOutCubic(t)
+        const e = easeInOutSmooth(t)
         child.position.x = lerp(motion.fromX, motion.toX, e)
         child.position.z = lerp(motion.fromZ, motion.toZ, e)
         child.position.y = BASE_HOVER
@@ -256,11 +246,9 @@ export class ShipRenderer {
       }
       const elapsed = now - motion.start
       const turnT = motion.turnMs <= 0 ? 1 : clamp01(elapsed / motion.turnMs)
-      child.rotation.y = lerpAngle(motion.startYaw, motion.endYaw, easeInOutCubic(turnT))
+      child.rotation.y = lerpAngle(motion.startYaw, motion.endYaw, easeInOutSmooth(turnT))
       this.facing.set(shipId, child.rotation.y)
       child.position.y = BASE_HOVER
-      const bob = child.userData.bob as { baseY: number; phase: number } | undefined
-      if (bob) bob.baseY = BASE_HOVER
 
       const burn = shipEngineBurn({
         elapsed,
@@ -290,7 +278,7 @@ export class ShipRenderer {
       }
 
       const moveT = motion.moveMs <= 0 ? 1 : clamp01((afterTurn - motion.igniteMs) / motion.moveMs)
-      const e = easeInOutCubic(moveT)
+      const e = easeInOutSmooth(moveT)
       child.position.x = lerp(motion.fromX, motion.toX, e)
       child.position.z = lerp(motion.fromZ, motion.toZ, e)
       child.rotation.y = motion.endYaw
@@ -341,10 +329,11 @@ function lastMoveYaw(log: GameEvent[], shipId: string, fallback: HexCoord): numb
 
 function createNavMarker(
   shipClass: keyof typeof SHIP_DEFINITIONS,
+  playerNo: number,
   active: boolean,
   label: string,
 ): THREE.Group {
-  const color = active ? palette.ochre : palette.ivory
+  const color = hullColor(playerNo, active)
   const g = new THREE.Group()
   const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
   const half = shipClass === 'DRZAZGA' ? 0.1 : 0.12
@@ -360,23 +349,45 @@ function createNavMarker(
   hull.rotation.x = -Math.PI / 2
   g.add(hull)
 
-  const number = createDeckNumber(label)
-  number.position.set(0, HULL_HEIGHT + 0.0015, 0.02)
-  g.add(number)
+  const sideY = HULL_HEIGHT * 0.52
+  const sideZ = 0.02
+  const sideX = half * 0.62
+  g.add(createHullNumber(label, new THREE.Vector3(sideX, sideY, sideZ), Math.PI / 2))
+  g.add(createHullNumber(label, new THREE.Vector3(-sideX, sideY, sideZ), -Math.PI / 2))
 
-  const y = HULL_HEIGHT * 0.5
-  const main = makeEnginePlume(0.028, 0.14, new THREE.Vector3(0, y, -length * 0.5 - 0.012), new THREE.Vector3(0, 0, -1))
+  const y = HULL_HEIGHT * 0.45
+  const main = makeEnginePlume(
+    0.03,
+    0.15,
+    new THREE.Vector3(0, y, -length * 0.5 - 0.014),
+    new THREE.Vector3(0, 0, -1),
+  )
   g.add(main)
 
-  const port = makeEnginePlume(0.012, 0.05, new THREE.Vector3(-half * 0.98, y, 0.02), new THREE.Vector3(-1, 0, 0))
+  const port = makeEnginePlume(
+    0.012,
+    0.06,
+    new THREE.Vector3(-half * 0.82, y, -length * 0.16),
+    new THREE.Vector3(-0.42, 0, -1),
+  )
   g.add(port)
 
-  const starboard = makeEnginePlume(0.012, 0.05, new THREE.Vector3(half * 0.98, y, 0.02), new THREE.Vector3(1, 0, 0))
+  const starboard = makeEnginePlume(
+    0.012,
+    0.06,
+    new THREE.Vector3(half * 0.82, y, -length * 0.16),
+    new THREE.Vector3(0.42, 0, -1),
+  )
   g.add(starboard)
 
   g.userData.engines = { main, port, starboard }
   applyEngineBurn(g, { main: 0, port: 0, starboard: 0 })
   return g
+}
+
+function hullColor(playerNo: number, active: boolean): number {
+  if (playerNo === 1) return active ? palette.player1 : 0x8a6a38
+  return active ? palette.player2 : 0x4f6070
 }
 
 function makeEnginePlume(
@@ -430,32 +441,31 @@ function setPlume(group: THREE.Group, intensity: number, lengthScale: number): v
   group.visible = lit > 0.03
 }
 
-function createDeckNumber(label: string): THREE.Mesh {
+function createHullNumber(label: string, position: THREE.Vector3, yaw: number): THREE.Mesh {
   const canvas = document.createElement('canvas')
-  canvas.width = 64
-  canvas.height = 64
+  canvas.width = 256
+  canvas.height = 96
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.clearRect(0, 0, 64, 64)
+    ctx.clearRect(0, 0, 256, 96)
     ctx.fillStyle = css.ink
-    ctx.font = '600 48px "IBM Plex Mono", monospace'
+    ctx.font = '700 56px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(label, 32, 36)
+    ctx.fillText(label, 128, 52)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.09, 0.09),
+    new THREE.PlaneGeometry(0.2, 0.075),
     new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
       depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -4,
-      polygonOffsetUnits: -4,
+      side: THREE.DoubleSide,
     }),
   )
-  mesh.rotation.x = -Math.PI / 2
+  mesh.position.copy(position)
+  mesh.rotation.y = yaw
   return mesh
 }

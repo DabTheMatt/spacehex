@@ -10,6 +10,8 @@ export const palette = {
   preview: 0x8a8374,
   ink: 0x0b0c0c,
   engine: 0x7ec8ff,
+  player1: 0xb58a4b,
+  player2: 0x6d8398,
 }
 
 export const css = {
@@ -22,4 +24,6 @@ export const css = {
   graphite: '#1c1c19',
   ink: '#0B0C0C',
   engine: '#7EC8FF',
+  player1: '#B58A4B',
+  player2: '#6D8398',
 }
