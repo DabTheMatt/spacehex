@@ -73,7 +73,7 @@ const mode = computed(() =>
   commandMode(game.state, { shipId: ui.selectedShipId, tile: ui.selectedTile }),
 )
 
-const planetCoord = computed(() => ui.inspectPlanet ?? game.ship.coord)
+const planetCoord = computed(() => ui.inspectPlanet ?? game.ship?.coord ?? { q: 0, r: 0 })
 
 const planet = computed(() => {
   const market = game.state.planetMarkets[coordKey(planetCoord.value)]

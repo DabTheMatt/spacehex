@@ -53,7 +53,13 @@ export class SpaceScene {
   private revealWhenSettled = new Set<string>()
 
   constructor(private readonly canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: false,
+      failIfMajorPerformanceCaveat: false,
+      powerPreference: 'default',
+    })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.setClearColor(palette.void)
     this.raycaster.params.Line = { threshold: 0.12 }

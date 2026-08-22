@@ -10,6 +10,7 @@
     @pointerleave="onLeave"
     @contextmenu.prevent
   />
+  <p v-if="bootError" class="boot-error">{{ bootError }}</p>
 </template>
 
 <script setup lang="ts">
@@ -24,6 +25,7 @@ import { isEvaHex } from '@/game/rules/planetMarket'
 const DRAG_PX = 12
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
+const bootError = ref('')
 const game = useGameStore()
 const ui = useUiStore()
 let scene: SpaceScene | null = null
@@ -195,7 +197,12 @@ function onUp(ev: PointerEvent): void {
 
 onMounted(() => {
   if (!canvasEl.value) return
-  scene = new SpaceScene(canvasEl.value)
+  try {
+    scene = new SpaceScene(canvasEl.value)
+  } catch (err) {
+    bootError.value = err instanceof Error ? err.message : String(err)
+    return
+  }
   scene.camera.onBreakInspect = () => {
     ui.inspectPlanet = null
   }

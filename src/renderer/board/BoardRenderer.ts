@@ -16,7 +16,7 @@ import {
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
 import { createPlanetOverlay, tickPlanetLod, createEdgeLabel, createEvaOverlay } from './planetLots'
 import { buyPrice, evaSellParts, isEvaHex } from '../../game/rules/planetMarket'
-import { RESOURCE_IDS } from '../../game/definitions/resources'
+import { RESOURCE_IDS, emptyCargo } from '../../game/definitions/resources'
 import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
 import { canExploreDirection } from '../../game/rules/exploration'
@@ -99,14 +99,17 @@ export class BoardRenderer {
           ].join(':')
         : ''
       const ship = activeShip(state)
+      const atEva = Boolean(ship && isEvaHex(ship.coord))
       const evaSig =
         def.type === 'EVA_1'
           ? [
               tile.designation,
-              isEvaHex(ship.coord) ? 'docked' : 'away',
-              RESOURCE_IDS.map(
-                (id) => `${id}:${ship.cargo[id]}:${formatParts(evaSellParts(state, id))}`,
-              ).join(','),
+              atEva ? 'docked' : 'away',
+              ship
+                ? RESOURCE_IDS.map(
+                    (id) => `${id}:${ship.cargo[id]}:${formatParts(evaSellParts(state, id))}`,
+                  ).join(',')
+                : 'none',
             ].join(':')
           : tile.designation
       const sig = [
@@ -156,7 +159,7 @@ export class BoardRenderer {
         const quotes = Object.fromEntries(
           RESOURCE_IDS.map((id) => [id, evaSellParts(state, id)]),
         ) as Record<(typeof RESOURCE_IDS)[number], ReturnType<typeof evaSellParts>>
-        glyph.add(createEvaOverlay(tile.coord, ship.cargo, quotes, isEvaHex(ship.coord)))
+        glyph.add(createEvaOverlay(tile.coord, ship?.cargo ?? emptyCargo(), quotes, atEva))
       }
       mesh.userData.glyph = glyph
       mesh.add(glyph)
