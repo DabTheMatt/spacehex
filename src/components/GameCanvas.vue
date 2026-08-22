@@ -58,23 +58,6 @@ function updateHover(clientX: number, clientY: number): void {
   ui.hover = scene.pickHover(clientX, clientY)
 }
 
-function confirmHover(): void {
-  const hover = ui.hover
-  if (!hover || game.state.phase === 'TILE_PLACEMENT') return
-  if (hover.kind === 'STAY') {
-    game.dispatch({ type: 'SKIP_MOVEMENT' })
-    ui.hover = null
-    return
-  }
-  if (hover.kind === 'MOVE') {
-    game.dispatch({ type: 'DECLARE_MOVE', target: hover.coord })
-    ui.hover = null
-    return
-  }
-  game.dispatch({ type: 'START_EXPLORATION', direction: hover.direction })
-  ui.hover = null
-}
-
 function onLeave(): void {
   if (dragging) return
   ui.hover = null
@@ -133,17 +116,21 @@ function onUp(ev: PointerEvent): void {
     return
   }
 
-  if (ev.button === 0 && ui.hover && !previewBusy()) {
-    confirmHover()
-    return
-  }
-
-  const status = game.state.exploration.status
-  if (status === 'SELECTING_DIRECTION') {
-    const ghost = scene.pickDirection(ev.clientX, ev.clientY)
-    if (ghost) {
-      game.dispatch({ type: 'START_EXPLORATION', direction: ghost.direction })
+  const hover = scene.pickHover(ev.clientX, ev.clientY)
+  if (hover && game.state.phase === 'PLAYER_TURN') {
+    if (hover.kind === 'STAY') {
+      game.dispatch({ type: 'SKIP_MOVEMENT' })
+      ui.hover = null
       return
+    }
+    if (hover.kind === 'MOVE') {
+      game.dispatch({ type: 'DECLARE_MOVE', target: hover.coord })
+      ui.hover = null
+      return
+    }
+    if (hover.kind === 'EXPLORE') {
+      game.dispatch({ type: 'START_EXPLORATION', direction: hover.direction })
+      ui.hover = null
     }
   }
 
@@ -157,10 +144,6 @@ function onUp(ev: PointerEvent): void {
   const tile = scene.pickTile(ev.clientX, ev.clientY)
   ui.selectedTile = tile
   ui.selectedShipId = null
-}
-
-function previewBusy(): boolean {
-  return game.state.phase === 'TILE_PLACEMENT'
 }
 
 onMounted(() => {

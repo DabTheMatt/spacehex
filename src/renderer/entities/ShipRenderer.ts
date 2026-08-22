@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { GameState } from '../../game/state/GameState'
 import type { GameEvent } from '../../game/engine/events'
 import type { ShipState } from '../../game/state/GameState'
-import { getWorldPosition } from '../../game/board/hexMath'
+import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
 import { SHIP_DEFINITIONS } from '../../game/definitions/ships'
@@ -26,7 +26,7 @@ import {
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
-const SHIP_SPACING = 0.46
+const RIM = HEX_SIZE * 0.7
 const HULL_HEIGHT = 0.11
 const BASE_HOVER = TILE_THICKNESS + 0.08
 
@@ -188,6 +188,7 @@ export class ShipRenderer {
       const marker = createNavMarker(ship.class, playerNo, active, `SG-${playerNo}`)
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
+      wrapper.userData.beacon = marker.userData.beacon
       wrapper.quaternion.setFromAxisAngle(Y_AXIS, yaw)
       wrapper.position.set(last.x, BASE_HOVER, last.z)
       wrapper.userData.shipId = ship.id
@@ -199,8 +200,17 @@ export class ShipRenderer {
     this.applyMotion(performance.now())
   }
 
-  tick(_camera: THREE.Camera): boolean {
-    return this.applyMotion(performance.now())
+  tick(_camera: THREE.Camera, time = 0): boolean {
+    const settled = this.applyMotion(performance.now())
+    for (const child of this.group.children) {
+      const beacon = child.userData.beacon as THREE.Mesh | undefined
+      if (!beacon) continue
+      const mat = beacon.material
+      if (Array.isArray(mat) || !('opacity' in mat)) continue
+      const on = (time * 2) % 1 < 0.5
+      mat.opacity = on ? 1 : 0.12
+    }
+    return settled
   }
 
   pickables(): THREE.Object3D[] {
@@ -349,11 +359,13 @@ function stackWorld(
   yaw: number,
 ): { x: number; z: number } {
   const pos = getWorldPosition(coord)
-  const side = index - (count - 1) / 2
-  return {
-    x: pos.x - Math.sin(yaw) * side * SHIP_SPACING,
-    z: pos.z + Math.cos(yaw) * side * SHIP_SPACING,
+  const sideX = Math.cos(yaw)
+  const sideZ = -Math.sin(yaw)
+  if (count <= 1) {
+    return { x: pos.x + sideX * RIM, z: pos.z + sideZ * RIM }
   }
+  const side = index === 0 ? -1 : 1
+  return { x: pos.x + sideX * side * RIM, z: pos.z + sideZ * side * RIM }
 }
 
 function lastMoveYaw(log: GameEvent[], shipId: string, fallback: HexCoord): number {
@@ -387,9 +399,16 @@ function createNavMarker(
   shape.closePath()
   const hull = new THREE.Mesh(
     new THREE.ExtrudeGeometry(shape, { depth: HULL_HEIGHT, bevelEnabled: false, steps: 1 }),
-    new THREE.MeshBasicMaterial({ color }),
+    new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.78,
+        depthWrite: false,
+        depthTest: false,
+      }),
   )
   hull.rotation.x = -Math.PI / 2
+  hull.renderOrder = 2
   g.add(hull)
 
   g.add(hullMark(label, length, half, true))
@@ -433,6 +452,23 @@ function createNavMarker(
   g.add(brakeStarboard)
 
   g.userData.engines = { main, port, starboard, brakePort, brakeStarboard }
+  if (active) {
+    const beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.018, 10, 8),
+      new THREE.MeshBasicMaterial({
+        color: 0xf4f1e8,
+        transparent: true,
+        opacity: 1,
+        depthTest: false,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    )
+    beacon.position.set(0, HULL_HEIGHT + 0.045, length * 0.08)
+    beacon.renderOrder = 10
+    g.add(beacon)
+    g.userData.beacon = beacon
+  }
   applyEngineBurn(g, ENGINES_OFF)
   return g
 }
@@ -469,7 +505,7 @@ function makeThruster(
     }),
   )
   mesh.position.y = plumeLen * 0.5
-  mesh.renderOrder = 4
+  mesh.renderOrder = 8
   group.add(mesh)
 
   const core = new THREE.Mesh(
@@ -485,7 +521,7 @@ function makeThruster(
     }),
   )
   core.position.y = plumeLen * 0.28
-  core.renderOrder = 5
+  core.renderOrder = 9
   group.add(core)
 
   group.userData.plumeMesh = mesh
@@ -581,6 +617,7 @@ function createHullNumber(label: string, width: number, height: number): THREE.M
       map: tex,
       transparent: true,
       depthWrite: false,
+      depthTest: false,
       polygonOffset: true,
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2,

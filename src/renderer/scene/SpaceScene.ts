@@ -226,7 +226,7 @@ export class SpaceScene {
     const time = now / 1000
     this.board.tick(time)
     this.preview.tick(time)
-    const shipsSettled = this.ships.tick(this.camera.camera)
+    const shipsSettled = this.ships.tick(this.camera.camera, time)
     this.hoverTargets.tick(this.camera.camera)
     let glyphsChanged = false
     for (const coord of this.ships.consumeLanded()) {

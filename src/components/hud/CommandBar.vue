@@ -12,21 +12,6 @@
       <div v-if="hint" class="command-bar__hint muted">{{ hint }}</div>
     </div>
 
-    <nav v-if="actions.length" class="command-bar__actions">
-      <button
-        v-for="action in actions"
-        :key="action.id"
-        type="button"
-        class="action"
-        :class="{ accent: action.accent, muted: action.muted }"
-        :disabled="action.disabled"
-        @click="action.run"
-      >
-        <span class="num">{{ action.num }}</span>
-        <span>{{ action.label }}</span>
-      </button>
-    </nav>
-
     <div class="command-bar__end">
       <button
         v-if="showEndTurn"
@@ -34,8 +19,7 @@
         class="action accent"
         @click="game.dispatch({ type: 'END_TURN' })"
       >
-        <span class="num">09</span>
-        <span>END TURN</span>
+        END TURN
       </button>
     </div>
   </footer>
@@ -58,8 +42,6 @@ const mode = computed(() =>
 )
 
 const identity = computed(() => {
-  if (mode.value === 'MOVE_TARGETING') return 'NAVIGATION / SELECT DESTINATION'
-  if (mode.value === 'EXPLORE_EDGE_SELECTION') return 'EXPLORATION / SELECT EDGE'
   if (mode.value === 'EXPLORE_ROTATION') return 'EXPLORATION / ORIENT SECTOR'
   if (mode.value !== 'OBJECT_SELECTED') return ''
   if (ui.selectedTile) {
@@ -80,7 +62,6 @@ const modeLine = computed(() => {
 })
 
 const params = computed(() => {
-  if (mode.value === 'MOVE_TARGETING') return [{ label: 'RANGE', value: '01' }]
   if (mode.value === 'OBJECT_SELECTED' && ui.selectedTile) {
     const tile = game.state.board.tiles[coordKey(ui.selectedTile)]
     if (!tile) return []
@@ -104,83 +85,8 @@ const params = computed(() => {
 })
 
 const hint = computed(() => {
-  if (mode.value === 'MOVE_TARGETING' || mode.value === 'EXPLORE_EDGE_SELECTION') return 'ESC  CANCEL'
   if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE   ·   CLICK HEX TO PLACE'
   return ''
-})
-
-const canAct = computed(() => {
-  const ship = ui.selectedShipId ? game.state.ships[ui.selectedShipId] : null
-  return ship?.id === game.ship.id && !game.state.movementSpent
-})
-
-const actions = computed(() => {
-  if (mode.value === 'MOVE_TARGETING' || mode.value === 'EXPLORE_EDGE_SELECTION') {
-    return [
-      {
-        id: 'esc',
-        num: 'ESC',
-        label: 'CANCEL',
-        accent: false,
-        muted: false,
-        disabled: false,
-        run: () => game.dispatch({ type: 'CANCEL_SELECTION' }),
-      },
-    ]
-  }
-  if (mode.value === 'EXPLORE_ROTATION') {
-    return [
-      {
-        id: 'q',
-        num: 'Q',
-        label: 'ROTATE',
-        accent: false,
-        muted: false,
-        disabled: false,
-        run: () => game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'LEFT' }),
-      },
-      {
-        id: 'e',
-        num: 'E',
-        label: 'ROTATE',
-        accent: false,
-        muted: false,
-        disabled: false,
-        run: () => game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' }),
-      },
-    ]
-  }
-  if (mode.value !== 'OBJECT_SELECTED' || !canAct.value) return []
-  const status = game.state.exploration.status
-  return [
-    {
-      id: '01',
-      num: '01',
-      label: 'MOVE',
-      accent: status === 'SELECTING_MOVE',
-      muted: false,
-      disabled: false,
-      run: () => game.dispatch({ type: 'BEGIN_MOVE' }),
-    },
-    {
-      id: '02',
-      num: '02',
-      label: 'EXPLORE',
-      accent: status === 'SELECTING_DIRECTION',
-      muted: false,
-      disabled: false,
-      run: () => game.dispatch({ type: 'BEGIN_EXPLORATION' }),
-    },
-    {
-      id: '03',
-      num: '03',
-      label: 'STAY',
-      accent: false,
-      muted: false,
-      disabled: false,
-      run: () => game.dispatch({ type: 'SKIP_MOVEMENT' }),
-    },
-  ]
 })
 
 const showEndTurn = computed(

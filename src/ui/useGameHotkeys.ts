@@ -31,19 +31,9 @@ export function useGameHotkeys(): void {
     const action = actionHotkey(ev.code)
     if (!action) return
     ev.preventDefault()
-    if (action === 'END_TURN') {
-      if (game.state.movementSpent) game.dispatch({ type: 'END_TURN' })
-      return
+    if (action === 'END_TURN' && game.state.movementSpent) {
+      game.dispatch({ type: 'END_TURN' })
     }
-    if (action === 'MOVE') {
-      game.dispatch({ type: 'BEGIN_MOVE' })
-      return
-    }
-    if (action === 'EXPLORE') {
-      game.dispatch({ type: 'BEGIN_EXPLORATION' })
-      return
-    }
-    game.dispatch({ type: 'SKIP_MOVEMENT' })
   }
 
   onMounted(() => window.addEventListener('keydown', onKey, true))
