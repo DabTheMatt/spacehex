@@ -3,7 +3,8 @@ import type { HexCoord } from '../../game/board/HexCoord'
 export const EVA_DOCK_RADIUS = 0.46
 export const EVA_DOCK_PHASE = Math.PI / 6
 export const EVA_DOCK_COUNT = 3
-export const EVA_HUB_SPIN = 0.22
+export const EVA_HUB_SPIN = 0.22 / 3
+export const EVA_PULSE_STEP_S = 2
 
 export function isEvaCoord(coord: HexCoord): boolean {
   return coord.q === 0 && coord.r === 0

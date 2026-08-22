@@ -19,6 +19,7 @@ import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { coordKey } from '@/game/board/HexCoord'
 import { planetInspectTheta } from '@/renderer/board/planetLots'
+import { isEvaHex } from '@/game/rules/planetMarket'
 
 const DRAG_PX = 12
 
@@ -119,16 +120,20 @@ function onUp(ev: PointerEvent): void {
   }
 
   const name = scene.pickPlanetName(ev.clientX, ev.clientY)
-  if (name && game.state.planetMarkets[coordKey(name)]) {
-    const same =
-      ui.inspectPlanet && ui.inspectPlanet.q === name.q && ui.inspectPlanet.r === name.r
-    if (same) {
-      ui.inspectPlanet = null
-      scene.camera.clearInspectLimits()
-    } else {
-      ui.inspectPlanet = name
+  if (name) {
+    const key = coordKey(name)
+    const inspectable = Boolean(game.state.planetMarkets[key] || isEvaHex(name))
+    if (inspectable) {
+      const same =
+        ui.inspectPlanet && ui.inspectPlanet.q === name.q && ui.inspectPlanet.r === name.r
+      if (same) {
+        ui.inspectPlanet = null
+        scene.camera.clearInspectLimits()
+      } else {
+        ui.inspectPlanet = name
+      }
+      return
     }
-    return
   }
 
   const buy = scene.pickBuy(ev.clientX, ev.clientY)

@@ -52,12 +52,12 @@ describe('tile glyphs', () => {
   it('keeps the EVA core still while the hub, docks, and airlock dots spin', () => {
     const glyph = createTileGlyph(TILE_DEFINITIONS['eva-1'])
     let hubs = 0
-    let pulses = 0
+    const pulses: number[] = []
     glyph.traverse((obj) => {
       if (obj.userData.animate === 'evaHub') hubs += 1
-      if (obj.userData.animate === 'evaPulse') pulses += 1
+      if (obj.userData.animate === 'evaPulse') pulses.push(Number(obj.userData.pulseIndex))
     })
     expect(hubs).toBe(1)
-    expect(pulses).toBe(9)
+    expect(pulses.sort()).toEqual([0, 1, 2])
   })
 })

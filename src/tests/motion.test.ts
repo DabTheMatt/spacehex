@@ -9,6 +9,7 @@ import {
   shipEngineBurn,
   shipsTooClose,
   shortestAngleDelta,
+  yieldOffSegment,
   SHIP_BRAKE_MS,
   SHIP_CLEARANCE,
   SHIP_MAIN_IGNITE_MS,
@@ -141,5 +142,11 @@ describe('ship clearance', () => {
     expect(shipsTooClose(0, 0, 1, 0)).toBe(false)
     expect(shipsTooClose(0, 0, SHIP_CLEARANCE, 0)).toBe(false)
     expect(shipsTooClose(0, 0, SHIP_CLEARANCE * 0.5, 0)).toBe(true)
+  })
+
+  it('slides a parked hull off the flight segment', () => {
+    const moved = yieldOffSegment(0, 0, -1, 0, 1, 0)
+    expect(Math.abs(moved.z)).toBeGreaterThan(SHIP_CLEARANCE)
+    expect(moved.x).toBeCloseTo(0)
   })
 })

@@ -22,7 +22,7 @@ import { activePlayer, activeShip } from './fuel'
 export type SellQuoteParts = { spot: number; margin: number; total: number }
 
 export function formatSellParts(parts: SellQuoteParts): string {
-  return `${parts.spot}+${parts.margin}=${parts.total}CR`
+  return `${parts.spot}+${parts.margin}=${parts.total}CR /1`
 }
 
 export function rollResourceAmount(size: 1 | 2 | 3, rng: RNG): number {

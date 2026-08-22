@@ -102,6 +102,28 @@ export function shipsTooClose(
   return dx * dx + dz * dz < clearance * clearance
 }
 
+/** Perpendicular slide that takes a parked hull off a flight segment. */
+export function yieldOffSegment(
+  px: number,
+  pz: number,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  clearance = SHIP_CLEARANCE,
+): { x: number; z: number } {
+  const abx = bx - ax
+  const abz = bz - az
+  const len = Math.hypot(abx, abz) || 1
+  const nx = -abz / len
+  const nz = abx / len
+  const side = Math.sign((px - ax) * nx + (pz - az) * nz) || 1
+  return {
+    x: px + nx * side * (clearance + 0.1),
+    z: pz + nz * side * (clearance + 0.1),
+  }
+}
+
 export function easeOutCubic(t: number): number {
   const x = clamp01(t)
   return 1 - (1 - x) ** 3

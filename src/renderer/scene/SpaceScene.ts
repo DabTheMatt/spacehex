@@ -167,7 +167,7 @@ export class SpaceScene {
         this.prevShipCoords.set(ship.id, dest)
         continue
       }
-      if (this.ships.isBusy(ship.id)) continue
+      if (this.ships.isBusy(ship.id) && this.ships.isFlyingTo(ship.id, dest)) continue
       this.ships.fly(ship.id, prev, dest)
       this.prevShipCoords.set(ship.id, dest)
     }

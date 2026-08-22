@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { TileType } from '../../game/board/tileRotation'
 import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
-import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, evaDockAngle } from './evaDocks'
+import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
 const Y = 0.012
@@ -84,24 +84,21 @@ function evaGlyph(color: number): THREE.Group {
     const dock = new THREE.Group()
     dock.position.set(Math.cos(a) * outer, 0, Math.sin(a) * outer)
     dock.add(circle(0.045, color, 16))
-    for (let p = 0; p < 3; p++) {
-      const pa = (Math.PI * 2 * p) / 3
-      const dot = new THREE.Mesh(
-        new THREE.CircleGeometry(0.007, 10),
-        new THREE.MeshBasicMaterial({
-          color,
-          transparent: true,
-          opacity: 0.2,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        }),
-      )
-      dot.rotation.x = -Math.PI / 2
-      dot.position.set(Math.cos(pa) * 0.018, Y + 0.002, Math.sin(pa) * 0.018)
-      dot.userData.animate = 'evaPulse'
-      dot.userData.pulseIndex = p
-      dock.add(dot)
-    }
+    const dot = new THREE.Mesh(
+      new THREE.CircleGeometry(0.0045, 10),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.2,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    )
+    dot.rotation.x = -Math.PI / 2
+    dot.position.y = Y + 0.002
+    dot.userData.animate = 'evaPulse'
+    dot.userData.pulseIndex = k
+    dock.add(dot)
     hub.add(dock)
   }
   g.add(core, hub)
@@ -360,10 +357,9 @@ export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
       if (!Array.isArray(mat) && 'opacity' in mat) {
         const count = 3
         const index = Number(obj.userData.pulseIndex) || 0
-        const chase = Math.floor(time * 2.4) % count
-        const prev = (chase + count - 1) % count
+        const chase = Math.floor(time / EVA_PULSE_STEP_S) % count
         mat.transparent = true
-        mat.opacity = index === chase ? 1 : index === prev ? 0.4 : 0.12
+        mat.opacity = index === chase ? 1 : 0.1
       }
     }
     if (obj.userData.animate === 'pulse' && obj instanceof THREE.Mesh) {

@@ -18,6 +18,8 @@ import {
   prefersReducedMotion,
   shipEngineBurn,
   shipsTooClose,
+  yieldOffSegment,
+  SHIP_CLEARANCE,
   shortestAngleDelta,
   SHIP_BRAKE_MS,
   SHIP_FLIGHT_MS,
@@ -233,7 +235,7 @@ export class ShipRenderer {
       const coord = child.userData.shipCoord as HexCoord | undefined
       const playerId = child.userData.playerId as string | undefined
       const motion = this.motion.get(shipId)
-      if (coord && playerId && isEvaCoord(coord) && motion?.kind !== 'fly' && motion?.kind !== 'hold') {
+      if (coord && playerId && isEvaCoord(coord) && motion?.kind !== 'fly' && motion?.kind !== 'hold' && motion?.kind !== 'slide') {
         const pos = getWorldPosition(coord)
         const dock = evaDockWorldOffset(evaDockIndexForPlayer(playerId), evaHubAngleAt(time))
         child.position.set(pos.x + dock.x, BASE_HOVER, pos.z + dock.z)
@@ -334,6 +336,13 @@ export class ShipRenderer {
       motion.lastTick = motion.lastTick || now
       const elapsed = now - motion.start - motion.pauseAccum
       const turnT = motion.turnMs <= 0 ? 1 : clamp01(elapsed / motion.turnMs)
+      const playerId = child.userData.playerId as string | undefined
+      if (isEvaCoord(motion.from) && playerId && turnT < 1) {
+        const pos = getWorldPosition(motion.from)
+        const dock = evaDockWorldOffset(evaDockIndexForPlayer(playerId), evaHubAngleAt(this.hubTime))
+        motion.fromX = pos.x + dock.x
+        motion.fromZ = pos.z + dock.z
+      }
       const yaw = lerpAngle(motion.startYaw, motion.endYaw, easeInOutCubic(turnT))
       child.quaternion.setFromAxisAngle(Y_AXIS, yaw)
       this.facing.set(shipId, yaw)
@@ -359,6 +368,12 @@ export class ShipRenderer {
 
       const afterTurn = elapsed - motion.turnMs
       if (afterTurn < motion.igniteMs) {
+        if (isEvaCoord(motion.from) && playerId) {
+          const pos = getWorldPosition(motion.from)
+          const dock = evaDockWorldOffset(evaDockIndexForPlayer(playerId), evaHubAngleAt(this.hubTime))
+          motion.fromX = pos.x + dock.x
+          motion.fromZ = pos.z + dock.z
+        }
         child.position.x = motion.fromX
         child.position.z = motion.fromZ
         child.quaternion.setFromAxisAngle(Y_AXIS, motion.endYaw)
@@ -373,12 +388,18 @@ export class ShipRenderer {
       const e = easeInOutSmooth(moveT)
       const nextX = lerp(motion.fromX, motion.toX, e)
       const nextZ = lerp(motion.fromZ, motion.toZ, e)
-      if (this.blockedAt(shipId, nextX, nextZ)) {
-        motion.pauseAccum += now - motion.lastTick
-        motion.lastTick = now
-        applyEngineBurn(child, ENGINES_OFF)
-        this.remember(child)
-        continue
+      if (this.blockedAt(shipId, nextX, nextZ, motion)) {
+        if (motion.pauseAccum > 2800) {
+          child.position.x = nextX
+          child.position.z = nextZ
+        } else {
+          this.yieldBlockers(shipId, nextX, nextZ, motion)
+          motion.pauseAccum += now - motion.lastTick
+          motion.lastTick = now
+          applyEngineBurn(child, ENGINES_OFF)
+          this.remember(child)
+          continue
+        }
       }
       child.position.x = nextX
       child.position.z = nextZ
@@ -397,13 +418,43 @@ export class ShipRenderer {
     return settled
   }
 
-  private blockedAt(shipId: string, x: number, z: number): boolean {
+  private blockedAt(shipId: string, x: number, z: number, flyer: FlyMotion): boolean {
     for (const other of this.group.children) {
       const otherId = other.userData.shipId as string
       if (otherId === shipId) continue
-      if (shipsTooClose(x, z, other.position.x, other.position.z)) return true
+      if (!shipsTooClose(x, z, other.position.x, other.position.z)) continue
+      const otherMotion = this.motion.get(otherId)
+      if (otherMotion?.kind === 'slide') continue
+      const otherCoord = other.userData.shipCoord as HexCoord | undefined
+      if (otherCoord && coordKey(otherCoord) === coordKey(flyer.from)) continue
+      if (otherMotion?.kind === 'hold') continue
+      if (otherMotion?.kind !== 'fly') {
+        this.yieldAside(otherId, flyer, other.position)
+        continue
+      }
+      return true
     }
     return false
+  }
+
+  private yieldBlockers(shipId: string, x: number, z: number, flyer: FlyMotion): void {
+    for (const other of this.group.children) {
+      const otherId = other.userData.shipId as string
+      if (otherId === shipId) continue
+      if (!shipsTooClose(x, z, other.position.x, other.position.z, SHIP_CLEARANCE + 0.04)) continue
+      const otherMotion = this.motion.get(otherId)
+      if (otherMotion?.kind === 'fly' || otherMotion?.kind === 'hold') continue
+      this.yieldAside(otherId, flyer, other.position)
+    }
+  }
+
+  private yieldAside(
+    shipId: string,
+    flyer: FlyMotion,
+    pos: { x: number; z: number },
+  ): void {
+    const to = yieldOffSegment(pos.x, pos.z, flyer.fromX, flyer.fromZ, flyer.toX, flyer.toZ)
+    this.maybeSlide(shipId, pos, to)
   }
 
   private remember(child: THREE.Object3D): void {
@@ -686,7 +737,7 @@ function createHullNumber(label: string, width: number, height: number): THREE.M
     ctx.font = '700 62px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillStyle = css.dusk
+    ctx.fillStyle = css.hullMark
     ctx.fillText(label, 128, 50)
   }
   const tex = new THREE.CanvasTexture(canvas)

@@ -146,7 +146,7 @@ describe('planet markets', () => {
     state = withLots(state, coordKey({ q: 4, r: 0 }), { ORE: 4, BIOMASS: 0, ICE: 0 })
     expect(nearestHomeworldDistance(state, { q: 0, r: 0 }, 'ORE')).toBe(4)
     expect(sellQuote(state, { q: 0, r: 0 }, 'ORE')).toBe(3 + 4)
-    expect(formatSellParts(evaSellParts(state, 'ORE'))).toBe('3+4=7CR')
+    expect(formatSellParts(evaSellParts(state, 'ORE'))).toBe('3+4=7CR /1')
 
     state = applyCommand(state, {
       type: 'DEV_PLACE_TILE',

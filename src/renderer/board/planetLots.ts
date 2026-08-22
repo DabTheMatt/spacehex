@@ -35,7 +35,6 @@ const TOP_Z = -(FLAT_EDGE - 0.28)
 const HEX_SPACING = 0.18
 const CLOSE_DIST = 4.2
 const FAR_DIST = 6.0
-const EVA_PAD_R = 0.2
 
 export function planetInspectTheta(tileRotation: number): number {
   return tileRotation * (Math.PI / 3)
@@ -132,11 +131,11 @@ export function createEvaOverlay(
   const g = new THREE.Group()
   g.userData.evaOverlay = true
   RESOURCE_IDS.forEach((id, index) => {
-    const angle = (Math.PI * 2 * index) / 3 + Math.PI / 2
+    const x = (index - 1) * HEX_SPACING
     const cluster = new THREE.Group()
-    cluster.position.set(Math.cos(angle) * EVA_PAD_R, TILE_THICKNESS + 0.035, Math.sin(angle) * EVA_PAD_R)
+    cluster.position.set(x, TILE_THICKNESS + 0.035, TOP_Z)
     const qty = cargo[id] ?? 0
-    cluster.add(stockHex(id, qty))
+    cluster.add(stockSquare(id, qty))
     const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id])
     name.position.set(0, 0.01, -LABEL_GAP)
     cluster.add(name)
@@ -145,7 +144,7 @@ export function createEvaOverlay(
     cluster.add(tag)
     if (canSell && qty > 0) {
       const hit = new THREE.Mesh(
-        new THREE.CircleGeometry(0.12, 12),
+        new THREE.PlaneGeometry(0.16, 0.16),
         new THREE.MeshBasicMaterial({
           transparent: true,
           opacity: 0,
@@ -339,6 +338,65 @@ function stockHex(id: ResourceId, amount: number): THREE.Group {
   return g
 }
 
+function stockSquare(id: ResourceId, amount: number): THREE.Group {
+  const g = new THREE.Group()
+  const color = RESOURCE_COLOR[id]
+  const half = 0.055
+  const fill = new THREE.Mesh(
+    new THREE.PlaneGeometry(half * 2, half * 2),
+    new THREE.MeshBasicMaterial({
+      color: palette.graphite,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      transparent: true,
+      opacity: amount > 0 ? 0.92 : 0.4,
+    }),
+  )
+  fill.rotation.x = -Math.PI / 2
+  g.add(fill)
+  const pts = [
+    new THREE.Vector3(-half, 0.002, -half),
+    new THREE.Vector3(half, 0.002, -half),
+    new THREE.Vector3(half, 0.002, half),
+    new THREE.Vector3(-half, 0.002, half),
+    new THREE.Vector3(-half, 0.002, -half),
+  ]
+  const ring = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color, transparent: true, depthWrite: false }),
+  )
+  g.add(ring)
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    ctx.clearRect(0, 0, 128, 128)
+    ctx.fillStyle = RESOURCE_CSS[id]
+    ctx.font = '500 72px "IBM Plex Mono", monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(amount), 64, 70)
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.needsUpdate = true
+  const digit = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.1, 0.1),
+    new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      side: THREE.DoubleSide,
+    }),
+  )
+  digit.rotation.x = -Math.PI / 2
+  digit.position.y = 0.012
+  digit.renderOrder = 7
+  g.add(digit)
+  return g
+}
+
 function diceCluster(id: ResourceId, amount: number, x: number): THREE.Group {
   const g = new THREE.Group()
   g.position.set(x, TILE_THICKNESS + 0.04, TOP_Z)
@@ -365,7 +423,7 @@ function caption(text: string, color: string): THREE.Mesh {
 }
 
 function priceTag(text: string, color: string): THREE.Mesh {
-  return textPlane(text, color, text.includes('+') ? 0.34 : 0.2, 0.05)
+  return textPlane(text, color, text.includes('+') ? 0.42 : 0.2, 0.05)
 }
 
 function textPlane(text: string, color: string, width: number, height: number): THREE.Mesh {
