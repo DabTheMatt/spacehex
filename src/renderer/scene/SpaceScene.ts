@@ -39,6 +39,7 @@ export class SpaceScene {
   readonly ships: ShipRenderer
   readonly hoverTargets: HoverTargetRenderer
   readonly raycaster = new THREE.Raycaster()
+  onShipLanded: ((coord: HexCoord) => void) | null = null
   private disposed = false
   private lastState: GameState | null = null
   private lastOptions: SceneOptions | null = null
@@ -250,6 +251,7 @@ export class SpaceScene {
     this.hoverTargets.tick(this.camera.camera)
     let glyphsChanged = false
     for (const coord of this.ships.consumeLanded()) {
+      this.onShipLanded?.(coord)
       const key = coordKey(coord)
       if (!this.hideGlyphKeys.has(key)) continue
       this.hideGlyphKeys.delete(key)

@@ -28,7 +28,7 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
 const RIM = HEX_SIZE * 0.32
 const HULL_HEIGHT = 0.11
-const BASE_HOVER = TILE_THICKNESS + 0.08
+const BASE_HOVER = TILE_THICKNESS + 0.28
 
 type HoldMotion = { kind: 'hold'; coord: HexCoord }
 type FlyMotion = {
@@ -423,13 +423,14 @@ function createNavMarker(
   shape.closePath()
   const hull = new THREE.Mesh(
     new THREE.ExtrudeGeometry(shape, { depth: HULL_HEIGHT, bevelEnabled: false, steps: 1 }),
-    new THREE.MeshBasicMaterial({ color, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color, depthWrite: true, depthTest: true }),
   )
   hull.rotation.x = -Math.PI / 2
-  hull.renderOrder = 2
+  hull.renderOrder = 3
   g.add(hull)
 
-  g.add(hullMark(label, length, half))
+  g.add(hullMark(label, length, half, true))
+  g.add(hullMark(label, length, half, false))
 
   const y = HULL_HEIGHT * 0.5
   const main = makeThruster(
@@ -481,7 +482,7 @@ function createNavMarker(
         blending: THREE.AdditiveBlending,
       }),
     )
-    beacon.position.set(-half * 0.42, HULL_HEIGHT + 0.022, length * 0.22)
+    beacon.position.set(-half * 0.38, HULL_HEIGHT + 0.018, length * 0.2)
     beacon.renderOrder = 10
     g.add(beacon)
     g.userData.beacon = beacon
@@ -591,32 +592,46 @@ function setPlume(group: THREE.Group, intensity: number, lengthScale: number): v
   mesh.visible = lit > 0.03
 }
 
-function hullMark(label: string, length: number, half: number): THREE.Mesh {
-  const width = Math.min(0.22, half * 1.7)
-  const depth = Math.min(0.1, length * 0.26)
-  const mesh = createHullNumber(label, width, depth)
-  mesh.rotation.x = -Math.PI / 2
-  mesh.position.set(0, HULL_HEIGHT + 0.004, length * 0.16)
+function hullMark(label: string, length: number, half: number, port: boolean): THREE.Mesh {
+  const midY = HULL_HEIGHT * 0.52
+  const nose = new THREE.Vector3(0, midY, length * 0.5)
+  const stern = new THREE.Vector3(port ? -half : half, midY, -length * 0.5)
+  const along = stern.clone().sub(nose)
+  const edgeLen = along.length()
+  along.normalize()
+  const pos = nose.clone().addScaledVector(along, edgeLen * 0.3)
+  const up = new THREE.Vector3(0, 1, 0)
+  const outward = new THREE.Vector3().crossVectors(along, up).normalize()
+  if ((port && outward.x > 0) || (!port && outward.x < 0)) outward.negate()
+  pos.addScaledVector(outward, 0.003)
+
+  const width = Math.min(0.09, edgeLen * 0.22)
+  const height = HULL_HEIGHT * 0.58
+  const mesh = createHullNumber(label, width, height)
+  const xAxis = new THREE.Vector3().crossVectors(up, outward).normalize()
+  const yAxis = new THREE.Vector3().crossVectors(outward, xAxis).normalize()
+  mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, outward))
+  mesh.position.copy(pos)
   mesh.renderOrder = 4
   return mesh
 }
 
 function createHullNumber(label: string, width: number, height: number): THREE.Mesh {
   const canvas = document.createElement('canvas')
-  canvas.width = 384
-  canvas.height = 128
+  canvas.width = 256
+  canvas.height = 96
   const ctx = canvas.getContext('2d')
   if (ctx) {
-    ctx.clearRect(0, 0, 384, 128)
-    ctx.font = '800 72px "IBM Plex Mono", monospace'
+    ctx.clearRect(0, 0, 256, 96)
+    ctx.font = '800 48px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.lineJoin = 'round'
-    ctx.lineWidth = 14
+    ctx.lineWidth = 10
     ctx.strokeStyle = css.ink
-    ctx.strokeText(label, 192, 68)
+    ctx.strokeText(label, 128, 50)
     ctx.fillStyle = css.ivory
-    ctx.fillText(label, 192, 68)
+    ctx.fillText(label, 128, 50)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
@@ -626,7 +641,10 @@ function createHullNumber(label: string, width: number, height: number): THREE.M
       map: tex,
       transparent: true,
       depthWrite: false,
-      depthTest: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+      side: THREE.DoubleSide,
     }),
   )
 }

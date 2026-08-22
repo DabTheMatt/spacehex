@@ -42,6 +42,9 @@ export function createHexMesh(options: {
     transparent: opacity < 1 || Boolean(options.dashed),
     opacity: options.dashed ? Math.min(opacity, 0.2) : opacity,
     side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
   })
   const mesh = new THREE.Mesh(geom, mat)
   mesh.rotation.x = -Math.PI / 2
