@@ -25,6 +25,7 @@ export class CameraController {
     toPos: THREE.Vector3
   } | null = null
   private follow: { x: number; z: number } | null = null
+  private followReleased = false
   mapRotateEnabled = true
   private keys = { w: false, a: false, s: false, d: false, q: false, e: false }
   private lastTick = performance.now()
@@ -49,6 +50,7 @@ export class CameraController {
     this.controls.enableRotate = true
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)
+    this.controls.addEventListener('start', this.releaseFollow)
   }
 
   resize(width: number, height: number): void {
@@ -67,8 +69,14 @@ export class CameraController {
 
   /** Keep current angle and distance; lock look-at to a world XZ each frame. */
   setFollow(point: { x: number; z: number } | null): void {
+    if (!point) {
+      this.follow = null
+      this.followReleased = false
+      return
+    }
+    if (this.followReleased || this.grabbing) return
     this.follow = point
-    if (point) this.panAnim = null
+    this.panAnim = null
   }
 
   /** Keep current angle and distance; glide the look-at to a hex. */
@@ -100,8 +108,7 @@ export class CameraController {
   }
 
   beginPan(clientX: number, clientY: number): void {
-    this.panAnim = null
-    this.follow = null
+    this.releaseFollow()
     this.grabbing = true
     this.panX = clientX
     this.panY = clientY
@@ -148,7 +155,7 @@ export class CameraController {
     const dt = Math.min(0.05, (now - this.lastTick) / 1000)
     this.lastTick = now
     if (this.keys.w || this.keys.a || this.keys.s || this.keys.d || this.keys.q || this.keys.e) {
-      this.panAnim = null
+      this.releaseFollow()
     }
     this.applyFocusPan(now)
     this.applyWasd(dt)
@@ -160,7 +167,14 @@ export class CameraController {
   dispose(): void {
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('keyup', this.onKeyUp)
+    this.controls.removeEventListener('start', this.releaseFollow)
     this.controls.dispose()
+  }
+
+  private releaseFollow = (): void => {
+    this.followReleased = true
+    this.follow = null
+    this.panAnim = null
   }
 
   private applyFollow(): void {

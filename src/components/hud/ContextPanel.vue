@@ -21,22 +21,6 @@ const game = useGameStore()
 const ui = useUiStore()
 
 const block = computed(() => {
-  const shipId = ui.selectedShipId ?? game.ship.id
-  if (ui.selectedShipId || !ui.selectedTile) {
-    const ship = game.state.ships[shipId]
-    if (!ship) return null
-    const player = game.state.players[ship.playerId]
-    const n = ship.playerId.replace(/\D/g, '') || '1'
-    return {
-      title: ship.class,
-      kicker: `P${n}  ·  ${ship.coord.q},${ship.coord.r}`,
-      rows: [
-        { label: 'HULL', value: `${pad(ship.hull)} / ${pad(ship.maxHull)}` },
-        { label: 'FUEL', value: pad(player?.fuel ?? 0) },
-        { label: 'PCH', value: pad(player?.glory ?? 0) },
-      ],
-    }
-  }
   const coord = ui.selectedTile
   if (!coord) return null
   const tile = game.state.board.tiles[coordKey(coord)]
@@ -55,8 +39,4 @@ const block = computed(() => {
     ],
   }
 })
-
-function pad(value: number): string {
-  return String(value).padStart(2, '0')
-}
 </script>

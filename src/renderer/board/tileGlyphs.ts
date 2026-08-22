@@ -2,8 +2,14 @@ import * as THREE from 'three'
 import type { TileType } from '../../game/board/tileRotation'
 import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
+import { RNG } from '../../game/random/RNG'
 
 const Y = 0.012
+const PLANET_TINTS = [palette.planetViolet, palette.planetRose, palette.planetSage] as const
+
+export function planetTintForId(id: string): number {
+  return PLANET_TINTS[new RNG(`planet-tint:${id}`).nextInt(PLANET_TINTS.length)]
+}
 
 function lineMat(color: number, opacity = 1): THREE.LineBasicMaterial {
   return new THREE.LineBasicMaterial({
@@ -165,25 +171,14 @@ function asteroidGlyph(color: number): THREE.Group {
       [0.18, -0.16],
     ],
   ]
-  const spins = [
-    { x: 0.11, y: 0.37, z: -0.08 },
-    { x: -0.19, y: -0.22, z: 0.14 },
-    { x: 0.28, y: -0.41, z: 0.06 },
-    { x: -0.09, y: 0.53, z: -0.17 },
-    { x: 0.16, y: -0.29, z: 0.31 },
-    { x: -0.33, y: 0.18, z: -0.24 },
-  ]
+  const spins = [0.37, -0.22, -0.41, 0.53, -0.29, 0.18]
   rocks.forEach((rock, index) => {
-    g.add(spinningRock(rock, color, spins[index] ?? { x: 0.2, y: 0.2, z: 0.2 }))
+    g.add(spinningRock(rock, color, spins[index] ?? 0.2))
   })
   return g
 }
 
-function spinningRock(
-  points: Array<[number, number]>,
-  color: number,
-  spin: { x: number; y: number; z: number },
-): THREE.Group {
+function spinningRock(points: Array<[number, number]>, color: number, spinY: number): THREE.Group {
   let cx = 0
   let cz = 0
   for (const [x, z] of points) {
@@ -197,9 +192,7 @@ function spinningRock(
   g.position.set(cx, 0, cz)
   g.add(poly(local, color, true))
   g.userData.animate = 'asteroid'
-  g.userData.spinX = spin.x
-  g.userData.spinY = spin.y
-  g.userData.spinZ = spin.z
+  g.userData.spinY = spinY
   return g
 }
 
@@ -247,9 +240,10 @@ function blackHoleGlyph(color: number): THREE.Group {
   return g
 }
 
-export function createTileGlyph(def: TileDefinition, color = palette.paper): THREE.Group {
+export function createTileGlyph(def: TileDefinition, color = palette.paper, salt = def.id): THREE.Group {
   const root = new THREE.Group()
   const type: TileType = def.type
+  const planetColor = planetTintForId(salt)
   switch (type) {
     case 'EVA_1':
       root.add(evaGlyph(color))
@@ -258,13 +252,13 @@ export function createTileGlyph(def: TileDefinition, color = palette.paper): THR
       root.add(voidGlyph(color))
       break
     case 'PLANET_LARGE':
-      root.add(planetGlyph(color, 'L'))
+      root.add(planetGlyph(planetColor, 'L'))
       break
     case 'PLANET_MEDIUM':
-      root.add(planetGlyph(color, 'M'))
+      root.add(planetGlyph(planetColor, 'M'))
       break
     case 'PLANET_SMALL':
-      root.add(planetGlyph(color, 'S'))
+      root.add(planetGlyph(planetColor, 'S'))
       break
     case 'ASTEROID':
       root.add(asteroidGlyph(color))
@@ -290,9 +284,9 @@ export function createTileGlyph(def: TileDefinition, color = palette.paper): THR
 export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
   root.traverse((obj) => {
     if (obj.userData.animate === 'asteroid') {
-      obj.rotation.x = time * Number(obj.userData.spinX || 0)
+      obj.rotation.x = 0
+      obj.rotation.z = 0
       obj.rotation.y = time * Number(obj.userData.spinY || 0)
-      obj.rotation.z = time * Number(obj.userData.spinZ || 0)
     }
     if (obj.userData.animate === 'spin') {
       obj.rotation.y = time * 0.12

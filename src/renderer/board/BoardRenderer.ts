@@ -108,7 +108,7 @@ export class BoardRenderer {
       mesh.userData.tileCoord = tile.coord
       mesh.userData.tileKey = key
       if (!hideGlyph) {
-        const glyph = createTileGlyph(def)
+        const glyph = createTileGlyph(def, palette.paper, tile.id)
         glyph.position.y = TILE_THICKNESS
         mesh.add(glyph)
       }

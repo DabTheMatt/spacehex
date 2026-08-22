@@ -7,7 +7,7 @@
     @click="game.dispatch({ type: 'END_TURN' })"
   >
     <span class="end-turn-btn__ring" />
-    <span class="end-turn-btn__dot" />
+    <span class="end-turn-btn__label">KONIEC<br />TURY</span>
   </button>
 </template>
 

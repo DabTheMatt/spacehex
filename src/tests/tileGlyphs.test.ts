@@ -1,23 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { TILE_DEFINITIONS } from '../game/definitions/tiles'
-import { createTileGlyph } from '../renderer/board/tileGlyphs'
+import { createTileGlyph, planetTintForId } from '../renderer/board/tileGlyphs'
+import { palette } from '../renderer/theme'
 
 describe('tile glyphs', () => {
-  it('gives each asteroid its own spin speed and direction', () => {
+  it('spins each asteroid in the tile plane at its own rate', () => {
     const glyph = createTileGlyph(TILE_DEFINITIONS['asteroid-1'])
-    const spins: Array<{ x: number; y: number; z: number }> = []
+    const spins: number[] = []
     glyph.traverse((obj) => {
       if (obj.userData.animate !== 'asteroid') return
-      spins.push({
-        x: Number(obj.userData.spinX),
-        y: Number(obj.userData.spinY),
-        z: Number(obj.userData.spinZ),
-      })
+      spins.push(Number(obj.userData.spinY))
     })
     expect(spins.length).toBeGreaterThanOrEqual(6)
-    const keys = spins.map((spin) => `${spin.x}:${spin.y}:${spin.z}`)
-    expect(new Set(keys).size).toBe(keys.length)
-    expect(spins.some((spin) => spin.y > 0)).toBe(true)
-    expect(spins.some((spin) => spin.y < 0)).toBe(true)
+    expect(new Set(spins).size).toBe(spins.length)
+    expect(spins.some((speed) => speed > 0)).toBe(true)
+    expect(spins.some((speed) => speed < 0)).toBe(true)
+  })
+
+  it('tints planets from the muted violet / rose / sage set', () => {
+    const tints = [palette.planetViolet, palette.planetRose, palette.planetSage]
+    expect(tints).toContain(planetTintForId('planet-large-1'))
+    expect(planetTintForId('planet-large-1')).toBe(planetTintForId('planet-large-1'))
+    const seen = new Set(
+      ['planet-large-1', 'planet-large-2', 'planet-medium-1', 'planet-small-1', 'planet-small-5'].map(
+        (id) => planetTintForId(id),
+      ),
+    )
+    expect(seen.size).toBeGreaterThan(1)
   })
 })

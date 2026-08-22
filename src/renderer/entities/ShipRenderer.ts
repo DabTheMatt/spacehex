@@ -184,20 +184,6 @@ export class ShipRenderer {
       wrapper.position.set(last.x, BASE_HOVER, last.z)
       wrapper.userData.shipId = ship.id
       wrapper.userData.hullHeight = HULL_HEIGHT
-      const player = state.players[ship.playerId]
-      if (active && player) {
-        const callout = createActiveCallout(
-          `SG-${playerNo}`,
-          playerNo === 1 ? css.player1 : css.player2,
-          playerNo === 1 ? palette.player1 : palette.player2,
-          player.fuel,
-          ship.hull,
-          ship.maxHull,
-          player.glory,
-        )
-        wrapper.add(callout)
-        wrapper.userData.callout = callout
-      }
       wrapper.userData.shipCoord = coord
       this.group.add(wrapper)
       this.maybeSlide(ship.id, last, target)
@@ -205,13 +191,8 @@ export class ShipRenderer {
     this.applyMotion(performance.now())
   }
 
-  tick(camera: THREE.Camera): boolean {
-    const settled = this.applyMotion(performance.now())
-    for (const child of this.group.children) {
-      const callout = child.userData.callout as THREE.Group | undefined
-      if (callout) layoutCallout(child, callout, camera)
-    }
-    return settled
+  tick(_camera: THREE.Camera): boolean {
+    return this.applyMotion(performance.now())
   }
 
   pickables(): THREE.Object3D[] {
@@ -609,140 +590,4 @@ function createHullNumber(label: string, width: number, height: number): THREE.M
       polygonOffsetUnits: -2,
     }),
   )
-}
-
-function createActiveCallout(
-  label: string,
-  ink: string,
-  accent: number,
-  fuel: number,
-  hull: number,
-  maxHull: number,
-  glory: number,
-): THREE.Group {
-  const g = new THREE.Group()
-  const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({
-      map: makeCalloutTexture(label, ink, fuel, hull, maxHull, glory),
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-    }),
-  )
-  sprite.center.set(0, 0)
-  sprite.scale.set(0.84, 0.46, 1)
-  g.add(sprite)
-
-  const line = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0.4, 0.5, 0)]),
-    new THREE.LineBasicMaterial({
-      color: accent,
-      transparent: true,
-      opacity: 0.55,
-      depthTest: false,
-    }),
-  )
-  g.add(line)
-  g.userData.calloutSprite = sprite
-  g.userData.calloutLine = line
-  return g
-}
-
-function layoutCallout(ship: THREE.Object3D, callout: THREE.Group, camera: THREE.Camera): void {
-  const sprite = callout.userData.calloutSprite as THREE.Sprite
-  const line = callout.userData.calloutLine as THREE.Line
-  if (!sprite || !line) return
-  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).setY(0)
-  if (right.lengthSq() < 1e-8) right.set(1, 0, 0)
-  else right.normalize()
-  const localRight = right.clone().applyQuaternion(ship.quaternion.clone().invert())
-  const localUp = new THREE.Vector3(0, 1, 0)
-  const origin = new THREE.Vector3(0, HULL_HEIGHT + 0.02, 0)
-  const card = origin.clone().addScaledVector(localRight, 0.55).addScaledVector(localUp, 0.48)
-  sprite.position.copy(card)
-  const geom = line.geometry as THREE.BufferGeometry
-  geom.setFromPoints([origin, card])
-  geom.computeBoundingSphere()
-}
-
-function makeCalloutTexture(
-  label: string,
-  ink: string,
-  fuel: number,
-  hull: number,
-  maxHull: number,
-  glory: number,
-): THREE.CanvasTexture {
-  const w = 280
-  const h = 156
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')
-  if (ctx) {
-    ctx.clearRect(0, 0, w, h)
-    ctx.strokeStyle = ink
-    ctx.lineWidth = 1
-    ctx.setLineDash([5, 4])
-    ctx.strokeRect(12.5, 12.5, w - 25, h - 25)
-    ctx.setLineDash([])
-    ctx.fillStyle = ink
-    ctx.globalAlpha = 0.12
-    for (let y = 16; y < h - 16; y += 3) {
-      ctx.fillRect(14, y, w - 28, 1)
-    }
-    ctx.globalAlpha = 1
-    ctx.font = '600 26px "IBM Plex Mono", monospace'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(label, 24, 36)
-    ctx.font = '500 16px "IBM Plex Mono", monospace'
-    drawStatRow(ctx, ink, 24, 68, 'FUEL', 6, fuel, 12, 5)
-    drawStatRow(ctx, ink, 24, 92, 'HULL', Math.max(1, maxHull), hull, 12, 5)
-    drawStatRow(ctx, ink, 24, 116, 'GLORY', Math.max(glory, 4), glory, 10, 4)
-  }
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.needsUpdate = true
-  return tex
-}
-
-function drawStatRow(
-  ctx: CanvasRenderingContext2D,
-  ink: string,
-  x: number,
-  y: number,
-  name: string,
-  count: number,
-  filled: number,
-  size: number,
-  gap: number,
-): void {
-  ctx.fillStyle = ink
-  ctx.fillText(name, x, y)
-  drawPips(ctx, ink, x + 70, y, count, filled, size, gap)
-}
-
-function drawPips(
-  ctx: CanvasRenderingContext2D,
-  ink: string,
-  x: number,
-  y: number,
-  count: number,
-  filled: number,
-  size: number,
-  gap: number,
-): void {
-  for (let i = 0; i < count; i++) {
-    const px = x + i * (size + gap)
-    ctx.beginPath()
-    ctx.rect(px, y - size / 2, size, size * 0.35)
-    if (i < filled) {
-      ctx.fillStyle = ink
-      ctx.fill()
-    } else {
-      ctx.strokeStyle = ink
-      ctx.lineWidth = 1
-      ctx.stroke()
-    }
-  }
 }

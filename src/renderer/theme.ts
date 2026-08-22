@@ -12,6 +12,10 @@ export const palette = {
   engine: 0x7ec8ff,
   player1: 0xb58a4b,
   player2: 0x6d8398,
+  /** Soft resource tints for planets (purple / red / green). */
+  planetViolet: 0xa898b0,
+  planetRose: 0xb8948c,
+  planetSage: 0x8f9a8a,
 }
 
 export const css = {
