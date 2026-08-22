@@ -33,7 +33,7 @@ const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
 const RIM = HEX_SIZE * 0.28
 const HULL_HEIGHT = 0.11
-const BASE_HOVER = TILE_THICKNESS + 0.14
+export const BASE_HOVER = TILE_THICKNESS + 0.14
 
 type HoldMotion = { kind: 'hold'; coord: HexCoord }
 type FlyMotion = {
@@ -102,6 +102,17 @@ export class ShipRenderer {
     this.visualPark.clear()
     this.landed = []
     this.group.clear()
+  }
+
+  worldPose(shipId: string): { x: number; y: number; z: number; yaw: number } | null {
+    const child = this.group.children.find((item) => item.userData.shipId === shipId)
+    if (!child) return null
+    return {
+      x: child.position.x,
+      y: child.position.y,
+      z: child.position.z,
+      yaw: this.facing.get(shipId) ?? 0,
+    }
   }
 
   /** World XZ of a ship currently in flight, if any. */

@@ -1,8 +1,7 @@
 import * as THREE from 'three'
 import type { PlanetMarket, ResourceId } from '../../game/definitions/resources'
-import { RESOURCE_IDS, RESOURCE_LABEL } from '../../game/definitions/resources'
+import { RESOURCE_IDS } from '../../game/definitions/resources'
 import { palette, css } from '../theme'
-import { TILE_THICKNESS } from './TileRenderer'
 import { HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { clamp01 } from '../motion'
@@ -28,11 +27,12 @@ const FLAT_EDGE = TILE_RADIUS * (Math.sqrt(3) / 2)
 export const EDGE_MARGIN = 0.12
 const NAME_R = FLAT_EDGE - EDGE_MARGIN
 const LOT_Z = -(FLAT_EDGE - EDGE_MARGIN)
-const NAME_GAP = 0.048
 const FOOT_GAP = 0.052
 const HEX_SPACING = 0.18
 const CLOSE_DIST = 4.2
-const FAR_DIST = 7.2
+const FAR_DIST = 6.0
+/** Half of ship `BASE_HOVER` (0.24): names and markets float at mid-height. */
+export const OVERLAY_HOVER = 0.12
 
 export function planetInspectTheta(tileRotation: number): number {
   return tileRotation * (Math.PI / 3)
@@ -78,17 +78,16 @@ export function createPlanetOverlay(
 
   const close = new THREE.Group()
   close.userData.lod = 'close'
+  const far = new THREE.Group()
+  far.userData.lod = 'far'
 
   RESOURCE_IDS.forEach((id, index) => {
     const lot = market.lots.find((item) => item.id === id)
     const amount = lot?.amount ?? 0
     const x = (index - 1) * HEX_SPACING
     const cluster = new THREE.Group()
-    cluster.position.set(x, TILE_THICKNESS + 0.035, LOT_Z)
+    cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
     cluster.add(stockHex(id, amount))
-    const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id], 0.24, 0.058)
-    name.position.set(0, 0.01, -NAME_GAP)
-    cluster.add(name)
     const tag = priceTag(`${buyPrice[id]}CR`, css.priceYellow)
     tag.position.set(0, 0.01, FOOT_GAP)
     cluster.add(tag)
@@ -109,10 +108,12 @@ export function createPlanetOverlay(
       cluster.add(hit)
     }
     close.add(cluster)
+    far.add(diceCluster(id, amount, x))
   })
 
-  g.add(close)
+  g.add(close, far)
   g.userData.closeLod = close
+  g.userData.farLod = far
   return g
 }
 
@@ -126,15 +127,14 @@ export function createEvaOverlay(
   g.userData.marketIcons = true
   const close = new THREE.Group()
   close.userData.lod = 'close'
+  const far = new THREE.Group()
+  far.userData.lod = 'far'
   RESOURCE_IDS.forEach((id, index) => {
     const x = (index - 1) * HEX_SPACING
     const cluster = new THREE.Group()
-    cluster.position.set(x, TILE_THICKNESS + 0.035, LOT_Z)
+    cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
     const qty = cargo[id] ?? 0
     cluster.add(stockSquare(id, qty))
-    const name = caption(RESOURCE_LABEL[id], RESOURCE_CSS[id], 0.24, 0.058)
-    name.position.set(0, 0.01, -NAME_GAP)
-    cluster.add(name)
     if (canSell && qty > 0) {
       const hit = new THREE.Mesh(
         new THREE.PlaneGeometry(0.16, 0.16),
@@ -152,12 +152,14 @@ export function createEvaOverlay(
       cluster.add(hit)
     }
     close.add(cluster)
+    far.add(diceCluster(id, qty, x))
   })
   const exchange = caption('GIEŁDA SUROWCE', css.priceYellow, 0.62, 0.05)
-  exchange.position.set(0, TILE_THICKNESS + 0.045, LOT_Z + FOOT_GAP)
+  exchange.position.set(0, OVERLAY_HOVER + 0.01, LOT_Z + FOOT_GAP)
   close.add(exchange)
-  g.add(close)
+  g.add(close, far)
   g.userData.closeLod = close
+  g.userData.farLod = far
   return g
 }
 
@@ -167,12 +169,14 @@ export function tickPlanetLod(root: THREE.Object3D, camera: THREE.Camera): void 
     if (!obj.userData.planetOverlay && !obj.userData.evaOverlay) return
     if (isOverlayHidden(obj)) {
       setLodOpacity(obj.userData.closeLod as THREE.Object3D | undefined, 0)
+      setLodOpacity(obj.userData.farLod as THREE.Object3D | undefined, 0)
       return
     }
     obj.getWorldPosition(world)
     const dist = camera.position.distanceTo(world)
     const close = clamp01((FAR_DIST - dist) / (FAR_DIST - CLOSE_DIST))
     setLodOpacity(obj.userData.closeLod as THREE.Object3D | undefined, close)
+    setLodOpacity(obj.userData.farLod as THREE.Object3D | undefined, 1 - close)
   })
 }
 
@@ -212,7 +216,7 @@ export function createEdgeLabel(
 ): THREE.Group {
   const g = new THREE.Group()
   g.userData.tileName = true
-  g.position.set(Math.cos(NAME_ANGLE) * NAME_R, TILE_THICKNESS + 0.04, Math.sin(NAME_ANGLE) * NAME_R)
+  g.position.set(Math.cos(NAME_ANGLE) * NAME_R, OVERLAY_HOVER, Math.sin(NAME_ANGLE) * NAME_R)
   const width = options.width ?? 0.7
   const canvas = document.createElement('canvas')
   canvas.width = 768
@@ -387,6 +391,27 @@ function stockSquare(id: ResourceId, amount: number): THREE.Group {
   digit.position.y = 0.012
   digit.renderOrder = 7
   g.add(digit)
+  return g
+}
+
+function diceCluster(id: ResourceId, amount: number, x: number): THREE.Group {
+  const g = new THREE.Group()
+  g.position.set(x, OVERLAY_HOVER, LOT_Z)
+  const color = RESOURCE_COLOR[id]
+  for (const pip of dicePips(amount)) {
+    const dot = new THREE.Mesh(
+      new THREE.CircleGeometry(0.012, 10),
+      new THREE.MeshBasicMaterial({
+        color,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        transparent: true,
+      }),
+    )
+    dot.rotation.x = -Math.PI / 2
+    dot.position.set(pip.x, 0.004, pip.z)
+    g.add(dot)
+  }
   return g
 }
 

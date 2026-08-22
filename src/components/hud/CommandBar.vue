@@ -131,6 +131,7 @@ const shipParams = computed(() => {
   const player = game.player
   return [
     { label: 'HULL', value: `${pad(ship.hull)} / ${pad(ship.maxHull)}` },
+    { label: 'ATK', value: pad(SHIP_DEFINITIONS[ship.class].attack) },
     { label: 'FUEL', value: pad(player.fuel) },
     { label: 'CR', value: pad(player.credits) },
     { label: 'HOLD', value: `${cargoUsed(ship.cargo)}/${CARGO_CAPACITY[ship.class]}` },

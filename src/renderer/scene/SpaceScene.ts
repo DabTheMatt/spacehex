@@ -6,9 +6,11 @@ import { BoardRenderer } from '../board/BoardRenderer'
 import { TilePreviewRenderer } from '../board/TilePreviewRenderer'
 import { ShipRenderer } from '../entities/ShipRenderer'
 import { HoverTargetRenderer } from '../entities/HoverTargetRenderer'
+import { CombatFx } from '../fx/CombatFx'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
+import { SHIP_DEFINITIONS } from '../../game/definitions/ships'
 import type { ResourceId } from '../../game/definitions/resources'
 import { userDataFromHits } from './pickHelpers'
 import type { BoardHover } from '../../ui/boardHover'
@@ -41,8 +43,10 @@ export class SpaceScene {
   readonly preview: TilePreviewRenderer
   readonly ships: ShipRenderer
   readonly hoverTargets: HoverTargetRenderer
+  readonly combat: CombatFx
   readonly raycaster = new THREE.Raycaster()
   private disposed = false
+  private pendingCombat: Array<{ attackerId: string; defenderId: string; since: number }> = []
   private lastState: GameState | null = null
   private lastOptions: SceneOptions | null = null
   private primed = false
@@ -73,7 +77,14 @@ export class SpaceScene {
     this.preview = new TilePreviewRenderer()
     this.ships = new ShipRenderer()
     this.hoverTargets = new HoverTargetRenderer()
-    this.scene.add(this.board.group, this.preview.group, this.ships.group, this.hoverTargets.group)
+    this.combat = new CombatFx()
+    this.scene.add(
+      this.board.group,
+      this.preview.group,
+      this.ships.group,
+      this.hoverTargets.group,
+      this.combat.group,
+    )
     this.loop()
   }
 
@@ -94,6 +105,13 @@ export class SpaceScene {
       if (event.type === 'GAME_STARTED') {
         this.resetSession()
         this.camera.panTo({ q: 0, r: 0 })
+      }
+      if (event.type === 'COMBAT_RESOLVED') {
+        this.pendingCombat.push({
+          attackerId: event.attackerId,
+          defenderId: event.defenderId,
+          since: performance.now(),
+        })
       }
     }
   }
@@ -247,6 +265,46 @@ export class SpaceScene {
     this.hideGlyphKeys.clear()
     this.revealWhenSettled.clear()
     this.ships.reset()
+    this.combat.dispose()
+    this.pendingCombat = []
+  }
+
+  private flushCombat(state: GameState, now: number): void {
+    const rest: typeof this.pendingCombat = []
+    for (const fight of this.pendingCombat) {
+      const from = this.ships.worldPose(fight.attackerId)
+      const to = this.ships.worldPose(fight.defenderId)
+      if (!from || !to) {
+        rest.push(fight)
+        continue
+      }
+      const dist = Math.hypot(from.x - to.x, from.z - to.z)
+      if (dist > 1.25 && now - fight.since < 8000) {
+        rest.push(fight)
+        continue
+      }
+      const attacker = state.ships[fight.attackerId]
+      const defender = state.ships[fight.defenderId]
+      if (attacker) {
+        this.combat.spawnVolley(
+          from,
+          from.yaw,
+          to,
+          SHIP_DEFINITIONS[attacker.class].attack,
+          now,
+        )
+      }
+      if (defender) {
+        this.combat.spawnVolley(
+          to,
+          to.yaw,
+          from,
+          SHIP_DEFINITIONS[defender.class].attack,
+          now + 90,
+        )
+      }
+    }
+    this.pendingCombat = rest
   }
 
   private loop = (): void => {
@@ -259,6 +317,8 @@ export class SpaceScene {
     this.preview.tick(time)
     const shipsSettled = this.ships.tick(this.camera.camera, time)
     this.hoverTargets.tick(time)
+    if (this.lastState) this.flushCombat(this.lastState, now)
+    this.combat.tick(now)
     let glyphsChanged = false
     for (const coord of this.ships.consumeLanded()) {
       const key = coordKey(coord)
