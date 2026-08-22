@@ -33,6 +33,7 @@ import { commandMode } from '@/ui/commandMode'
 import { coordKey } from '@/game/board/HexCoord'
 import { getTileDefinition } from '@/game/definitions/tiles'
 import { SHIP_DEFINITIONS } from '@/game/definitions/ships'
+import { CARGO_CAPACITY, cargoUsed } from '@/game/definitions/resources'
 
 const game = useGameStore()
 const ui = useUiStore()
@@ -78,6 +79,8 @@ const params = computed(() => {
     return [
       { label: 'HULL', value: `${pad(ship.hull)} / ${pad(ship.maxHull)}` },
       { label: 'FUEL', value: pad(player.fuel) },
+      { label: 'CR', value: pad(player.credits) },
+      { label: 'HOLD', value: `${cargoUsed(ship.cargo)}/${CARGO_CAPACITY[ship.class]}` },
       { label: 'PCH', value: pad(player.glory) },
     ]
   }
@@ -86,6 +89,13 @@ const params = computed(() => {
 
 const hint = computed(() => {
   if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE'
+  if (ui.selectedTile) {
+    const key = coordKey(ui.selectedTile)
+    const market = game.state.planetMarkets[key]
+    if (market?.lots.length) return 'CLICK A LOT TO BUY  ·  1 UNIT'
+  }
+  const here = game.state.planetMarkets[coordKey(game.ship.coord)]
+  if (here?.lots.length) return 'CLICK A LOT TO BUY  ·  1 UNIT'
   return ''
 })
 

@@ -4,6 +4,7 @@ import type { HexCoord } from '../board/HexCoord'
 import type { Rotation } from '../board/tileRotation'
 import type { GameEvent } from '../engine/events'
 import type { ShipClass } from '../definitions/ships'
+import type { PlanetMarket, ResourceId } from '../definitions/resources'
 
 export type GamePhase = 'PLAYER_TURN' | 'TILE_PLACEMENT'
 
@@ -23,6 +24,7 @@ export interface PlayerState {
   shipId: string
   fuel: number
   glory: number
+  credits: number
 }
 
 export interface ShipState {
@@ -32,6 +34,7 @@ export interface ShipState {
   coord: HexCoord
   hull: number
   maxHull: number
+  cargo: Record<ResourceId, number>
 }
 
 export interface NpcShipState {
@@ -54,6 +57,7 @@ export interface GameState {
   players: Record<string, PlayerState>
   ships: Record<string, ShipState>
   npcShips: Record<string, NpcShipState>
+  planetMarkets: Record<string, PlanetMarket>
   log: GameEvent[]
   movementSpent: boolean
 }

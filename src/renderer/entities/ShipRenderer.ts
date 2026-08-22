@@ -27,7 +27,7 @@ import {
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
-const RIM = HEX_SIZE * 0.64
+const RIM = HEX_SIZE * 0.5
 const HULL_HEIGHT = 0.11
 const BASE_HOVER = TILE_THICKNESS + 0.14
 
@@ -124,7 +124,10 @@ export class ShipRenderer {
     const fromW = getWorldPosition(from)
     const toW = getWorldPosition(to)
     const last = this.lastXZ.get(shipId)
-    const endYaw = Math.atan2(toW.x - fromW.x, toW.z - fromW.z)
+    const endYaw = Math.atan2(
+      toW.x - (last?.x ?? fromW.x),
+      toW.z - (last?.z ?? fromW.z),
+    )
     const startYaw = this.facing.get(shipId) ?? lastMoveYaw([], shipId, from)
     const yawDelta = shortestAngleDelta(startYaw, endYaw)
     const instant = prefersReducedMotion()
@@ -181,11 +184,6 @@ export class ShipRenderer {
       group.ships.forEach((ship, index) => {
         const slot = stackWorld(group.coord, group.ships.length, index, group.yaw)
         targets.set(ship.id, slot)
-        const motion = this.motion.get(ship.id)
-        if (motion?.kind === 'fly') {
-          motion.toX = slot.x
-          motion.toZ = slot.z
-        }
       })
     }
 

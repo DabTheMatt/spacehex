@@ -116,6 +116,12 @@ function onUp(ev: PointerEvent): void {
     return
   }
 
+  const buy = scene.pickBuy(ev.clientX, ev.clientY)
+  if (buy && game.state.phase === 'PLAYER_TURN') {
+    game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })
+    return
+  }
+
   const hover = scene.pickHover(ev.clientX, ev.clientY)
   if (hover && game.state.phase === 'PLAYER_TURN') {
     if (hover.kind === 'STAY') {

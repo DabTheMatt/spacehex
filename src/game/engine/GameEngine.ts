@@ -2,6 +2,7 @@ import type { GameCommand } from './commands'
 import type { GameEvent } from './events'
 import type { GameState } from '../state/GameState'
 import { GAME_STATE_VERSION, PLAYER_IDS, STARTING_FUEL } from '../definitions/constants'
+import { emptyCargo, STARTING_CREDITS } from '../definitions/resources'
 import { EXPLORATION_TILE_IDS, EVA_TILE_ID, getTileDefinition } from '../definitions/tiles'
 import { SHIP_DEFINITIONS } from '../definitions/ships'
 import { RNG } from '../random/RNG'
@@ -16,6 +17,8 @@ import { canMoveTo } from '../rules/movement'
 import { canExploreDirection } from '../rules/exploration'
 import { resolveCombatOnEntry } from '../rules/combat'
 import { resolveSector } from '../rules/glory'
+import { buyResource, stockPlanetIfNeeded } from '../rules/planetMarket'
+import type { ResourceId } from '../definitions/resources'
 import type { HexCoord } from '../board/HexCoord'
 import type { PlacedTile } from '../board/Tile'
 
@@ -47,6 +50,7 @@ export function createInitialState(seed: string): GameState {
       shipId: 'mewa-1',
       fuel: STARTING_FUEL,
       glory: 0,
+      credits: STARTING_CREDITS,
     },
     'player-2': {
       id: 'player-2',
@@ -54,6 +58,7 @@ export function createInitialState(seed: string): GameState {
       shipId: 'mewa-2',
       fuel: STARTING_FUEL,
       glory: 0,
+      credits: STARTING_CREDITS,
     },
   }
 
@@ -66,6 +71,7 @@ export function createInitialState(seed: string): GameState {
       coord: { q: 0, r: 0 },
       hull: mewa.hull,
       maxHull: mewa.hull,
+      cargo: emptyCargo(),
     },
     'mewa-2': {
       id: 'mewa-2',
@@ -74,6 +80,7 @@ export function createInitialState(seed: string): GameState {
       coord: { q: 0, r: 0 },
       hull: mewa.hull,
       maxHull: mewa.hull,
+      cargo: emptyCargo(),
     },
   }
 
@@ -89,6 +96,7 @@ export function createInitialState(seed: string): GameState {
     players,
     ships,
     npcShips: {},
+    planetMarkets: {},
     log: [{ type: 'GAME_STARTED', seed }, { type: 'ROUND_STARTED', round: 1 }],
     movementSpent: false,
   }
@@ -130,6 +138,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return confirmPlacement(state)
     case 'SKIP_MOVEMENT':
       return skipMovement(state)
+    case 'BUY_RESOURCE':
+      return buyResourceCommand(state, command.coord, command.resource)
     case 'END_TURN':
       return endTurn(state)
     case 'DEV_ADD_FUEL':
@@ -332,10 +342,16 @@ function confirmPlacement(state: GameState): EngineResult {
   )
 
   const moved = moveShip(next, placed.coord, FUEL_COST_EXPLORE)
-  next = moved.state
+  const before = moved.state
+  next = stockPlanetIfNeeded(before, placed.id, placed.coord)
   const sector = resolveSector(next, placed.id)
-  next = append(next, [sector])
-  return { state: next, events: [...placeEvents, ...moved.events, sector] }
+  const extra: GameEvent[] = []
+  if (next.planetMarkets[coordKey(placed.coord)] && !before.planetMarkets[coordKey(placed.coord)]) {
+    extra.push({ type: 'PLANET_STOCKED', tileId: placed.id, coord: placed.coord })
+  }
+  extra.push(sector)
+  next = append(next, extra)
+  return { state: next, events: [...placeEvents, ...moved.events, ...extra] }
 }
 
 function moveShip(state: GameState, target: HexCoord, fuelCost: number): EngineResult {
@@ -376,6 +392,24 @@ function skipMovement(state: GameState): EngineResult {
     exploration: { status: 'NONE' },
   }
   return { state: next, events: [] }
+}
+
+function buyResourceCommand(
+  state: GameState,
+  coord: HexCoord,
+  resource: ResourceId,
+): EngineResult {
+  if (!requireTurn(state)) return reject(state, 'BUY_RESOURCE', 'NOT_IN_TURN')
+  const result = buyResource(state, coord, resource)
+  if (!result.ok) return reject(state, 'BUY_RESOURCE', result.reason)
+  const player = activePlayer(result.state)
+  const lotPrice =
+    state.planetMarkets[coordKey(coord)]?.lots.find((item) => item.id === resource)?.price ?? 0
+  const events: GameEvent[] = [
+    { type: 'RESOURCE_BOUGHT', playerId: player.id, resource, price: lotPrice, coord },
+    { type: 'CREDITS_CHANGED', playerId: player.id, credits: player.credits },
+  ]
+  return { state: append(result.state, events), events }
 }
 
 function endTurn(state: GameState): EngineResult {
@@ -448,17 +482,22 @@ function devPlace(
     { type: 'TILE_PLACED', tileId, coord },
     { type: 'HEX_DISCOVERED', tileId },
   ]
-  return {
-    state: append(
-      {
-        ...state,
-        board: { tiles: { ...state.board.tiles, [coordKey(coord)]: placed } },
-        explorationDeck: deck,
-      },
-      events,
-    ),
+  let next = append(
+    {
+      ...state,
+      board: { tiles: { ...state.board.tiles, [coordKey(coord)]: placed } },
+      explorationDeck: deck,
+    },
     events,
+  )
+  const beforeMarkets = next.planetMarkets
+  next = stockPlanetIfNeeded(next, tileId, coord)
+  if (next.planetMarkets[coordKey(coord)] && !beforeMarkets[coordKey(coord)]) {
+    const stocked: GameEvent = { type: 'PLANET_STOCKED', tileId, coord }
+    next = append(next, [stocked])
+    events.push(stocked)
   }
+  return { state: next, events }
 }
 
 function devRotate(

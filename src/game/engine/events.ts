@@ -1,5 +1,6 @@
 import type { HexCoord } from '../board/HexCoord'
 import type { Rotation } from '../board/tileRotation'
+import type { ResourceId } from '../definitions/resources'
 
 export type GameEvent =
   | { type: 'GAME_STARTED'; seed: string }
@@ -12,6 +13,9 @@ export type GameEvent =
   | { type: 'SHIP_MOVED'; shipId: string; from: HexCoord; to: HexCoord }
   | { type: 'HEX_DISCOVERED'; tileId: string }
   | { type: 'SECTOR_RESOLVED'; tileId: string; note: string }
+  | { type: 'PLANET_STOCKED'; tileId: string; coord: HexCoord }
+  | { type: 'RESOURCE_BOUGHT'; playerId: string; resource: ResourceId; price: number; coord: HexCoord }
+  | { type: 'CREDITS_CHANGED'; playerId: string; credits: number }
   | { type: 'COMBAT_RESOLVED'; attackerId: string; defenderId: string; damage: number }
   | { type: 'TURN_ENDED'; playerId: string }
   | { type: 'ROUND_STARTED'; round: number }

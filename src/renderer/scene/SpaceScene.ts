@@ -9,6 +9,7 @@ import { HoverTargetRenderer } from '../entities/HoverTargetRenderer'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
+import type { ResourceId } from '../../game/definitions/resources'
 import { userDataFromHits } from './pickHelpers'
 import type { BoardHover } from '../../ui/boardHover'
 import { TILE_SETTLED_Y, TILE_SLOT_Y } from '../board/TileRenderer'
@@ -113,6 +114,11 @@ export class SpaceScene {
   pickTile(clientX: number, clientY: number): HexCoord | null {
     const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
     return userDataFromHits<HexCoord>(hits, 'tileCoord') ?? null
+  }
+
+  pickBuy(clientX: number, clientY: number): { coord: HexCoord; resource: ResourceId } | null {
+    const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
+    return userDataFromHits<{ coord: HexCoord; resource: ResourceId }>(hits, 'buyLot') ?? null
   }
 
   private beginRise(key: string): void {

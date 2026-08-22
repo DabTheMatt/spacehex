@@ -14,6 +14,7 @@ import {
   TILE_THICKNESS,
 } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
+import { createPlanetLots } from './planetLots'
 import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
 import { canExploreDirection } from '../../game/rules/exploration'
@@ -84,6 +85,10 @@ export class BoardRenderer {
       keep.add(key)
       const selected = options.selectedKey === key
       const hideGlyph = options.hideGlyphKeys?.has(key) === true
+      const market = state.planetMarkets[key]
+      const marketSig = market
+        ? market.lots.map((lot) => `${lot.id}:${lot.amount}:${lot.price}`).join(',')
+        : ''
       const sig = [
         tile.id,
         tile.definitionId,
@@ -92,6 +97,7 @@ export class BoardRenderer {
         options.showDebug ? 'd' : '',
         options.showCoords ? 'c' : '',
         options.showEdges ? 'e' : '',
+        marketSig,
       ].join('|')
       const existing = this.tileCache.get(key)
       if (existing?.sig === sig) {
@@ -112,6 +118,7 @@ export class BoardRenderer {
       mesh.userData.tileKey = key
       const glyph = createTileGlyph(def, palette.paper, tile.id)
       glyph.position.y = TILE_THICKNESS
+      if (market) glyph.add(createPlanetLots(market, tile.coord))
       mesh.userData.glyph = glyph
       mesh.add(glyph)
       this.syncGlyphFade(key, mesh, hideGlyph, true)
