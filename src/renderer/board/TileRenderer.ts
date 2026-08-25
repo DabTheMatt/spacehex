@@ -7,10 +7,11 @@ export const TILE_THICKNESS = 0.1
 export const TILE_SLOT_Y = -TILE_THICKNESS
 export const TILE_SETTLED_Y = 0
 
-function hexShape(radius: number): THREE.Shape {
+function hexShape(radius: number, clockwise = false): THREE.Shape {
   const shape = new THREE.Shape()
   for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i
+    const t = clockwise ? 6 - i : i
+    const angle = (Math.PI / 3) * t
     const x = radius * Math.cos(angle)
     const y = -radius * Math.sin(angle)
     if (i === 0) shape.moveTo(x, y)
@@ -222,46 +223,81 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
   return g
 }
 
-/** Empty-neighbor ghost — dashed outline only, not a placed tile. */
-export function makeDashedHexGhost(direction: number, opacity = 0.22): THREE.Group {
+/** Legal-destination ghost — thick ochre frame (WebGL lines are 1px and vanish on phones). */
+export function makeDashedHexGhost(
+  direction: number,
+  opacity = 0.72,
+  kind: 'EXPLORE' | 'MOVE' = 'EXPLORE',
+): THREE.Group {
   const g = new THREE.Group()
   const radius = HEX_SIZE * 0.96
   const y = 0.006
+  const pick = { kind, direction }
+  const ringOpacity = Math.min(1, opacity)
+
+  const frame = hexFrameMesh(radius, 0.055, palette.ochre, ringOpacity)
+  frame.position.y = y
+  frame.userData = pick
+  g.add(frame)
+
   const pts: THREE.Vector3[] = []
   for (let i = 0; i <= 6; i++) {
     const angle = (Math.PI / 3) * (i % 6)
-    pts.push(new THREE.Vector3(radius * Math.cos(angle), y, radius * Math.sin(angle)))
+    pts.push(new THREE.Vector3(radius * Math.cos(angle), y + 0.004, radius * Math.sin(angle)))
   }
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(pts),
     new THREE.LineDashedMaterial({
-      color: palette.ochre,
-      dashSize: 0.07,
-      gapSize: 0.055,
+      color: palette.ivory,
+      dashSize: 0.09,
+      gapSize: 0.045,
       transparent: true,
-      opacity,
-    }),
-  )
-  line.computeLineDistances()
-  const pick = { kind: 'EXPLORE', direction }
-  line.userData = pick
-  g.add(line)
-
-  const hit = new THREE.Mesh(
-    new THREE.ShapeGeometry(hexShape(radius)),
-    new THREE.MeshBasicMaterial({
-      color: palette.ochre,
-      transparent: true,
-      opacity: Math.min(0.08, opacity * 0.25),
-      side: THREE.DoubleSide,
+      opacity: ringOpacity,
       depthWrite: false,
     }),
   )
-  hit.rotation.x = -Math.PI / 2
-  hit.position.y = y
-  hit.userData = pick
-  g.add(hit)
+  line.computeLineDistances()
+  line.userData = pick
+  g.add(line)
+
+  // Empty explore slots need a faint plate so the hex reads on the void.
+  // Move ghosts sit on an existing tile — no extra fill (interface.md).
+  if (kind === 'EXPLORE') {
+    const hit = new THREE.Mesh(
+      new THREE.ShapeGeometry(hexShape(radius - 0.06)),
+      new THREE.MeshBasicMaterial({
+        color: palette.ochre,
+        transparent: true,
+        opacity: Math.min(0.14, opacity * 0.2),
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    )
+    hit.rotation.x = -Math.PI / 2
+    hit.position.y = y
+    hit.userData = pick
+    g.add(hit)
+  }
   g.userData = pick
   return g
+}
+
+function hexFrameMesh(radius: number, width: number, color: number, opacity: number): THREE.Mesh {
+  const outer = hexShape(radius)
+  const hole = hexShape(Math.max(0.05, radius - width), true)
+  outer.holes.push(hole)
+  const mesh = new THREE.Mesh(
+    new THREE.ShapeGeometry(outer),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: opacity < 1,
+      opacity,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
+    }),
+  )
+  mesh.rotation.x = -Math.PI / 2
+  return mesh
 }
 

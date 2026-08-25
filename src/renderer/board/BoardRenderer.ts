@@ -59,7 +59,7 @@ export class BoardRenderer {
     this.drawExploreGhosts(state, options.hover)
     this.drawMoveGhosts(state, options.hover)
     if (options.hover?.kind === 'STAY') {
-      this.drawHoverGhost(-1, options.hover.coord, 0.85, TILE_THICKNESS)
+      this.drawHoverGhost(-1, options.hover.coord, 0.85, TILE_THICKNESS, 'MOVE')
     }
   }
 
@@ -259,8 +259,9 @@ export class BoardRenderer {
     coord: { q: number; r: number },
     opacity: number,
     y = TILE_SETTLED_Y,
+    kind: 'EXPLORE' | 'MOVE' = 'EXPLORE',
   ): void {
-    const ghost = makeDashedHexGhost(direction, opacity)
+    const ghost = makeDashedHexGhost(direction, opacity, kind)
     const pos = getWorldPosition(coord)
     ghost.position.set(pos.x, y, pos.z)
     this.markers.add(ghost)
@@ -274,7 +275,7 @@ export class BoardRenderer {
       const target = getNeighbor(origin, dir)
       const hot =
         hover?.kind === 'EXPLORE' && hover.coord.q === target.q && hover.coord.r === target.r
-      this.drawHoverGhost(dir, target, hot ? 0.92 : 0.16)
+      this.drawHoverGhost(dir, target, hot ? 0.98 : 0.78, TILE_SETTLED_Y, 'EXPLORE')
     }
   }
 
@@ -285,7 +286,7 @@ export class BoardRenderer {
       const target = getNeighbor(origin, dir)
       if (!canMoveTo(state, target)) continue
       const hot = hover?.kind === 'MOVE' && hover.coord.q === target.q && hover.coord.r === target.r
-      this.drawHoverGhost(dir, target, hot ? 0.92 : 0.16, TILE_THICKNESS)
+      this.drawHoverGhost(dir, target, hot ? 0.98 : 0.86, TILE_THICKNESS, 'MOVE')
     }
   }
 
