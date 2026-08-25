@@ -223,19 +223,21 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
   return g
 }
 
-/** Legal-destination ghost — thick ochre frame (WebGL lines are 1px and vanish on phones). */
+/** Legal-destination ghost — thick ivory frame (WebGL lines are 1px and vanish on phones). */
 export function makeDashedHexGhost(
   direction: number,
   opacity = 0.72,
   kind: 'EXPLORE' | 'MOVE' = 'EXPLORE',
 ): THREE.Group {
   const g = new THREE.Group()
-  const radius = HEX_SIZE * 0.96
+  const radius = HEX_SIZE * (kind === 'MOVE' ? 1.04 : 0.98)
   const y = 0.006
   const pick = { kind, direction }
   const ringOpacity = Math.min(1, opacity)
+  const color = palette.ivory
+  const frameWidth = kind === 'MOVE' ? 0.12 : 0.16
 
-  const frame = hexFrameMesh(radius, 0.055, palette.ochre, ringOpacity)
+  const frame = hexFrameMesh(radius, frameWidth, color, ringOpacity)
   frame.position.y = y
   frame.userData = pick
   g.add(frame)
@@ -248,9 +250,9 @@ export function makeDashedHexGhost(
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(pts),
     new THREE.LineDashedMaterial({
-      color: palette.ivory,
-      dashSize: 0.09,
-      gapSize: 0.045,
+      color: palette.ochre,
+      dashSize: 0.1,
+      gapSize: 0.04,
       transparent: true,
       opacity: ringOpacity,
       depthWrite: false,
@@ -264,11 +266,11 @@ export function makeDashedHexGhost(
   // Move ghosts sit on an existing tile — no extra fill (interface.md).
   if (kind === 'EXPLORE') {
     const hit = new THREE.Mesh(
-      new THREE.ShapeGeometry(hexShape(radius - 0.06)),
+      new THREE.ShapeGeometry(hexShape(radius - frameWidth - 0.02)),
       new THREE.MeshBasicMaterial({
-        color: palette.ochre,
+        color: palette.ivory,
         transparent: true,
-        opacity: Math.min(0.14, opacity * 0.2),
+        opacity: Math.min(0.22, opacity * 0.28),
         side: THREE.DoubleSide,
         depthWrite: false,
       }),
