@@ -68,6 +68,8 @@ export class CameraController {
     this.controls.mouseButtons.LEFT = null
     this.controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY
     this.controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE
+    this.controls.touches.ONE = THREE.TOUCH.PAN
+    this.controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE
     this.controls.enableRotate = true
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('keyup', this.onKeyUp)

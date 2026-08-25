@@ -38,6 +38,14 @@
     </section>
 
     <div class="command-bar__end">
+      <div v-if="mode === 'EXPLORE_ROTATION'" class="command-bar__rotate">
+        <button type="button" class="action" @click="game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'LEFT' })">
+          Q
+        </button>
+        <button type="button" class="action" @click="game.dispatch({ type: 'ROTATE_PENDING_TILE', direction: 'RIGHT' })">
+          E
+        </button>
+      </div>
       <button
         v-if="showEndTurn"
         type="button"
@@ -66,6 +74,7 @@ import {
 } from '@/game/definitions/resources'
 import { shipsAt } from '@/game/rules/combat'
 import { buyPrice, evaSellParts, formatSellParts, isEvaHex } from '@/game/rules/planetMarket'
+import { prefersCoarsePointer } from '@/ui/pointerInput'
 
 const game = useGameStore()
 const ui = useUiStore()
@@ -106,11 +115,11 @@ const planetLots = computed(() => {
 })
 
 const planetHint = computed(() => {
-  if (mode.value === 'EXPLORE_ROTATION') return 'Q / E  ROTATE'
+  if (mode.value === 'EXPLORE_ROTATION') return prefersCoarsePointer() ? 'TAP HEX TO PLACE' : 'Q / E  ROTATE'
   const others = shipsAt(game.state, game.ship.coord).filter((item) => item.id !== game.ship.id)
   if (others.length && others.some((item) => item.hull > 0)) {
     if ((game.player.attacksThisTurn ?? 0) >= 1) return 'ATTACK USED THIS TURN'
-    return 'RIGHT-CLICK ENEMY TO ATTACK'
+    return prefersCoarsePointer() ? 'HOLD OR TAP ENEMY TO ATTACK' : 'RIGHT-CLICK ENEMY TO ATTACK'
   }
   if (isEvaHex(planetCoord.value)) {
     const here = isEvaHex(game.ship.coord)

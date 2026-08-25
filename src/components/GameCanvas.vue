@@ -22,8 +22,12 @@ import { coordKey } from '@/game/board/HexCoord'
 import { planetInspectTheta } from '@/renderer/board/planetLots'
 import { canDeclareAttack, hostileOnHex } from '@/game/rules/combat'
 import { isEvaHex } from '@/game/rules/planetMarket'
-
-const DRAG_PX = 12
+import {
+  dragThreshold,
+  isAttackConfirmTap,
+  isTouchLike,
+  LONG_PRESS_MS,
+} from '@/ui/pointerInput'
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 const bootError = ref('')
@@ -33,6 +37,11 @@ let scene: SpaceScene | null = null
 let downX = 0
 let downY = 0
 let dragging = false
+let pinch = false
+let tapConsumed = false
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
+let lastTapShip: { id: string; at: number } | null = null
+const pointers = new Set<number>()
 
 function sync(): void {
   if (!scene) return
@@ -59,7 +68,21 @@ function focusShip(shipId: string): void {
 function resize(): void {
   if (!scene || !canvasEl.value) return
   const parent = canvasEl.value.parentElement ?? document.body
-  scene.resize(parent.clientWidth, parent.clientHeight)
+  const vv = window.visualViewport
+  const width = Math.round(vv?.width ?? parent.clientWidth)
+  const height = Math.round(vv?.height ?? parent.clientHeight)
+  scene.resize(width, height)
+}
+
+function clearLongPress(): void {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
+function setCursor(kind: 'grab' | 'pointer'): void {
+  if (canvasEl.value) canvasEl.value.style.cursor = kind
 }
 
 function updateHover(clientX: number, clientY: number): void {
@@ -68,43 +91,85 @@ function updateHover(clientX: number, clientY: number): void {
   if (shipHit && hostileOnHex(game.state, shipHit.shipId)) {
     ui.threatShipId = shipHit.shipId
     ui.hover = null
-    scene.camera.setOrbitEnabled(false)
-    if (canvasEl.value) canvasEl.value.style.cursor = 'pointer'
+    setCursor('pointer')
     return
   }
   ui.threatShipId = null
-  scene.camera.setOrbitEnabled(true)
-  if (canvasEl.value) canvasEl.value.style.cursor = 'grab'
+  setCursor('grab')
   ui.hover = scene.pickHover(clientX, clientY)
 }
 
+function tryAttack(shipId: string): boolean {
+  if (!scene) return false
+  const check = canDeclareAttack(game.state, shipId)
+  if (!check.ok) {
+    if (check.reason === 'ATTACK_LIMIT') ui.flashNotice('ATTACK LIMIT REACHED')
+    return false
+  }
+  ui.inspectPlanet = null
+  ui.mapOverview = false
+  scene.camera.clearInspectLimits()
+  game.dispatch({ type: 'DECLARE_ATTACK', defenderId: shipId })
+  ui.threatShipId = null
+  lastTapShip = null
+  return true
+}
+
 function onLeave(): void {
-  if (dragging) return
+  if (dragging || pinch || pointers.size > 0) return
   ui.hover = null
   ui.threatShipId = null
   scene?.camera.setOrbitEnabled(true)
-  if (canvasEl.value) canvasEl.value.style.cursor = 'grab'
+  setCursor('grab')
 }
 
 function onDown(ev: PointerEvent): void {
+  pointers.add(ev.pointerId)
   downX = ev.clientX
   downY = ev.clientY
   dragging = false
+  tapConsumed = false
   canvasEl.value?.focus()
-  if (ev.button === 0) {
+  if (pointers.size >= 2) {
+    pinch = true
+    clearLongPress()
+    if (dragging) scene?.camera.endPan()
+    dragging = false
+    scene?.camera.setOrbitEnabled(true)
+    return
+  }
+  pinch = false
+  if (!isTouchLike(ev.pointerType) && ev.button === 0) {
     canvasEl.value?.setPointerCapture(ev.pointerId)
   }
-  if (ev.button === 2) {
-    ev.preventDefault()
+  if (ev.button === 2) ev.preventDefault()
+  if (!scene) return
+  if (isTouchLike(ev.pointerType)) {
+    scene.camera.setOrbitEnabled(false)
+    updateHover(ev.clientX, ev.clientY)
+    const shipHit = scene.pickShip(ev.clientX, ev.clientY)
+    if (shipHit && hostileOnHex(game.state, shipHit.shipId)) {
+      const id = shipHit.shipId
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null
+        tapConsumed = tryAttack(id)
+      }, LONG_PRESS_MS)
+    }
+  } else if (ev.button === 0 && ui.threatShipId) {
+    scene.camera.setOrbitEnabled(false)
   }
 }
 
 function onMove(ev: PointerEvent): void {
   if (!scene) return
-  if ((ev.buttons & 1) === 1) {
+  if (pinch || pointers.size >= 2) return
+    const held =
+      isTouchLike(ev.pointerType) || (ev.pointerType === 'mouse' && (ev.buttons & 1) === 1)
+  if (held && pointers.has(ev.pointerId)) {
     const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY)
-    if (!dragging && dist > DRAG_PX) {
+    if (!dragging && dist > dragThreshold(ev.pointerType)) {
       dragging = true
+      clearLongPress()
       scene.camera.setOrbitEnabled(false)
       scene.camera.beginPan(ev.clientX, ev.clientY)
       return
@@ -112,48 +177,66 @@ function onMove(ev: PointerEvent): void {
     if (dragging) scene.camera.updatePan(ev.clientX, ev.clientY)
     return
   }
-  if (ev.buttons === 0) updateHover(ev.clientX, ev.clientY)
+  if (ev.pointerType === 'mouse' && ev.buttons === 0) updateHover(ev.clientX, ev.clientY)
 }
 
 function onUp(ev: PointerEvent): void {
   if (!scene) return
+  pointers.delete(ev.pointerId)
   const wasDrag = dragging
-  if (ev.button === 0) {
+  const wasPinch = pinch
+  if (pointers.size === 0) pinch = false
+  clearLongPress()
+  if (!isTouchLike(ev.pointerType) && ev.button === 0) {
     scene.camera.endPan()
     scene.camera.setOrbitEnabled(true)
     canvasEl.value?.releasePointerCapture(ev.pointerId)
+  } else {
+    scene.camera.endPan()
+    if (pointers.size === 0) scene.camera.setOrbitEnabled(true)
   }
   dragging = false
-  if (wasDrag) return
-
-  if (ev.button === 2) {
-    ev.preventDefault()
-    const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY)
-    if (dist > DRAG_PX) return
-    const shipHit = scene.pickShip(ev.clientX, ev.clientY)
-    if (shipHit) {
-      const check = canDeclareAttack(game.state, shipHit.shipId)
-      if (!check.ok) {
-        if (check.reason === 'ATTACK_LIMIT') ui.flashNotice('ATTACK LIMIT REACHED')
-        return
-      }
-      ui.inspectPlanet = null
-      ui.mapOverview = false
-      scene.camera.clearInspectLimits()
-      game.dispatch({ type: 'DECLARE_ATTACK', defenderId: shipHit.shipId })
-      ui.threatShipId = null
-    }
+  if (wasDrag || wasPinch || pointers.size > 0) return
+  if (tapConsumed) {
+    tapConsumed = false
     return
   }
 
+  if (ev.button === 2) {
+    ev.preventDefault()
+    if (Math.hypot(ev.clientX - downX, ev.clientY - downY) > dragThreshold(ev.pointerType)) return
+    const shipHit = scene.pickShip(ev.clientX, ev.clientY)
+    if (shipHit) tryAttack(shipHit.shipId)
+    return
+  }
+
+  if (isTouchLike(ev.pointerType)) {
+    const shipHit = scene.pickShip(ev.clientX, ev.clientY)
+    if (shipHit && hostileOnHex(game.state, shipHit.shipId)) {
+      if (isAttackConfirmTap(lastTapShip, shipHit.shipId, performance.now())) {
+        tryAttack(shipHit.shipId)
+        return
+      }
+      lastTapShip = { id: shipHit.shipId, at: performance.now() }
+      ui.threatShipId = shipHit.shipId
+      return
+    }
+    lastTapShip = null
+  }
+
+  handleTap(ev.clientX, ev.clientY)
+}
+
+function handleTap(clientX: number, clientY: number): void {
+  if (!scene) return
   if (game.state.phase === 'TILE_PLACEMENT') {
-    if (scene.pickPlacement(ev.clientX, ev.clientY)) {
+    if (scene.pickPlacement(clientX, clientY)) {
       game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
     }
     return
   }
 
-  const name = scene.pickPlanetName(ev.clientX, ev.clientY)
+  const name = scene.pickPlanetName(clientX, clientY)
   if (name) {
     const key = coordKey(name)
     const inspectable = Boolean(game.state.planetMarkets[key] || isEvaHex(name))
@@ -170,7 +253,7 @@ function onUp(ev: PointerEvent): void {
     }
   }
 
-  const buy = scene.pickBuy(ev.clientX, ev.clientY)
+  const buy = scene.pickBuy(clientX, clientY)
   if (buy && game.state.phase === 'PLAYER_TURN') {
     const events = game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })
     if (events.some((event) => event.type === 'COMMAND_REJECTED' && event.reason === 'BUY_LIMIT')) {
@@ -179,13 +262,13 @@ function onUp(ev: PointerEvent): void {
     return
   }
 
-  const sell = scene.pickSell(ev.clientX, ev.clientY)
+  const sell = scene.pickSell(clientX, clientY)
   if (sell && game.state.phase === 'PLAYER_TURN') {
     game.dispatch({ type: 'SELL_RESOURCE', resource: sell.resource })
     return
   }
 
-  const hover = scene.pickHover(ev.clientX, ev.clientY)
+  const hover = scene.pickHover(clientX, clientY)
   if (hover && game.state.phase === 'PLAYER_TURN') {
     if (hover.kind === 'STAY') {
       ui.inspectPlanet = null
@@ -211,7 +294,7 @@ function onUp(ev: PointerEvent): void {
     }
   }
 
-  const shipHit = scene.pickShip(ev.clientX, ev.clientY)
+  const shipHit = scene.pickShip(clientX, clientY)
   if (shipHit) {
     ui.inspectPlanet = null
     scene.camera.clearInspectLimits()
@@ -220,7 +303,7 @@ function onUp(ev: PointerEvent): void {
     return
   }
 
-  const tile = scene.pickTile(ev.clientX, ev.clientY)
+  const tile = scene.pickTile(clientX, clientY)
   ui.inspectPlanet = null
   scene.camera.clearInspectLimits()
   ui.selectedTile = tile
@@ -244,10 +327,15 @@ onMounted(() => {
   focusShip(game.ship.id)
   sync()
   window.addEventListener('resize', resize)
+  window.visualViewport?.addEventListener('resize', resize)
+  window.visualViewport?.addEventListener('scroll', resize)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', resize)
+  window.visualViewport?.removeEventListener('resize', resize)
+  window.visualViewport?.removeEventListener('scroll', resize)
+  clearLongPress()
   scene?.dispose()
 })
 
