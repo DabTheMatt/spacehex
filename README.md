@@ -20,9 +20,9 @@ Build:
 npm run build
 ```
 
-Po włączeniu GitHub Pages (Actions → workflow *Deploy GitHub Pages*) aplikacja będzie pod:
+Live prototype: **https://dabthematt.github.io/spacehex/**
 
-`https://dabthematt.github.io/spacehex/`
+The workflow `.github/workflows/pages.yml` builds and deploys on every push to `main`. If the site 404s, enable Pages once: **Settings → Pages → Source: GitHub Actions**.
 
 ## Sterowanie
 
