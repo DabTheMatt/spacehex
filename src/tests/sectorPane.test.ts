@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { APP_VERSION } from '../appVersion'
 import { hudPaneLabel } from '../ui/sectorPane'
@@ -40,4 +43,14 @@ describe('probe feed', () => {
     expect(PROBE_STROKE_OPACITY).toBeLessThanOrEqual(0.45)
     expect(PROBE_SCAN_OPACITY).toBeLessThanOrEqual(0.18)
   })
+
+  it('draws the discovered tile glyph under the probe', () => {
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../renderer/board/BoardRenderer.ts'),
+      'utf8',
+    )
+    expect(src).toContain('createTileGlyph(def, palette.paper, tile.id)')
+    expect(src).not.toMatch(/probed \? new THREE\.Group\(\)/)
+  })
 })
+

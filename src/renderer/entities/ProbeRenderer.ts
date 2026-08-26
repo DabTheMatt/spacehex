@@ -6,12 +6,12 @@ import { TILE_THICKNESS } from '../board/TileRenderer'
 import { prefersReducedMotion } from '../motion'
 
 const RING_COUNT = 2
-const HEX_SCANS = 4
+const HEX_SCANS = 2
 const BLUE = palette.engine
-/** No fill slab — wireframe hologram only. */
+/** No fill slab — wireframe hologram only. Tile glyph still shows the find. */
 export const PROBE_TILE_OPACITY = 0
 export const PROBE_STROKE_OPACITY = 0.4
-export const PROBE_SCAN_OPACITY = 0.16
+export const PROBE_SCAN_OPACITY = 0.12
 export const PROBE_LED_HZ = 2.2
 
 export function probeOwnerColor(playerId: string): number {
@@ -168,7 +168,7 @@ function makeProbeMesh(ledColor: number): THREE.Group {
       depthTest: false,
     }),
   )
-  led.position.y = 0.092
+  led.position.y = 0.098
   led.renderOrder = 13
   led.userData.probeLed = true
   g.add(body, needle, glow, led)

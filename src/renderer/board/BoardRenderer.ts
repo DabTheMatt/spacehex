@@ -162,7 +162,7 @@ export class BoardRenderer {
       mesh.rotation.y = tile.rotation * (Math.PI / 3)
       mesh.userData.tileCoord = tile.coord
       mesh.userData.tileKey = key
-      const glyph = probed ? new THREE.Group() : createTileGlyph(def, palette.paper, tile.id)
+      const glyph = createTileGlyph(def, palette.paper, tile.id)
       glyph.position.y = TILE_THICKNESS
       if (options.showTileNames !== false) {
         glyph.add(
