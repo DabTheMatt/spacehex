@@ -10,6 +10,7 @@ import {
   makeEdgeChevron,
   makeSelectionMarks,
   makeDashedHexGhost,
+  pulseHexGhosts,
   TILE_SETTLED_Y,
   TILE_THICKNESS,
 } from './TileRenderer'
@@ -59,7 +60,7 @@ export class BoardRenderer {
     this.drawExploreGhosts(state, options.hover)
     this.drawMoveGhosts(state, options.hover)
     if (options.hover?.kind === 'STAY') {
-      this.drawHoverGhost(-1, options.hover.coord, 0.85, TILE_THICKNESS, 'MOVE')
+      this.drawHoverGhost(-1, options.hover.coord, 0.35, TILE_THICKNESS, 'MOVE', false)
     }
   }
 
@@ -67,6 +68,7 @@ export class BoardRenderer {
     this.advanceGlyphFades(performance.now())
     tickTileGlyphs(this.tiles, time)
     tickPlanetLod(this.tiles, camera)
+    pulseHexGhosts(this.markers, time)
   }
 
   setTileY(key: string, y: number): void {
@@ -260,8 +262,9 @@ export class BoardRenderer {
     opacity: number,
     y = TILE_SETTLED_Y,
     kind: 'EXPLORE' | 'MOVE' = 'EXPLORE',
+    pulse = true,
   ): void {
-    const ghost = makeDashedHexGhost(direction, opacity, kind)
+    const ghost = makeDashedHexGhost(direction, opacity, kind, pulse)
     const pos = getWorldPosition(coord)
     ghost.position.set(pos.x, y, pos.z)
     this.markers.add(ghost)
@@ -275,7 +278,7 @@ export class BoardRenderer {
       const target = getNeighbor(origin, dir)
       const hot =
         hover?.kind === 'EXPLORE' && hover.coord.q === target.q && hover.coord.r === target.r
-      this.drawHoverGhost(dir, target, hot ? 0.95 : 0.78, TILE_SETTLED_Y, 'EXPLORE')
+      this.drawHoverGhost(dir, target, hot ? 0.55 : 0.38, TILE_SETTLED_Y, 'EXPLORE')
     }
   }
 
@@ -286,7 +289,7 @@ export class BoardRenderer {
       const target = getNeighbor(origin, dir)
       if (!canMoveTo(state, target)) continue
       const hot = hover?.kind === 'MOVE' && hover.coord.q === target.q && hover.coord.r === target.r
-      this.drawHoverGhost(dir, target, hot ? 0.95 : 0.82, TILE_THICKNESS, 'MOVE')
+      this.drawHoverGhost(dir, target, hot ? 0.55 : 0.38, TILE_THICKNESS, 'MOVE')
     }
   }
 

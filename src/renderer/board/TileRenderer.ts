@@ -4,6 +4,7 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 import { HEX_SIZE } from '../../game/board/hexMath'
 import { palette } from '../theme'
+import { prefersReducedMotion } from '../motion'
 
 export const TILE_THICKNESS = 0.1
 /** Incoming tile sits just under the board: its top face is the placed-hex floor (y = 0). */
@@ -226,39 +227,56 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
 }
 
 /**
- * Legal-destination ghost: a 2px dashed line in screen space.
- * Default WebGL lines are always 1 CSS pixel and vanish on a phone;
- * Line2 keeps a ~3 CSS-pixel stroke at any zoom (width is multiplied by DPR
- * because Line2 resolution is the drawing buffer). Unfilled.
+ * Legal-destination marker: one thin dashed stroke per edge (no closed
+ * polyline — Line2 round joints blob at the vertices). Opacity is pulsed
+ * in `pulseHexGhosts` so the hex reads as “you can move here”.
  */
 export function makeDashedHexGhost(
   direction: number,
-  opacity = 0.72,
+  opacity = 0.4,
   kind: 'EXPLORE' | 'MOVE' = 'EXPLORE',
+  pulse = true,
 ): THREE.Group {
   const g = new THREE.Group()
   const radius = HEX_SIZE * (kind === 'MOVE' ? 1.02 : 0.96)
   const y = 0.008
   const pick = { kind, direction }
-  const positions: number[] = []
-  for (let i = 0; i <= 6; i++) {
-    const angle = (Math.PI / 3) * (i % 6)
-    positions.push(radius * Math.cos(angle), y, radius * Math.sin(angle))
+  const dpr = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 2)
+  const rest = Math.min(0.55, Math.max(0.16, opacity * 0.55))
+  g.userData.pulse = pulse
+  g.userData.pulseRest = rest
+
+  for (let i = 0; i < 6; i++) {
+    const a0 = (Math.PI / 3) * i
+    const a1 = (Math.PI / 3) * ((i + 1) % 6)
+    const x0 = radius * Math.cos(a0)
+    const z0 = radius * Math.sin(a0)
+    const x1 = radius * Math.cos(a1)
+    const z1 = radius * Math.sin(a1)
+    // Stop short of the vertex so round caps do not form a corner blob.
+    const inset = 0.14
+    const sx = x0 + (x1 - x0) * inset
+    const sz = z0 + (z1 - z0) * inset
+    const ex = x0 + (x1 - x0) * (1 - inset)
+    const ez = z0 + (z1 - z0) * (1 - inset)
+    const geom = new LineGeometry()
+    geom.setPositions([sx, y, sz, ex, y, ez])
+    const mat = new LineMaterial({
+      color: palette.preview,
+      dashed: true,
+      dashSize: 0.1,
+      gapSize: 0.08,
+      transparent: true,
+      opacity: rest,
+      depthTest: false,
+      depthWrite: false,
+    })
+    mat.linewidth = 1.15 * dpr
+    const line = new Line2(geom, mat)
+    line.computeLineDistances()
+    line.userData = pick
+    g.add(line)
   }
-  const geom = new LineGeometry()
-  geom.setPositions(positions)
-  const mat = new LineMaterial({
-    color: palette.ivory,
-    dashed: false,
-    transparent: true,
-    opacity: Math.min(1, opacity),
-    depthTest: false,
-    depthWrite: false,
-  })
-  mat.linewidth = 3 * (typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 2))
-  const line = new Line2(geom, mat)
-  line.userData = pick
-  g.add(line)
 
   const hit = new THREE.Mesh(
     new THREE.ShapeGeometry(hexShape(radius)),
@@ -275,7 +293,23 @@ export function makeDashedHexGhost(
   hit.position.y = y
   hit.userData = pick
   g.add(hit)
-  g.userData = pick
+  g.userData = { ...pick, pulse, pulseRest: rest }
   return g
+}
+
+/** Subtle breathe: ~2.4s period, muted taupe, never a full-bright ring. */
+export function pulseHexGhosts(root: THREE.Object3D, timeSeconds: number): void {
+  const wave = prefersReducedMotion() ? 0.5 : 0.5 + 0.5 * Math.sin(timeSeconds * ((Math.PI * 2) / 2.4))
+  root.traverse((obj) => {
+    if (!obj.userData.pulse) return
+    const rest = Number(obj.userData.pulseRest) || 0.22
+    const opacity = rest + rest * 0.85 * wave
+    obj.traverse((child) => {
+      const mat = (child as THREE.Mesh).material as LineMaterial | undefined
+      if (!mat || !mat.isLineMaterial) return
+      mat.transparent = true
+      mat.opacity = Math.min(0.62, opacity)
+    })
+  })
 }
 

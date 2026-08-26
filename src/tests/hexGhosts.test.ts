@@ -1,24 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
-import { makeDashedHexGhost } from '../renderer/board/TileRenderer'
+import { makeDashedHexGhost, pulseHexGhosts } from '../renderer/board/TileRenderer'
+
+function lineMaterials(root: THREE.Object3D): LineMaterial[] {
+  const lines: LineMaterial[] = []
+  root.traverse((obj) => {
+    const mat = (obj as THREE.Mesh).material
+    if (mat && (mat as LineMaterial).isLineMaterial) lines.push(mat as LineMaterial)
+  })
+  return lines
+}
 
 describe('move / explore hex ghosts', () => {
-  it('uses a 2px screen-space line so destinations stay readable', () => {
-    const ghost = makeDashedHexGhost(0, 0.72, 'EXPLORE')
-    const lines: LineMaterial[] = []
-    ghost.traverse((obj) => {
-      const mat = (obj as THREE.Mesh).material
-      if (mat && (mat as LineMaterial).isLineMaterial) lines.push(mat as LineMaterial)
-    })
-    expect(lines).toHaveLength(1)
-    expect(lines[0].opacity).toBeGreaterThanOrEqual(0.65)
-    expect(lines[0].linewidth).toBeGreaterThanOrEqual(2.5)
-    expect(lines[0].dashed).toBe(false)
+  it('uses a thin dashed stroke per edge, not a closed solid ring', () => {
+    const ghost = makeDashedHexGhost(0, 0.38, 'EXPLORE')
+    const lines = lineMaterials(ghost)
+    expect(lines).toHaveLength(6)
+    expect(lines.every((mat) => mat.dashed)).toBe(true)
+    expect(lines.every((mat) => mat.linewidth < 2)).toBe(true)
   })
 
   it('does not fill a placed move-target hex', () => {
-    const ghost = makeDashedHexGhost(2, 0.8, 'MOVE')
+    const ghost = makeDashedHexGhost(2, 0.38, 'MOVE')
     const fills: number[] = []
     ghost.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh)) return
@@ -27,5 +31,15 @@ describe('move / explore hex ghosts', () => {
       fills.push(mat.opacity)
     })
     expect(fills.every((opacity) => opacity === 0)).toBe(true)
+  })
+
+  it('breathes opacity over time', () => {
+    const ghost = makeDashedHexGhost(1, 0.38, 'EXPLORE')
+    pulseHexGhosts(ghost, 0)
+    const dim = lineMaterials(ghost)[0].opacity
+    pulseHexGhosts(ghost, 0.6)
+    const bright = lineMaterials(ghost)[0].opacity
+    expect(bright).toBeGreaterThan(dim)
+    expect(bright).toBeLessThan(0.7)
   })
 })
