@@ -1,10 +1,6 @@
 import * as THREE from 'three'
-import { Line2 } from 'three/addons/lines/Line2.js'
-import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 import { HEX_SIZE } from '../../game/board/hexMath'
 import { palette } from '../theme'
-import { prefersReducedMotion } from '../motion'
 
 export const TILE_THICKNESS = 0.1
 /** Incoming tile sits just under the board: its top face is the placed-hex floor (y = 0). */
@@ -250,12 +246,12 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
 }
 
 /**
- * Legal-destination marker: short corner ticks only (no full hex ring).
- * Opacity is pulsed in `pulseHexGhosts`.
+ * Legal-destination marker: invisible hit hex only (no frame).
+ * Labels on explore ghosts carry the readable cue.
  */
 export function makeDashedHexGhost(
   direction: number,
-  opacity = 0.4,
+  _opacity = 0.4,
   kind: 'EXPLORE' | 'MOVE' = 'EXPLORE',
   pulse = true,
 ): THREE.Group {
@@ -263,40 +259,8 @@ export function makeDashedHexGhost(
   const radius = HEX_SIZE * (kind === 'MOVE' ? 1.02 : 0.96)
   const y = 0.008
   const pick = { kind, direction }
-  const dpr = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 2)
-  const rest = Math.min(0.28, Math.max(0.08, opacity * 0.28))
-  const tick = 0.07
   g.userData.pulse = pulse
-  g.userData.pulseRest = rest
-
-  for (let i = 0; i < 6; i++) {
-    const a0 = (Math.PI / 3) * i
-    const a1 = (Math.PI / 3) * ((i + 1) % 6)
-    const a2 = (Math.PI / 3) * ((i + 5) % 6)
-    const vx = radius * Math.cos(a0)
-    const vz = radius * Math.sin(a0)
-    const along1 = new THREE.Vector3(Math.cos(a1) * radius - vx, 0, Math.sin(a1) * radius - vz).normalize()
-    const along2 = new THREE.Vector3(Math.cos(a2) * radius - vx, 0, Math.sin(a2) * radius - vz).normalize()
-    const origin = new THREE.Vector3(vx, y, vz)
-    const p1 = origin.clone().addScaledVector(along1, tick)
-    const p2 = origin.clone().addScaledVector(along2, tick)
-    for (const end of [p1, p2]) {
-      const geom = new LineGeometry()
-      geom.setPositions([origin.x, origin.y, origin.z, end.x, end.y, end.z])
-      const mat = new LineMaterial({
-        color: palette.preview,
-        dashed: false,
-        transparent: true,
-        opacity: rest,
-        depthTest: false,
-        depthWrite: false,
-      })
-      mat.linewidth = 0.9 * dpr
-      const line = new Line2(geom, mat)
-      line.userData = pick
-      g.add(line)
-    }
-  }
+  g.userData.pulseRest = 0
 
   const hit = new THREE.Mesh(
     new THREE.ShapeGeometry(hexShape(radius)),
@@ -313,23 +277,10 @@ export function makeDashedHexGhost(
   hit.position.y = y
   hit.userData = pick
   g.add(hit)
-  g.userData = { ...pick, pulse, pulseRest: rest }
+  g.userData = { ...pick, pulse, pulseRest: 0 }
   return g
 }
 
-/** Subtle breathe: ~2.4s period, muted taupe, never a full-bright ring. */
-export function pulseHexGhosts(root: THREE.Object3D, timeSeconds: number): void {
-  const wave = prefersReducedMotion() ? 0.5 : 0.5 + 0.5 * Math.sin(timeSeconds * ((Math.PI * 2) / 2.4))
-  root.traverse((obj) => {
-    if (!obj.userData.pulse) return
-    const rest = Number(obj.userData.pulseRest) || 0.22
-    const opacity = rest + rest * 0.85 * wave
-    obj.traverse((child) => {
-      const mat = (child as THREE.Mesh).material as LineMaterial | undefined
-      if (!mat || !mat.isLineMaterial) return
-      mat.transparent = true
-      mat.opacity = Math.min(0.38, opacity)
-    })
-  })
-}
+/** Legal hexes have no frame to pulse; kept so the board tick stays a no-op. */
+export function pulseHexGhosts(_root: THREE.Object3D, _timeSeconds: number): void {}
 

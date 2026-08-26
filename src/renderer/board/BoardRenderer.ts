@@ -19,7 +19,7 @@ import { PROBE_STROKE_OPACITY, PROBE_TILE_OPACITY } from '../entities/ProbeRende
 import { createPlanetOverlay, tickPlanetLod, createEdgeLabel, createEvaOverlay } from './planetLots'
 import { buyPrice, evaSellParts, isEvaHex } from '../../game/rules/planetMarket'
 import { RESOURCE_IDS, emptyCargo } from '../../game/definitions/resources'
-import { palette } from '../theme'
+import { palette, css } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
 import { canExploreDirection } from '../../game/rules/exploration'
 import { canMoveTo } from '../../game/rules/movement'
@@ -162,7 +162,7 @@ export class BoardRenderer {
       mesh.rotation.y = tile.rotation * (Math.PI / 3)
       mesh.userData.tileCoord = tile.coord
       mesh.userData.tileKey = key
-      const glyph = createTileGlyph(def, palette.paper, tile.id)
+      const glyph = createTileGlyph(def, probed ? palette.engine : palette.paper, tile.id, probed)
       glyph.position.y = TILE_THICKNESS
       if (options.showTileNames !== false) {
         glyph.add(
@@ -170,6 +170,7 @@ export class BoardRenderer {
             coord: tile.coord,
             clickable: true,
             width: def.type === 'EVA_1' ? 0.92 : 0.72,
+            color: probed ? css.engine : css.ivory,
           }),
         )
       }
@@ -301,7 +302,10 @@ export class BoardRenderer {
         hover?.kind === 'EXPLORE' && hover.coord.q === target.q && hover.coord.r === target.r
       const ghost = this.drawHoverGhost(dir, target, hot ? 0.55 : 0.38, TILE_SETTLED_Y, 'EXPLORE')
       if (typeof document === 'undefined') continue
-      const caption = createEdgeLabel(probeAim ? 'LAUNCH PROBE' : 'UNKNOWN SPACE', { width: 0.78 })
+      const caption = createEdgeLabel(probeAim ? 'LAUNCH PROBE' : 'UNKNOWN SPACE', {
+        width: 0.78,
+        color: css.dusk,
+      })
       caption.position.y = 0.02
       ghost.add(caption)
     }

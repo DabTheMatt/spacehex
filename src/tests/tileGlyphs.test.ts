@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import * as THREE from 'three'
 import { TILE_DEFINITIONS } from '../game/definitions/tiles'
 import { createTileGlyph, planetTintForId } from '../renderer/board/tileGlyphs'
 import { palette } from '../renderer/theme'
@@ -35,6 +36,18 @@ describe('tile glyphs', () => {
       if (obj.userData.animate === 'moon') moons += 1
     })
     expect(moons).toBe(1)
+  })
+
+  it('paints a probe-scan planet glyph engine blue instead of a muted tint', () => {
+    const glyph = createTileGlyph(TILE_DEFINITIONS['planet-medium-1'], palette.engine, 'scan-planet', true)
+    const colors = new Set<number>()
+    glyph.traverse((obj) => {
+      const mat = (obj as THREE.Line).material as THREE.LineBasicMaterial | undefined
+      if (!mat || !('color' in mat)) return
+      colors.add(mat.color.getHex())
+    })
+    expect(colors.has(palette.engine)).toBe(true)
+    expect(colors.has(planetTintForId('scan-planet'))).toBe(false)
   })
 
   it('tints planets from the muted violet / rose / sage set', () => {

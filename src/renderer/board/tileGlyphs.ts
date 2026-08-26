@@ -290,10 +290,15 @@ function blackHoleGlyph(color: number): THREE.Group {
   return g
 }
 
-export function createTileGlyph(def: TileDefinition, color = palette.paper, salt = def.id): THREE.Group {
+export function createTileGlyph(
+  def: TileDefinition,
+  color = palette.paper,
+  salt = def.id,
+  scan = false,
+): THREE.Group {
   const root = new THREE.Group()
   const type: TileType = def.type
-  const planetColor = planetTintForId(salt)
+  const planetColor = scan ? color : planetTintForId(salt)
   switch (type) {
     case 'EVA_1':
       root.add(evaGlyph(color))

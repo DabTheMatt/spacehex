@@ -212,7 +212,7 @@ function setLodOpacity(root: THREE.Object3D | undefined, opacity: number): void 
 
 export function createEdgeLabel(
   text: string,
-  options: { coord?: HexCoord; clickable?: boolean; width?: number } = {},
+  options: { coord?: HexCoord; clickable?: boolean; width?: number; color?: string } = {},
 ): THREE.Group {
   const g = new THREE.Group()
   g.userData.tileName = true
@@ -224,7 +224,7 @@ export function createEdgeLabel(
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, 768, 80)
-    ctx.fillStyle = css.ivory
+    ctx.fillStyle = options.color ?? css.ivory
     ctx.font = '400 26px "IBM Plex Mono", "Noto Sans", sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
