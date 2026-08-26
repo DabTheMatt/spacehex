@@ -1,4 +1,7 @@
 import * as THREE from 'three'
+import { Line2 } from 'three/addons/lines/Line2.js'
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js'
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 import { HEX_SIZE } from '../../game/board/hexMath'
 import { palette } from '../theme'
 
@@ -7,11 +10,10 @@ export const TILE_THICKNESS = 0.1
 export const TILE_SLOT_Y = -TILE_THICKNESS
 export const TILE_SETTLED_Y = 0
 
-function hexShape(radius: number, clockwise = false): THREE.Shape {
+function hexShape(radius: number): THREE.Shape {
   const shape = new THREE.Shape()
   for (let i = 0; i < 6; i++) {
-    const t = clockwise ? 6 - i : i
-    const angle = (Math.PI / 3) * t
+    const angle = (Math.PI / 3) * i
     const x = radius * Math.cos(angle)
     const y = -radius * Math.sin(angle)
     if (i === 0) shape.moveTo(x, y)
@@ -223,83 +225,59 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
   return g
 }
 
-/** Legal-destination ghost — thick ivory frame (WebGL lines are 1px and vanish on phones). */
+/**
+ * Legal-destination ghost: a 2px dashed line in screen space.
+ * Default WebGL lines are always 1 CSS pixel and vanish on a phone;
+ * Line2 keeps a thin, readable stroke at any zoom without filling the hex.
+ */
 export function makeDashedHexGhost(
   direction: number,
   opacity = 0.72,
   kind: 'EXPLORE' | 'MOVE' = 'EXPLORE',
 ): THREE.Group {
   const g = new THREE.Group()
-  const radius = HEX_SIZE * (kind === 'MOVE' ? 1.04 : 0.98)
-  const y = 0.006
+  const radius = HEX_SIZE * (kind === 'MOVE' ? 1.02 : 0.96)
+  const y = 0.008
   const pick = { kind, direction }
-  const ringOpacity = Math.min(1, opacity)
-  const color = palette.ivory
-  const frameWidth = kind === 'MOVE' ? 0.12 : 0.16
-
-  const frame = hexFrameMesh(radius, frameWidth, color, ringOpacity)
-  frame.position.y = y
-  frame.userData = pick
-  g.add(frame)
-
-  const pts: THREE.Vector3[] = []
+  const positions: number[] = []
   for (let i = 0; i <= 6; i++) {
     const angle = (Math.PI / 3) * (i % 6)
-    pts.push(new THREE.Vector3(radius * Math.cos(angle), y + 0.004, radius * Math.sin(angle)))
+    positions.push(radius * Math.cos(angle), y, radius * Math.sin(angle))
   }
-  const line = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineDashedMaterial({
-      color: palette.ochre,
-      dashSize: 0.1,
-      gapSize: 0.04,
-      transparent: true,
-      opacity: ringOpacity,
-      depthWrite: false,
-    }),
-  )
+  const geom = new LineGeometry()
+  geom.setPositions(positions)
+  const mat = new LineMaterial({
+    color: palette.preview,
+    dashed: true,
+    dashSize: 0.12,
+    gapSize: 0.07,
+    transparent: true,
+    opacity: Math.min(1, opacity),
+    depthTest: false,
+    depthWrite: false,
+  })
+  mat.linewidth = 2.25
+  const line = new Line2(geom, mat)
   line.computeLineDistances()
   line.userData = pick
   g.add(line)
 
-  // Empty explore slots need a faint plate so the hex reads on the void.
-  // Move ghosts sit on an existing tile — no extra fill (interface.md).
-  if (kind === 'EXPLORE') {
-    const hit = new THREE.Mesh(
-      new THREE.ShapeGeometry(hexShape(radius - frameWidth - 0.02)),
-      new THREE.MeshBasicMaterial({
-        color: palette.ivory,
-        transparent: true,
-        opacity: Math.min(0.22, opacity * 0.28),
-        side: THREE.DoubleSide,
-        depthWrite: false,
-      }),
-    )
-    hit.rotation.x = -Math.PI / 2
-    hit.position.y = y
-    hit.userData = pick
-    g.add(hit)
-  }
-  g.userData = pick
-  return g
-}
-
-function hexFrameMesh(radius: number, width: number, color: number, opacity: number): THREE.Mesh {
-  const outer = hexShape(radius)
-  const hole = hexShape(Math.max(0.05, radius - width), true)
-  outer.holes.push(hole)
-  const mesh = new THREE.Mesh(
-    new THREE.ShapeGeometry(outer),
+  const hit = new THREE.Mesh(
+    new THREE.ShapeGeometry(hexShape(radius)),
     new THREE.MeshBasicMaterial({
-      color,
-      transparent: opacity < 1,
-      opacity,
+      color: palette.preview,
+      transparent: true,
+      opacity: 0,
       side: THREE.DoubleSide,
       depthWrite: false,
       depthTest: false,
     }),
   )
-  mesh.rotation.x = -Math.PI / 2
-  return mesh
+  hit.rotation.x = -Math.PI / 2
+  hit.position.y = y
+  hit.userData = pick
+  g.add(hit)
+  g.userData = pick
+  return g
 }
 
