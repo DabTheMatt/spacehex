@@ -9,5 +9,6 @@ export function canMoveTo(state: GameState, target: HexCoord): boolean {
   if (!canAffordMove(state)) return false
   if (!isTilePlaced(state.board, target)) return false
   const ship = activeShip(state)
+  if (ship.hull <= 0) return false
   return hexDistance(ship.coord, target) === 1
 }

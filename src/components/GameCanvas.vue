@@ -282,6 +282,15 @@ function handleTap(clientX: number, clientY: number): void {
     }
   }
 
+  const buyFuel = scene.pickFuel(clientX, clientY)
+  if (buyFuel && game.state.phase === 'PLAYER_TURN' && !ui.probeAiming) {
+    const events = game.dispatch({ type: 'BUY_FUEL', coord: buyFuel })
+    if (events.some((event) => event.type === 'COMMAND_REJECTED' && event.reason === 'TANK_FULL')) {
+      ui.flashNotice('FUEL TANK FULL')
+    }
+    return
+  }
+
   const buy = scene.pickBuy(clientX, clientY)
   if (buy && game.state.phase === 'PLAYER_TURN' && !ui.probeAiming) {
     const events = game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })

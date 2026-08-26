@@ -9,7 +9,7 @@ import { isTilePlaced } from '@/game/board/HexMap'
 import { activePlayer, activeShip } from '@/game/rules/fuel'
 import { getTileDefinition } from '@/game/definitions/tiles'
 
-const engine = new GameEngine('spacehex-v0.1')
+const engine = new GameEngine(`spacehex-${Date.now()}`)
 
 export const useGameStore = defineStore('game', () => {
   const state = ref<GameState>(engine.getState())

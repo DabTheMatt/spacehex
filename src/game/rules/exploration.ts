@@ -7,6 +7,7 @@ export function canExploreDirection(state: GameState, direction: number): boolea
   if (state.movementSpent) return false
   if (!canAffordExplore(state)) return false
   const ship = activeShip(state)
+  if (ship.hull <= 0) return false
   const target = getNeighbor(ship.coord, direction)
   return !isTilePlaced(state.board, target)
 }

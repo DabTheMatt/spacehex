@@ -12,7 +12,8 @@ export type GameEvent =
   | { type: 'TILE_ROTATED'; rotation: Rotation }
   | { type: 'TILE_PLACED'; tileId: string; coord: HexCoord }
   | { type: 'SHIP_MOVED'; shipId: string; from: HexCoord; to: HexCoord }
-  | { type: 'HEX_DISCOVERED'; tileId: string }
+  | { type: 'HEX_DISCOVERED'; tileId: string; playerId: string }
+  | { type: 'DECK_SHUFFLED'; count: number }
   | { type: 'SECTOR_RESOLVED'; tileId: string; note: string }
   | { type: 'PLANET_STOCKED'; tileId: string; coord: HexCoord }
   | { type: 'RESOURCE_BOUGHT'; playerId: string; resource: ResourceId; price: number; coord: HexCoord }
@@ -38,4 +39,7 @@ export type GameEvent =
   | { type: 'PROBE_DISMISSED'; coord: HexCoord; shipId: string }
   | { type: 'NPC_SPAWNED'; shipId: string; class: ShipClass; coord: HexCoord }
   | { type: 'SHIP_DAMAGED'; shipId: string; damage: number; hullAfter: number }
+  | { type: 'SHIP_DESTROYED'; shipId: string }
+  | { type: 'ASTEROID_STRIKE'; shipId: string; coord: HexCoord; damage: number }
+  | { type: 'FUEL_BOUGHT'; playerId: string; price: number; fuel: number; coord: HexCoord }
   | { type: 'COMMAND_REJECTED'; command: string; reason: string }

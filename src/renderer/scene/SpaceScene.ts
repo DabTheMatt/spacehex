@@ -162,6 +162,16 @@ export class SpaceScene {
       if (event.type !== 'PROBE_LAUNCHED') continue
       this.launchProbeFlight(event.shipId, event.coord)
     }
+    for (const event of events) {
+      if (event.type === 'ASTEROID_STRIKE' && event.damage > 0) {
+        const pose = this.ships.worldPose(event.shipId) ?? fallbackShipPose(this.lastState, event.shipId)
+        const dest = getWorldPosition(event.coord)
+        const target = pose
+          ? { x: dest.x, y: pose.y, z: dest.z }
+          : { x: dest.x, y: TILE_THICKNESS + 0.14, z: dest.z }
+        this.combat.spawnDamage(target, event.damage, performance.now())
+      }
+    }
   }
 
   private launchProbeFlight(shipId: string, coord: HexCoord): void {
@@ -225,6 +235,11 @@ export class SpaceScene {
   pickBuy(clientX: number, clientY: number): { coord: HexCoord; resource: ResourceId } | null {
     const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
     return userDataFromHits<{ coord: HexCoord; resource: ResourceId }>(hits, 'buyLot') ?? null
+  }
+
+  pickFuel(clientX: number, clientY: number): HexCoord | null {
+    const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
+    return userDataFromHits<{ coord: HexCoord }>(hits, 'buyFuel')?.coord ?? null
   }
 
   pickSell(clientX: number, clientY: number): { resource: ResourceId } | null {

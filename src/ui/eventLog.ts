@@ -2,6 +2,7 @@ import type { GameEvent } from '@/game/engine/events'
 import type { GameState } from '@/game/state/GameState'
 import { RESOURCE_LABEL } from '@/game/definitions/resources'
 import { SHIP_DEFINITIONS } from '@/game/definitions/ships'
+import { discoveryNoun } from '@/ui/discoveryCopy'
 
 export function shipCallsign(state: GameState, shipId: string): string {
   const ship = state.ships[shipId]
@@ -16,6 +17,20 @@ export function shipCallsign(state: GameState, shipId: string): string {
 
 export function formatLogLine(state: GameState, event: GameEvent): string | null {
   switch (event.type) {
+    case 'DECK_SHUFFLED':
+      return 'Exploration deck shuffled.'
+    case 'HEX_DISCOVERED': {
+      const name = state.players[event.playerId]?.name ?? 'Player'
+      return `${name} discovered ${discoveryNoun(event.tileId)}.`
+    }
+    case 'ASTEROID_STRIKE':
+      return event.damage > 0
+        ? `${shipCallsign(state, event.shipId)} hit an asteroid field (−${event.damage}).`
+        : `${shipCallsign(state, event.shipId)} crossed an asteroid field.`
+    case 'SHIP_DESTROYED':
+      return `${shipCallsign(state, event.shipId)} was destroyed.`
+    case 'FUEL_BOUGHT':
+      return `${state.players[event.playerId]?.name ?? 'Player'} bought fuel.`
     case 'PROBE_LAUNCHED': {
       const name = state.players[event.playerId]?.name ?? event.playerId
       return `${name} launched a probe.`
@@ -48,7 +63,7 @@ export function formatLogLine(state: GameState, event: GameEvent): string | null
   }
 }
 
-export function visibleLogLines(state: GameState, limit = 8): string[] {
+export function visibleLogLines(state: GameState, limit = 10): string[] {
   const lines: string[] = []
   for (let i = state.log.length - 1; i >= 0 && lines.length < limit; i--) {
     const line = formatLogLine(state, state.log[i])

@@ -20,6 +20,17 @@
       <div class="hud-pane__label muted">SHIP</div>
       <div class="hud-pane__id">{{ shipId }}</div>
       <div class="command-bar__params">
+        <span class="hull-readout">
+          <span class="muted">HULL</span>
+          <span class="hull-pips" aria-hidden="true">
+            <i
+              v-for="i in hullPips"
+              :key="i"
+              :class="['hull-pip', { filled: hullPipFilled(i, game.ship.hull) }]"
+            />
+          </span>
+          <span>{{ game.ship.hull }}</span>
+        </span>
         <span v-for="row in shipParams" :key="row.label">
           <span class="muted">{{ row.label }}</span>
           {{ row.value }}
@@ -86,6 +97,8 @@ import { canLaunchAnyProbe } from '@/game/rules/probes'
 import { prefersCoarsePointer } from '@/ui/pointerInput'
 import { hudPaneLabel } from '@/ui/sectorPane'
 import { getTileDefinition } from '@/game/definitions/tiles'
+import { hullPipCount, hullPipFilled } from '@/ui/hullPips'
+import { FUEL_BUY_PRICE, FUEL_TANK } from '@/game/definitions/constants'
 
 const game = useGameStore()
 const ui = useUiStore()
@@ -123,10 +136,13 @@ const planetLots = computed(() => {
   }
   const market = planet.value
   if (!market) return []
-  return market.lots.map((lot) => ({
-    id: lot.id,
-    text: `${RESOURCE_LABEL[lot.id]} ×${lot.amount}  ${buyPrice(game.state, lot.id)}CR`,
-  }))
+  return [
+    ...market.lots.map((lot) => ({
+      id: lot.id,
+      text: `${RESOURCE_LABEL[lot.id]} ×${lot.amount}  ${buyPrice(game.state, lot.id)}CR`,
+    })),
+    { id: 'FUEL' as const, text: `FUEL  ${FUEL_BUY_PRICE}CR  ${game.player.fuel}/${FUEL_TANK}` },
+  ]
 })
 
 const planetHint = computed(() => {
@@ -154,14 +170,16 @@ const planetHint = computed(() => {
 const shipId = computed(() => {
   const ship = game.ship
   const n = ship.playerId.replace(/\D/g, '') || '1'
-  return `${SHIP_DEFINITIONS[ship.class].id} / SG-${n}`
+  const id = `${SHIP_DEFINITIONS[ship.class].id} / SG-${n}`
+  return ship.hull <= 0 ? `${id}  DESTROYED` : id
 })
+
+const hullPips = computed(() => hullPipCount(game.ship.maxHull))
 
 const shipParams = computed(() => {
   const ship = game.ship
   const player = game.player
   return [
-    { label: 'HULL', value: `${pad(ship.hull)} / ${pad(ship.maxHull)}` },
     { label: 'ATK', value: pad(SHIP_DEFINITIONS[ship.class].attack) },
     { label: 'FUEL', value: pad(player.fuel) },
     { label: 'CR', value: pad(player.credits) },

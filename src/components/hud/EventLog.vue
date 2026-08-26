@@ -12,5 +12,5 @@ import { useGameStore } from '@/stores/gameStore'
 import { visibleLogLines } from '@/ui/eventLog'
 
 const game = useGameStore()
-const lines = computed(() => visibleLogLines(game.state, 8))
+const lines = computed(() => visibleLogLines(game.state, 10))
 </script>

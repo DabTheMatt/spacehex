@@ -17,9 +17,11 @@ import { canMoveTo } from '../rules/movement'
 import { canExploreDirection } from '../rules/exploration'
 import { resolveDeclaredCombat, canDeclareAttack } from '../rules/combat'
 import { resolveDiscovery, addGlory } from '../rules/glory'
-import { buyResource, sellResource, stockPlanetIfNeeded } from '../rules/planetMarket'
+import { buyFuel, buyResource, sellResource, stockPlanetIfNeeded } from '../rules/planetMarket'
 import { canLaunchProbe, dismissProbesUnderShips } from '../rules/probes'
 import { spawnThornsForPlacedTile } from '../rules/npcs'
+import { resolveEntryHazards } from '../rules/sectorHazards'
+import { applyHullDamage } from '../rules/damage'
 import { rollSectorName } from '../definitions/sectorNames'
 import type { ResourceId } from '../definitions/resources'
 import type { HexCoord } from '../board/HexCoord'
@@ -110,7 +112,11 @@ export function createInitialState(seed: string): GameState {
     npcShips: {},
     planetMarkets: {},
     probes: {},
-    log: [{ type: 'GAME_STARTED', seed }, { type: 'ROUND_STARTED', round: 1 }],
+    log: [
+      { type: 'GAME_STARTED', seed },
+      { type: 'DECK_SHUFFLED', count: drawPile.length },
+      { type: 'ROUND_STARTED', round: 1 },
+    ],
     movementSpent: false,
   }
 }
@@ -157,6 +163,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return launchProbe(state, command.direction)
     case 'BUY_RESOURCE':
       return buyResourceCommand(state, command.coord, command.resource)
+    case 'BUY_FUEL':
+      return buyFuelCommand(state, command.coord)
     case 'SELL_RESOURCE':
       return sellResourceCommand(state, command.resource)
     case 'END_TURN':
@@ -178,32 +186,12 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return { state: append(next, [event]), events: [event] }
     }
     case 'DEV_DAMAGE_SHIP': {
-      const playerShip = state.ships[command.shipId]
-      const npcShip = state.npcShips[command.shipId]
-      const ship = playerShip ?? npcShip
-      if (!ship) return reject(state, command.type, 'NO_SHIP')
-      const hull = Math.max(0, ship.hull - command.amount)
-      const damage = ship.hull - hull
-      const event: GameEvent = { type: 'SHIP_DAMAGED', shipId: ship.id, damage, hullAfter: hull }
-      const next = append(
-        playerShip
-          ? {
-              ...state,
-              ships: {
-                ...state.ships,
-                [ship.id]: { ...playerShip, hull },
-              },
-            }
-          : {
-              ...state,
-              npcShips: {
-                ...state.npcShips,
-                [ship.id]: { ...npcShip!, hull },
-              },
-            },
-        [event],
-      )
-      return { state: next, events: [event] }
+      const hit = applyHullDamage(state, command.shipId, command.amount)
+      if (!state.ships[command.shipId] && !state.npcShips[command.shipId]) {
+        return reject(state, command.type, 'NO_SHIP')
+      }
+      if (hit.events.length === 0) return reject(state, command.type, 'NO_DAMAGE')
+      return { state: append(hit.state, hit.events), events: hit.events }
     }
     case 'DEV_FORCE_NEXT_TILE':
       return {
@@ -358,7 +346,7 @@ function confirmPlacement(state: GameState): EngineResult {
 
   const placeEvents: GameEvent[] = [
     { type: 'TILE_PLACED', tileId: placed.id, coord: placed.coord },
-    { type: 'HEX_DISCOVERED', tileId: placed.id },
+    { type: 'HEX_DISCOVERED', tileId: placed.id, playerId: placed.discoveredByPlayerId ?? state.activePlayerId },
   ]
 
   let next: GameState = append(
@@ -428,7 +416,9 @@ function moveShip(state: GameState, target: HexCoord, fuelCost: number): EngineR
   next = append(next, [moveEvent, fuelEvent])
   const dismissed = dismissProbesUnderShips(next)
   next = append(dismissed.state, dismissed.events)
-  return { state: next, events: [moveEvent, fuelEvent, ...dismissed.events] }
+  const hazard = resolveEntryHazards(next, ship.id, target)
+  next = append(hazard.state, hazard.events)
+  return { state: next, events: [moveEvent, fuelEvent, ...dismissed.events, ...hazard.events] }
 }
 
 function launchProbe(state: GameState, direction: number): EngineResult {
@@ -450,7 +440,7 @@ function launchProbe(state: GameState, direction: number): EngineResult {
   const placeEvents: GameEvent[] = [
     { type: 'TILE_DRAWN', tileId: drawn.tileId },
     { type: 'TILE_PLACED', tileId: placed.id, coord: dest },
-    { type: 'HEX_DISCOVERED', tileId: placed.id },
+    { type: 'HEX_DISCOVERED', tileId: placed.id, playerId: player.id },
   ]
   let next = spendFuel(state, FUEL_COST_EXPLORE)
   const fuelEvent: GameEvent = {
@@ -541,6 +531,19 @@ function buyResourceCommand(
   const player = activePlayer(result.state)
   const events: GameEvent[] = [
     { type: 'RESOURCE_BOUGHT', playerId: player.id, resource, price: result.price, coord },
+    { type: 'CREDITS_CHANGED', playerId: player.id, credits: player.credits },
+  ]
+  return { state: append(result.state, events), events }
+}
+
+function buyFuelCommand(state: GameState, coord: HexCoord): EngineResult {
+  if (!requireTurn(state)) return reject(state, 'BUY_FUEL', 'NOT_IN_TURN')
+  const result = buyFuel(state, coord)
+  if (!result.ok) return reject(state, 'BUY_FUEL', result.reason)
+  const player = activePlayer(result.state)
+  const events: GameEvent[] = [
+    { type: 'FUEL_BOUGHT', playerId: player.id, price: result.price, fuel: player.fuel, coord },
+    { type: 'FUEL_CHANGED', playerId: player.id, fuel: player.fuel },
     { type: 'CREDITS_CHANGED', playerId: player.id, credits: player.credits },
   ]
   return { state: append(result.state, events), events }
@@ -660,7 +663,7 @@ function devPlace(
   }
   const events: GameEvent[] = [
     { type: 'TILE_PLACED', tileId, coord },
-    { type: 'HEX_DISCOVERED', tileId },
+    { type: 'HEX_DISCOVERED', tileId, playerId: placed.discoveredByPlayerId ?? state.activePlayerId },
   ]
   let next = append(
     {

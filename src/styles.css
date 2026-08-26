@@ -283,6 +283,34 @@ body,
   text-transform: uppercase;
 }
 
+.hull-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.hull-pips {
+  display: inline-flex;
+  gap: 0.16rem;
+}
+
+.hull-pip {
+  display: block;
+  width: 0.55rem;
+  height: 0.34rem;
+  border: 1px solid var(--color-muted);
+  background: transparent;
+}
+
+.hull-pip.filled {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.cargo--fuel {
+  color: var(--color-accent);
+}
+
 .command-bar__cargo {
   display: flex;
   flex-wrap: wrap;

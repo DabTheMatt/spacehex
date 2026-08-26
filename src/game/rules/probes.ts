@@ -8,6 +8,7 @@ import { activeShip, canAffordExplore } from './fuel'
 export type ProbeReject =
   | 'NOT_IN_MOVEMENT'
   | 'NO_PROBES'
+  | 'WRECK'
   | 'ILLEGAL_HEX'
   | 'OCCUPIED'
   | 'NO_FUEL'
@@ -32,6 +33,7 @@ export function canLaunchProbe(
     return { ok: false, reason: 'NOT_IN_MOVEMENT' }
   }
   const ship = activeShip(state)
+  if (ship.hull <= 0) return { ok: false, reason: 'WRECK' }
   if ((ship.probes ?? 0) <= 0) return { ok: false, reason: 'NO_PROBES' }
   if (!canAffordExplore(state)) return { ok: false, reason: 'NO_FUEL' }
   if (state.explorationDeck.drawPile.length === 0) return { ok: false, reason: 'EMPTY_DECK' }

@@ -28,7 +28,7 @@ import {
   SHIP_TURN_MS,
 } from '../motion'
 
-type Parkable = Pick<ShipState, 'id' | 'class' | 'coord'> & { playerId?: string }
+type Parkable = Pick<ShipState, 'id' | 'class' | 'coord' | 'hull'> & { playerId?: string }
 
 function roster(state: GameState): Parkable[] {
   const players: Parkable[] = Object.values(state.ships)
@@ -36,6 +36,7 @@ function roster(state: GameState): Parkable[] {
     id: npc.id,
     class: npc.class,
     coord: npc.coord,
+    hull: npc.hull,
   }))
   return [...players, ...npcs]
 }
@@ -266,8 +267,9 @@ export class ShipRenderer {
       if (!flying && !this.duel.has(ship.id)) this.facing.set(ship.id, yaw)
       const playerNo = ship.playerId ? Number(ship.playerId.replace(/\D/g, '')) || 1 : 0
       const active = Boolean(ship.playerId) && state.players[state.activePlayerId]?.shipId === ship.id
+      const wreck = ship.hull <= 0
       const wrapper = new THREE.Group()
-      const marker = createNavMarker(ship.class, playerNo, active, hullLabel(ship))
+      const marker = createNavMarker(ship.class, playerNo, active && !wreck, hullLabel(ship), wreck)
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
       wrapper.userData.beacon = marker.userData.beacon
@@ -670,8 +672,9 @@ function createNavMarker(
   playerNo: number,
   active: boolean,
   label: string,
+  wreck = false,
 ): THREE.Group {
-  const color = hullColor(playerNo, active)
+  const color = wreck ? palette.dusk : hullColor(playerNo, active)
   const g = new THREE.Group()
   const { length, half } = hullExtents(shipClass)
   const shape = hullShape(shipClass)

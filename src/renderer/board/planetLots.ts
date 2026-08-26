@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { PlanetMarket, ResourceId } from '../../game/definitions/resources'
 import { RESOURCE_IDS } from '../../game/definitions/resources'
+import { FUEL_BUY_PRICE } from '../../game/definitions/constants'
 import { palette, css } from '../theme'
 import { HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
@@ -84,7 +85,7 @@ export function createPlanetOverlay(
   RESOURCE_IDS.forEach((id, index) => {
     const lot = market.lots.find((item) => item.id === id)
     const amount = lot?.amount ?? 0
-    const x = (index - 1) * HEX_SPACING
+    const x = (index - 1.5) * HEX_SPACING
     const cluster = new THREE.Group()
     cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
     cluster.add(stockHex(id, amount))
@@ -110,6 +111,30 @@ export function createPlanetOverlay(
     close.add(cluster)
     far.add(diceCluster(id, amount, x))
   })
+
+  const fuelX = 1.5 * HEX_SPACING
+  const fuelCluster = new THREE.Group()
+  fuelCluster.position.set(fuelX, OVERLAY_HOVER, LOT_Z)
+  fuelCluster.add(stockHexFuel())
+  const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, css.ochre)
+  fuelTag.position.set(0, 0.01, FOOT_GAP)
+  fuelCluster.add(fuelTag)
+  const fuelHit = new THREE.Mesh(
+    new THREE.CircleGeometry(0.12, 12),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  )
+  fuelHit.rotation.x = -Math.PI / 2
+  fuelHit.position.y = 0.02
+  fuelHit.userData.buyFuel = { coord }
+  fuelHit.userData.pickOnly = true
+  fuelCluster.add(fuelHit)
+  close.add(fuelCluster)
+  far.add(diceClusterFuel(fuelX))
 
   g.add(close, far)
   g.userData.closeLod = close
@@ -391,6 +416,64 @@ function stockSquare(id: ResourceId, amount: number): THREE.Group {
   digit.position.y = 0.012
   digit.renderOrder = 7
   g.add(digit)
+  return g
+}
+
+function stockHexFuel(): THREE.Group {
+  const g = new THREE.Group()
+  const color = palette.ochre
+  const shape = new THREE.Shape()
+  const r = 0.072
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i
+    const x = r * Math.cos(a)
+    const y = r * Math.sin(a)
+    if (i === 0) shape.moveTo(x, y)
+    else shape.lineTo(x, y)
+  }
+  shape.closePath()
+  const hex = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape),
+    new THREE.MeshBasicMaterial({
+      color: palette.graphite,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      transparent: true,
+      opacity: 0.92,
+    }),
+  )
+  hex.rotation.x = -Math.PI / 2
+  g.add(hex)
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(r * 0.94, r, 6),
+    new THREE.MeshBasicMaterial({
+      color,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      transparent: true,
+    }),
+  )
+  ring.rotation.x = -Math.PI / 2
+  ring.position.y = 0.002
+  g.add(ring)
+  return g
+}
+
+function diceClusterFuel(x: number): THREE.Group {
+  const g = new THREE.Group()
+  g.position.set(x, OVERLAY_HOVER, LOT_Z)
+  const dot = new THREE.Mesh(
+    new THREE.CircleGeometry(0.014, 10),
+    new THREE.MeshBasicMaterial({
+      color: palette.ochre,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      transparent: true,
+    }),
+  )
+  dot.rotation.x = -Math.PI / 2
+  dot.position.set(0, 0.004, 0)
+  g.add(dot)
   return g
 }
 
