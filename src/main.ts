@@ -2,6 +2,9 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import './styles.css'
 import App from './App.vue'
+import { APP_VERSION } from './appVersion'
+
+document.title = `SPACE HEX — v${APP_VERSION}`
 
 const app = createApp(App)
 app.use(createPinia())

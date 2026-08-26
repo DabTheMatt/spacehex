@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_VERSION } from '../appVersion'
 import { hudPaneLabel } from '../ui/sectorPane'
 import { CAMERA_INSPECT_FILL } from '../renderer/scene/CameraController'
 import {
@@ -6,6 +7,12 @@ import {
   PROBE_STROKE_OPACITY,
   PROBE_TILE_OPACITY,
 } from '../renderer/entities/ProbeRenderer'
+
+describe('app version', () => {
+  it('is a semver label shown on the Pages build', () => {
+    expect(APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/)
+  })
+})
 
 describe('sector pane label', () => {
   it('calls EVA a station, planets planets, and everything else a sector', () => {

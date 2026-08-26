@@ -2,12 +2,13 @@
   <header class="global-status">
     <span>{{ left }}</span>
     <button type="button" class="action global-status__new" @click="newGame">NEW GAME</button>
-    <span class="muted">DECK {{ pad(game.state.explorationDeck.drawPile.length) }}</span>
+    <span class="muted">v{{ APP_VERSION }} · DECK {{ pad(game.state.explorationDeck.drawPile.length) }}</span>
   </header>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { APP_VERSION } from '@/appVersion'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 
