@@ -11,16 +11,18 @@ import { coordKey } from '../../game/board/HexCoord'
 export class HoverTargetRenderer {
   readonly group = new THREE.Group()
 
-  sync(state: GameState, _hover: BoardHover | null): void {
+  sync(state: GameState, _hover: BoardHover | null, probeAim = false): void {
     this.group.clear()
     if (state.phase !== 'PLAYER_TURN' || state.movementSpent) return
     const ship = activeShip(state)
-    this.addHit({ kind: 'STAY', coord: ship.coord }, TILE_THICKNESS + 0.04, HEX_SIZE * 0.86)
+    if (!probeAim) {
+      this.addHit({ kind: 'STAY', coord: ship.coord }, TILE_THICKNESS + 0.04, HEX_SIZE * 0.62)
+    }
 
     for (let dir = 0; dir < 6; dir++) {
       const target = getNeighbor(ship.coord, dir)
       if (canExploreDirection(state, dir)) {
-        this.addHit({ kind: 'EXPLORE', coord: target, direction: dir }, 0.06, HEX_SIZE * 0.86)
+        this.addHit({ kind: 'EXPLORE', coord: target, direction: dir }, TILE_THICKNESS + 0.08, HEX_SIZE * 0.92)
       } else if (canMoveTo(state, target)) {
         this.addHit(
           { kind: 'MOVE', coord: target, direction: dir },

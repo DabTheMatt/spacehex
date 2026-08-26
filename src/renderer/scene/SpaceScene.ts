@@ -280,7 +280,7 @@ export class SpaceScene {
     this.preview.sync(this.lastState)
     this.ships.sync(this.lastState)
     this.ships.setThreat(this.duel ? null : (this.lastOptions.threatShipId ?? null))
-    this.hoverTargets.sync(this.lastState, this.lastOptions.hover ?? null)
+    this.hoverTargets.sync(this.lastState, this.lastOptions.hover ?? null, this.lastOptions.probeAim === true)
     this.probes.sync(this.lastState, this.inflightProbeKeys)
   }
 

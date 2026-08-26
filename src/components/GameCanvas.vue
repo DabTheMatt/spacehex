@@ -252,7 +252,7 @@ function handleTap(clientX: number, clientY: number): void {
   }
 
   const name = scene.pickPlanetName(clientX, clientY)
-  if (name) {
+  if (name && !ui.probeAiming) {
     const key = coordKey(name)
     const inspectable = Boolean(game.state.planetMarkets[key] || isEvaHex(name))
     if (inspectable) {
@@ -269,7 +269,7 @@ function handleTap(clientX: number, clientY: number): void {
   }
 
   const buy = scene.pickBuy(clientX, clientY)
-  if (buy && game.state.phase === 'PLAYER_TURN') {
+  if (buy && game.state.phase === 'PLAYER_TURN' && !ui.probeAiming) {
     const events = game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })
     if (events.some((event) => event.type === 'COMMAND_REJECTED' && event.reason === 'BUY_LIMIT')) {
       ui.flashNotice('OPERATION LIMIT REACHED')
@@ -278,7 +278,7 @@ function handleTap(clientX: number, clientY: number): void {
   }
 
   const sell = scene.pickSell(clientX, clientY)
-  if (sell && game.state.phase === 'PLAYER_TURN') {
+  if (sell && game.state.phase === 'PLAYER_TURN' && !ui.probeAiming) {
     game.dispatch({ type: 'SELL_RESOURCE', resource: sell.resource })
     return
   }
@@ -286,6 +286,7 @@ function handleTap(clientX: number, clientY: number): void {
   const hover = scene.pickHover(clientX, clientY)
   if (hover && game.state.phase === 'PLAYER_TURN') {
     if (hover.kind === 'STAY') {
+      if (ui.probeAiming) return
       ui.inspectPlanet = null
       scene.camera.clearInspectLimits()
       game.dispatch({ type: 'SKIP_MOVEMENT' })

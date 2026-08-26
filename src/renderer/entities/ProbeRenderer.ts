@@ -26,7 +26,7 @@ export class ProbeRenderer {
     this.group.traverse((obj) => {
       if (obj.userData.probeFill) {
         const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial
-        mat.opacity = 0.1 + 0.12 * wave
+        mat.opacity = 0.18 + 0.14 * wave
       }
       if (obj.userData.probeBody) {
         obj.position.y = TILE_THICKNESS + 0.12 + wave * 0.03
@@ -37,7 +37,7 @@ export class ProbeRenderer {
         const scale = 0.22 + cycle * 0.78
         obj.scale.set(scale, 1, scale)
         const mat = (obj as THREE.Line).material as THREE.LineBasicMaterial
-        mat.opacity = (1 - cycle) * 0.45 * (0.55 + 0.45 * wave)
+        mat.opacity = (1 - cycle) * 0.72
       }
     })
   }
