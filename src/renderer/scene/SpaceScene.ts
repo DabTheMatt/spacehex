@@ -11,7 +11,8 @@ import { CombatFx } from '../fx/CombatFx'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
-import { getWorldPosition } from '../../game/board/hexMath'
+import { getNeighbor, getWorldPosition } from '../../game/board/hexMath'
+import { activeShip } from '../../game/rules/fuel'
 import type { ResourceId } from '../../game/definitions/resources'
 import { userDataFromHits } from './pickHelpers'
 import type { BoardHover } from '../../ui/boardHover'
@@ -186,8 +187,17 @@ export class SpaceScene {
   }
 
   pickHover(clientX: number, clientY: number): BoardHover | null {
-    const hits = this.intersectAll(clientX, clientY, this.hoverTargets.pickables())
-    return userDataFromHits<BoardHover>(hits, 'boardHover') ?? null
+    const diskHits = this.intersectAll(clientX, clientY, this.hoverTargets.pickables())
+    const fromDisk = userDataFromHits<BoardHover>(diskHits, 'boardHover')
+    if (fromDisk) return fromDisk
+    if (!this.lastState) return null
+    const ghostHits = this.intersectAll(clientX, clientY, this.board.pickables())
+    const kind = userDataFromHits<'EXPLORE' | 'MOVE'>(ghostHits, 'kind')
+    const direction = userDataFromHits<number>(ghostHits, 'direction')
+    if (kind !== 'EXPLORE' && kind !== 'MOVE') return null
+    if (direction === undefined) return null
+    const coord = getNeighbor(activeShip(this.lastState).coord, direction)
+    return { kind, coord, direction }
   }
 
   pickDirection(clientX: number, clientY: number): { direction: number } | null {

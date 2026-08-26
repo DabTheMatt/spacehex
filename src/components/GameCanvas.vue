@@ -211,9 +211,13 @@ function onUp(ev: PointerEvent): void {
     if (pointers.size === 0) scene.camera.setOrbitEnabled(true)
   }
   dragging = false
-  if (wasDrag || wasPinch || pointers.size > 0) return
+  if (wasPinch || pointers.size > 0) return
   if (tapConsumed) {
     tapConsumed = false
+    return
+  }
+  if (wasDrag) {
+    tryLaunchAimedProbe(ev.clientX, ev.clientY)
     return
   }
 
@@ -240,6 +244,18 @@ function onUp(ev: PointerEvent): void {
   }
 
   handleTap(ev.clientX, ev.clientY)
+}
+
+function tryLaunchAimedProbe(clientX: number, clientY: number): boolean {
+  if (!scene || !ui.probeAiming || game.state.phase !== 'PLAYER_TURN') return false
+  const hover = scene.pickHover(clientX, clientY)
+  if (hover?.kind !== 'EXPLORE') return false
+  ui.inspectPlanet = null
+  scene.camera.clearInspectLimits()
+  game.dispatch({ type: 'LAUNCH_PROBE', direction: hover.direction })
+  ui.probeAiming = false
+  ui.hover = null
+  return true
 }
 
 function handleTap(clientX: number, clientY: number): void {
@@ -303,13 +319,9 @@ function handleTap(clientX: number, clientY: number): void {
     if (hover.kind === 'EXPLORE') {
       ui.inspectPlanet = null
       scene.camera.clearInspectLimits()
-      if (ui.probeAiming) {
-        game.dispatch({ type: 'LAUNCH_PROBE', direction: hover.direction })
-        ui.probeAiming = false
-      } else {
-        game.dispatch({ type: 'START_EXPLORATION', direction: hover.direction })
-        game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
-      }
+      if (tryLaunchAimedProbe(clientX, clientY)) return
+      game.dispatch({ type: 'START_EXPLORATION', direction: hover.direction })
+      game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
       ui.hover = null
       return
     }
