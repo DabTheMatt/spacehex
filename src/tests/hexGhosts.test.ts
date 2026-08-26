@@ -13,7 +13,7 @@ describe('move / explore hex ghosts', () => {
     })
     expect(lines).toHaveLength(1)
     expect(lines[0].opacity).toBeGreaterThanOrEqual(0.65)
-    expect(lines[0].linewidth).toBeGreaterThanOrEqual(2)
+    expect(lines[0].linewidth).toBeGreaterThanOrEqual(2.5)
     expect(lines[0].dashed).toBe(false)
   })
 

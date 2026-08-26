@@ -228,8 +228,8 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
 /**
  * Legal-destination ghost: a 2px dashed line in screen space.
  * Default WebGL lines are always 1 CSS pixel and vanish on a phone;
- * Line2 keeps a thin, readable stroke at any zoom without filling the hex.
- * Solid (not dashed): world-space dashes undersample when the camera is pulled back.
+ * Line2 keeps a ~3 CSS-pixel stroke at any zoom (width is multiplied by DPR
+ * because Line2 resolution is the drawing buffer). Unfilled.
  */
 export function makeDashedHexGhost(
   direction: number,
@@ -255,7 +255,7 @@ export function makeDashedHexGhost(
     depthTest: false,
     depthWrite: false,
   })
-  mat.linewidth = 2.5
+  mat.linewidth = 3 * (typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 2))
   const line = new Line2(geom, mat)
   line.userData = pick
   g.add(line)

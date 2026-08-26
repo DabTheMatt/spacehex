@@ -275,7 +275,7 @@ export class BoardRenderer {
       const target = getNeighbor(origin, dir)
       const hot =
         hover?.kind === 'EXPLORE' && hover.coord.q === target.q && hover.coord.r === target.r
-      this.drawHoverGhost(dir, target, hot ? 0.95 : 0.62, TILE_SETTLED_Y, 'EXPLORE')
+      this.drawHoverGhost(dir, target, hot ? 0.95 : 0.78, TILE_SETTLED_Y, 'EXPLORE')
     }
   }
 
@@ -286,7 +286,7 @@ export class BoardRenderer {
       const target = getNeighbor(origin, dir)
       if (!canMoveTo(state, target)) continue
       const hot = hover?.kind === 'MOVE' && hover.coord.q === target.q && hover.coord.r === target.r
-      this.drawHoverGhost(dir, target, hot ? 0.95 : 0.7, TILE_THICKNESS, 'MOVE')
+      this.drawHoverGhost(dir, target, hot ? 0.95 : 0.82, TILE_THICKNESS, 'MOVE')
     }
   }
 
