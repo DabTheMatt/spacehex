@@ -5,7 +5,7 @@ import { coordKey } from '../game/board/HexCoord'
 import { STARTING_PROBES } from '../game/definitions/constants'
 import { formatLogLine } from '../ui/eventLog'
 import { palette } from '../renderer/theme'
-import { probeOwnerColor } from '../renderer/entities/ProbeRenderer'
+import { probeOwnerColor, PROBE_LED_GLOW_ON, PROBE_LED_HZ, PROBE_LED_ON } from '../renderer/entities/ProbeRenderer'
 
 describe('probes', () => {
   it('starts each ship with two probes', () => {
@@ -56,6 +56,12 @@ describe('probe owner lamp', () => {
   it('uses player paint for the blinking LED', () => {
     expect(probeOwnerColor('player-1')).toBe(palette.player1)
     expect(probeOwnerColor('player-2')).toBe(palette.player2)
+  })
+
+  it('blinks slower, smaller, and more transparent than the first LED pass', () => {
+    expect(PROBE_LED_HZ).toBeCloseTo(0.55)
+    expect(PROBE_LED_ON).toBeCloseTo(0.5)
+    expect(PROBE_LED_GLOW_ON).toBeCloseTo(0.275)
   })
 })
 

@@ -12,7 +12,9 @@ const BLUE = palette.engine
 export const PROBE_TILE_OPACITY = 0
 export const PROBE_STROKE_OPACITY = 0.4
 export const PROBE_SCAN_OPACITY = 0.12
-export const PROBE_LED_HZ = 2.2
+export const PROBE_LED_HZ = 0.55
+export const PROBE_LED_ON = 0.5
+export const PROBE_LED_GLOW_ON = 0.275
 
 export function probeOwnerColor(playerId: string): number {
   return playerId === 'player-2' ? palette.player2 : palette.player1
@@ -52,11 +54,11 @@ export class ProbeRenderer {
       }
       if (obj.userData.probeLed) {
         const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial
-        mat.opacity = ledOn ? 1 : 0.08
+        mat.opacity = ledOn ? PROBE_LED_ON : PROBE_LED_ON * 0.08
       }
       if (obj.userData.probeLedGlow) {
         const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial
-        mat.opacity = ledOn ? 0.55 : 0.06
+        mat.opacity = ledOn ? PROBE_LED_GLOW_ON : PROBE_LED_GLOW_ON * 0.1
       }
       if (typeof obj.userData.ringPhase === 'number') {
         const cycle = reduced ? 0.35 : (time * 0.16 + obj.userData.ringPhase) % 1
@@ -145,11 +147,11 @@ function makeProbeMesh(ledColor: number): THREE.Group {
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.032, 5), mat)
   body.position.y = 0.022
   const glow = new THREE.Mesh(
-    new THREE.SphereGeometry(0.07, 12, 10),
+    new THREE.SphereGeometry(0.035, 12, 10),
     new THREE.MeshBasicMaterial({
       color: ledColor,
       transparent: true,
-      opacity: 0.5,
+      opacity: PROBE_LED_GLOW_ON,
       depthWrite: false,
       depthTest: false,
       blending: THREE.AdditiveBlending,
@@ -159,11 +161,11 @@ function makeProbeMesh(ledColor: number): THREE.Group {
   glow.renderOrder = 12
   glow.userData.probeLedGlow = true
   const led = new THREE.Mesh(
-    new THREE.SphereGeometry(0.022, 12, 10),
+    new THREE.SphereGeometry(0.011, 12, 10),
     new THREE.MeshBasicMaterial({
       color: ledColor,
       transparent: true,
-      opacity: 1,
+      opacity: PROBE_LED_ON,
       depthWrite: false,
       depthTest: false,
     }),

@@ -11,6 +11,10 @@ const WASD_SPEED = 6
 const MAP_ROTATE_SPEED = 1.15
 /** Planet/sector name inspect: hex fills this fraction of the shorter viewport. */
 export const CAMERA_INSPECT_FILL = 0.9
+/** Play angle: 30° from vertical so the board stays readable. */
+export const CAMERA_SHIP_FOCUS_PHI = Math.PI / 6
+const MIN_POLAR = 0.08
+const MAX_POLAR = Math.PI / 2 - 0.12
 
 export class CameraController {
   readonly camera: THREE.PerspectiveCamera
@@ -71,8 +75,8 @@ export class CameraController {
     this.controls.dampingFactor = 0.08
     this.controls.minDistance = 2.4
     this.controls.maxDistance = 400
-    this.controls.minPolarAngle = 0.04
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.06
+    this.controls.minPolarAngle = MIN_POLAR
+    this.controls.maxPolarAngle = MAX_POLAR
     this.controls.zoomSpeed = 1.35
     this.controls.target.set(0, 0, 0)
     this.controls.enablePan = false
@@ -115,10 +119,36 @@ export class CameraController {
     this.glideLookAt(x, z)
   }
 
-  /**
-   * Top-down inspect: tile fills ~60% of the view, title edge toward screen-bottom.
-   * `nameTheta` is OrbitControls azimuth so the camera sits on the name edge.
-   */
+  /** Frame the active ship at a 30° polar angle and the current distance. */
+  focusShip(coord: HexCoord): void {
+    this.overview = false
+    this.overviewRestore = null
+    this.clearInspectLimits()
+    this.onBreakInspect?.()
+    const { x, z } = getWorldPosition(coord)
+    const toTarget = new THREE.Vector3(x, 0, z)
+    const fromTarget = this.controls.target.clone()
+    const offset = this.camera.position.clone().sub(fromTarget)
+    const from = new THREE.Spherical().setFromVector3(offset)
+    const toRadius = Math.min(this.controls.maxDistance, Math.max(6, from.radius))
+    this.follow = null
+    this.followReleased = true
+    this.panAnim = null
+    const instant = prefersReducedMotion()
+    this.orbitAnim = {
+      start: performance.now(),
+      duration: instant ? 0 : CAMERA_FOCUS_MS,
+      fromTarget,
+      toTarget,
+      fromRadius: from.radius,
+      toRadius,
+      fromPhi: from.phi,
+      toPhi: CAMERA_SHIP_FOCUS_PHI,
+      fromTheta: from.theta,
+      thetaDelta: 0,
+    }
+  }
+
   inspectPlanet(coord: HexCoord, nameTheta: number): void {
     this.beginInspect(coord, nameTheta, 0.14)
   }
@@ -246,8 +276,8 @@ export class CameraController {
   clearInspectLimits(): void {
     if (!this.inspectLimits) return
     this.inspectLimits = false
-    this.controls.minPolarAngle = 0.04
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.06
+    this.controls.minPolarAngle = MIN_POLAR
+    this.controls.maxPolarAngle = MAX_POLAR
     this.controls.minDistance = 2.4
   }
 
@@ -384,6 +414,7 @@ export class CameraController {
     this.applyWasd(dt)
     this.applyMapRotate(dt)
     this.applyFollow(dt)
+    if (!this.pinch && !this.orbitAnim) this.sanitizeOrbit()
     if (!this.grabbing && !this.pinch && !this.panAnim && !this.orbitAnim && !this.follow) this.controls.update()
   }
 
@@ -392,6 +423,25 @@ export class CameraController {
     window.removeEventListener('keyup', this.onKeyUp)
     this.controls.removeEventListener('start', this.releaseFollow)
     this.controls.dispose()
+  }
+
+  private sanitizeOrbit(): void {
+    this.camera.up.set(0, 1, 0)
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    if (!Number.isFinite(offset.x) || offset.lengthSq() < 1e-6) {
+      offset.set(0, 8, 10)
+    }
+    const sph = new THREE.Spherical().setFromVector3(offset)
+    let phi = sph.phi
+    if (!Number.isFinite(phi)) phi = CAMERA_SHIP_FOCUS_PHI
+    const maxPhi = this.controls.maxPolarAngle
+    const minPhi = this.controls.minPolarAngle
+    if (phi > maxPhi || phi < minPhi || offset.y < 0.2) {
+      sph.phi = Math.min(maxPhi, Math.max(minPhi, phi))
+      sph.makeSafe()
+      this.camera.position.copy(this.controls.target).add(new THREE.Vector3().setFromSpherical(sph))
+      this.camera.lookAt(this.controls.target)
+    }
   }
 
   private releaseFollow = (): void => {

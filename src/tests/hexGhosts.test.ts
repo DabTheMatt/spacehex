@@ -13,12 +13,11 @@ function lineMaterials(root: THREE.Object3D): LineMaterial[] {
 }
 
 describe('move / explore hex ghosts', () => {
-  it('uses a thin dashed stroke per edge, not a closed solid ring', () => {
+  it('marks only the six corners with short ticks', () => {
     const ghost = makeDashedHexGhost(0, 0.38, 'EXPLORE')
     const lines = lineMaterials(ghost)
-    expect(lines).toHaveLength(6)
-    expect(lines[0].dashed).toBe(true)
-    expect(lines[0].dashSize).toBeCloseTo(0.05)
+    expect(lines).toHaveLength(12)
+    expect(lines[0].dashed).toBe(false)
   })
 
   it('does not fill a placed move-target hex', () => {
@@ -40,6 +39,6 @@ describe('move / explore hex ghosts', () => {
     pulseHexGhosts(ghost, 0.6)
     const bright = lineMaterials(ghost)[0].opacity
     expect(bright).toBeGreaterThan(dim)
-    expect(bright).toBeLessThan(0.7)
+    expect(bright).toBeLessThan(0.45)
   })
 })

@@ -17,6 +17,7 @@ export const useUiStore = defineStore('ui', () => {
   const hoverRotation = ref(0)
   const inspectPlanet = ref<HexCoord | null>(null)
   const mapOverview = ref(false)
+  const shipFocusNonce = ref(0)
   const showTileNames = ref(true)
   const showMarketIcons = ref(true)
   const notice = ref<string | null>(null)
@@ -45,6 +46,7 @@ export const useUiStore = defineStore('ui', () => {
     hoverRotation,
     inspectPlanet,
     mapOverview,
+    shipFocusNonce,
     showTileNames,
     showMarketIcons,
     notice,

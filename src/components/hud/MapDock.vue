@@ -35,6 +35,18 @@
         <polygon points="16,9 22,12.5 22,19.5 16,23 10,19.5 10,12.5" fill="currentColor" opacity="0.35" />
       </svg>
     </button>
+    <button type="button" class="map-btn" title="Focus ship" @click="focusShip">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <path
+          d="M6 10 V6 H10 M22 6 H26 V10 M26 22 V26 H22 M10 26 H6 V22"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="square"
+        />
+        <polygon points="16,11 20,21 16,19 12,21" fill="currentColor" />
+      </svg>
+    </button>
   </div>
 </template>
 
@@ -45,5 +57,11 @@ const ui = useUiStore()
 
 function toggleMap(): void {
   ui.mapOverview = !ui.mapOverview
+}
+
+function focusShip(): void {
+  ui.mapOverview = false
+  ui.inspectPlanet = null
+  ui.shipFocusNonce += 1
 }
 </script>

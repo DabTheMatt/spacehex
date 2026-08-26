@@ -250,9 +250,8 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
 }
 
 /**
- * Legal-destination marker: one thin dashed stroke per edge (no closed
- * polyline — Line2 round joints blob at the vertices). Opacity is pulsed
- * in `pulseHexGhosts` so the hex reads as “you can move here”.
+ * Legal-destination marker: short corner ticks only (no full hex ring).
+ * Opacity is pulsed in `pulseHexGhosts`.
  */
 export function makeDashedHexGhost(
   direction: number,
@@ -265,40 +264,38 @@ export function makeDashedHexGhost(
   const y = 0.008
   const pick = { kind, direction }
   const dpr = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 2)
-  const rest = Math.min(0.55, Math.max(0.16, opacity * 0.55))
+  const rest = Math.min(0.28, Math.max(0.08, opacity * 0.28))
+  const tick = 0.07
   g.userData.pulse = pulse
   g.userData.pulseRest = rest
 
   for (let i = 0; i < 6; i++) {
     const a0 = (Math.PI / 3) * i
     const a1 = (Math.PI / 3) * ((i + 1) % 6)
-    const x0 = radius * Math.cos(a0)
-    const z0 = radius * Math.sin(a0)
-    const x1 = radius * Math.cos(a1)
-    const z1 = radius * Math.sin(a1)
-    // Stop short of the vertex so round caps do not form a corner blob.
-    const inset = 0.14
-    const sx = x0 + (x1 - x0) * inset
-    const sz = z0 + (z1 - z0) * inset
-    const ex = x0 + (x1 - x0) * (1 - inset)
-    const ez = z0 + (z1 - z0) * (1 - inset)
-    const geom = new LineGeometry()
-    geom.setPositions([sx, y, sz, ex, y, ez])
-    const mat = new LineMaterial({
-      color: palette.preview,
-      dashed: true,
-      dashSize: 0.05,
-      gapSize: 0.04,
-      transparent: true,
-      opacity: rest,
-      depthTest: false,
-      depthWrite: false,
-    })
-    mat.linewidth = 1.15 * dpr
-    const line = new Line2(geom, mat)
-    line.computeLineDistances()
-    line.userData = pick
-    g.add(line)
+    const a2 = (Math.PI / 3) * ((i + 5) % 6)
+    const vx = radius * Math.cos(a0)
+    const vz = radius * Math.sin(a0)
+    const along1 = new THREE.Vector3(Math.cos(a1) * radius - vx, 0, Math.sin(a1) * radius - vz).normalize()
+    const along2 = new THREE.Vector3(Math.cos(a2) * radius - vx, 0, Math.sin(a2) * radius - vz).normalize()
+    const origin = new THREE.Vector3(vx, y, vz)
+    const p1 = origin.clone().addScaledVector(along1, tick)
+    const p2 = origin.clone().addScaledVector(along2, tick)
+    for (const end of [p1, p2]) {
+      const geom = new LineGeometry()
+      geom.setPositions([origin.x, origin.y, origin.z, end.x, end.y, end.z])
+      const mat = new LineMaterial({
+        color: palette.preview,
+        dashed: false,
+        transparent: true,
+        opacity: rest,
+        depthTest: false,
+        depthWrite: false,
+      })
+      mat.linewidth = 0.9 * dpr
+      const line = new Line2(geom, mat)
+      line.userData = pick
+      g.add(line)
+    }
   }
 
   const hit = new THREE.Mesh(
@@ -331,7 +328,7 @@ export function pulseHexGhosts(root: THREE.Object3D, timeSeconds: number): void 
       const mat = (child as THREE.Mesh).material as LineMaterial | undefined
       if (!mat || !mat.isLineMaterial) return
       mat.transparent = true
-      mat.opacity = Math.min(0.62, opacity)
+      mat.opacity = Math.min(0.38, opacity)
     })
   })
 }

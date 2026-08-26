@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { APP_VERSION } from '../appVersion'
 import { hudPaneLabel } from '../ui/sectorPane'
-import { CAMERA_INSPECT_FILL } from '../renderer/scene/CameraController'
+import { CAMERA_INSPECT_FILL, CAMERA_SHIP_FOCUS_PHI } from '../renderer/scene/CameraController'
 import {
   PROBE_SCAN_OPACITY,
   PROBE_STROKE_OPACITY,
@@ -30,6 +30,10 @@ describe('planet inspect framing', () => {
   it('fills more of the view than the previous 60% framing', () => {
     expect(CAMERA_INSPECT_FILL).toBeGreaterThan(0.6)
     expect(CAMERA_INSPECT_FILL).toBeLessThanOrEqual(1)
+  })
+
+  it('focuses the active ship at 30 degrees from vertical', () => {
+    expect(CAMERA_SHIP_FOCUS_PHI).toBeCloseTo(Math.PI / 6)
   })
 })
 

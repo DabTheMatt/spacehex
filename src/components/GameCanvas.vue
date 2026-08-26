@@ -450,6 +450,14 @@ watch(
 )
 
 watch(
+  () => ui.shipFocusNonce,
+  () => {
+    if (!scene || !game.ship) return
+    scene.camera.focusShip(game.ship.coord)
+  },
+)
+
+watch(
   () => ui.mapOverview,
   (on) => {
     if (!scene) return
