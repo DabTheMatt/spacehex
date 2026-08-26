@@ -28,6 +28,7 @@ export function createHexMesh(options: {
   fill: number
   stroke: number
   opacity?: number
+  strokeOpacity?: number
   y?: number
   radius?: number
   dashed?: boolean
@@ -35,6 +36,7 @@ export function createHexMesh(options: {
   const group = new THREE.Group()
   const radius = options.radius ?? HEX_SIZE * 0.96
   const opacity = options.opacity ?? 1
+  const translucent = opacity < 1 || Boolean(options.dashed)
   const shape = hexShape(radius)
   const geom = new THREE.ExtrudeGeometry(shape, {
     depth: TILE_THICKNESS,
@@ -43,9 +45,10 @@ export function createHexMesh(options: {
   })
   const mat = new THREE.MeshBasicMaterial({
     color: options.fill,
-    transparent: opacity < 1 || Boolean(options.dashed),
+    transparent: translucent,
     opacity: options.dashed ? Math.min(opacity, 0.2) : opacity,
     side: THREE.DoubleSide,
+    depthWrite: !translucent,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
@@ -57,7 +60,9 @@ export function createHexMesh(options: {
 
   const topY = (options.y ?? 0) + TILE_THICKNESS + 0.002
   const botY = options.y ?? 0
-  const strokeOpacity = options.dashed ? 0.95 : Math.min(1, opacity + 0.2)
+  const strokeOpacity =
+    options.strokeOpacity ?? (options.dashed ? 0.95 : Math.min(1, opacity + 0.2))
+  const postOpacity = options.dashed ? 0.85 : Math.min(strokeOpacity, Math.max(opacity, strokeOpacity * 0.85))
   group.add(hexRing(radius, topY, options.stroke, strokeOpacity, options.dashed))
   group.add(hexRing(radius, botY, options.stroke, strokeOpacity, options.dashed))
   for (let i = 0; i < 6; i++) {
@@ -68,7 +73,7 @@ export function createHexMesh(options: {
       hexLine(
         [new THREE.Vector3(x, botY, z), new THREE.Vector3(x, topY, z)],
         options.stroke,
-        options.dashed ? 0.85 : Math.min(1, opacity + 0.15),
+        postOpacity,
         options.dashed,
       ),
     )

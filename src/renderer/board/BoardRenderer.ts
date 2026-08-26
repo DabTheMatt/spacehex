@@ -15,6 +15,7 @@ import {
   TILE_THICKNESS,
 } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
+import { PROBE_STROKE_OPACITY, PROBE_TILE_OPACITY } from '../entities/ProbeRenderer'
 import { createPlanetOverlay, tickPlanetLod, createEdgeLabel, createEvaOverlay } from './planetLots'
 import { buyPrice, evaSellParts, isEvaHex } from '../../game/rules/planetMarket'
 import { RESOURCE_IDS, emptyCargo } from '../../game/definitions/resources'
@@ -146,7 +147,17 @@ export class BoardRenderer {
         this.tiles.remove(existing.mesh)
       }
       const pos = getWorldPosition(tile.coord)
-      const mesh = createHexMesh({ fill: palette.tileFill, stroke: palette.ivory, y: TILE_SETTLED_Y })
+      const mesh = createHexMesh(
+        probed
+          ? {
+              fill: palette.engine,
+              stroke: palette.engine,
+              opacity: PROBE_TILE_OPACITY,
+              strokeOpacity: PROBE_STROKE_OPACITY,
+              y: TILE_SETTLED_Y,
+            }
+          : { fill: palette.tileFill, stroke: palette.ivory, y: TILE_SETTLED_Y },
+      )
       mesh.position.set(pos.x, options.tileY?.[key] ?? TILE_SETTLED_Y, pos.z)
       mesh.rotation.y = tile.rotation * (Math.PI / 3)
       mesh.userData.tileCoord = tile.coord
