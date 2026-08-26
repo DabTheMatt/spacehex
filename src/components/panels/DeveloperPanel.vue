@@ -29,6 +29,7 @@
       </select>
     </label>
     <button type="button" :disabled="!forced" @click="force">put on top of deck</button>
+    <button type="button" :disabled="!forced" @click="placeBeside">place beside ship</button>
     <label class="chk"><input v-model="ui.showCoords" type="checkbox" /> coordinates q,r</label>
     <label class="chk"><input v-model="ui.showEdges" type="checkbox" /> edge indices 0–5</label>
     <label class="chk"><input v-model="ui.showDebug" type="checkbox" /> overlay tileId / rotation</label>
@@ -39,6 +40,8 @@
 import { computed, ref } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
+import { getNeighbor } from '@/game/board/hexMath'
+import { isTilePlaced } from '@/game/board/HexMap'
 
 const game = useGameStore()
 const ui = useUiStore()
@@ -48,5 +51,16 @@ const remaining = computed(() => game.state.explorationDeck.drawPile)
 function force(): void {
   if (!forced.value) return
   game.dispatch({ type: 'DEV_FORCE_NEXT_TILE', tileId: forced.value })
+}
+
+function placeBeside(): void {
+  if (!forced.value) return
+  const origin = game.ship.coord
+  for (let dir = 0; dir < 6; dir++) {
+    const coord = getNeighbor(origin, dir)
+    if (isTilePlaced(game.state.board, coord)) continue
+    game.dispatch({ type: 'DEV_PLACE_TILE', tileId: forced.value, coord, rotation: 0 })
+    return
+  }
 }
 </script>
