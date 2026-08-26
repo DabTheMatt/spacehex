@@ -84,7 +84,7 @@ Talia eksploracji: **24** kafle. Seedowane tasowanie przy `START_GAME`.
 
 Nie implementować: Pelikan, kolonizacja, SOS, holowanie, multiplayer online, pełna ekonomia, synteza, pełne skanery, rozbudowane AI, finalne modele/tekstury/ilustracje, particle, zaawansowane audio.
 
-Sondy (wyjątek, Maciej): 2 na statek, wystrzał zamiast ruchu na nieodkryty przyległy hex. Sonda ciągnie kafel z talii i kładzie go (statek zostaje). Marker: przezroczysty błękit + sonda + kręgi. Sonda znika, gdy statek wejdzie na hex.
+Sondy (wyjątek, Maciej): 2 na statek, wystrzał zamiast ruchu na nieodkryty przyległy hex. Sonda ciągnie kafel z talii i kładzie go (statek zostaje); kafel widać jak po eksploracji, sonda to mały znacznik na krawędzi. Sonda znika, gdy statek wejdzie na hex.
 
 Nie wolno: generować mapy z góry, traktować planszy jako tablicy prostokątnej, proceduralnego infinite grida, automatycznie wybierać orientacji kafla, przenosić zasad do Three.js, uzależniać logiki od animacji.
 

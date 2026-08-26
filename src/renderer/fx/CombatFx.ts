@@ -7,9 +7,9 @@ export const MISSILE_SIDE_MS = 280
 export const MISSILE_FLY_MS = 520
 export const MISSILE_BOOM_MS = 220
 export const MISSILE_SHOT_MS = MISSILE_SIDE_MS + MISSILE_FLY_MS + MISSILE_BOOM_MS
-export const PROBE_SIDE_MS = 280
-export const PROBE_FLY_MS = 780
-export const PROBE_FADE_MS = 160
+export const PROBE_SIDE_MS = 220
+export const PROBE_FLY_MS = 900
+export const PROBE_FADE_MS = 180
 const TRAIL = 14
 const ROCKET_COLOR = 0xc45c4a
 const PROBE_COLOR = palette.engine
@@ -320,7 +320,7 @@ function makeRocket(): THREE.Mesh {
 
 function makeProbeDart(): THREE.Mesh {
   const mesh = new THREE.Mesh(
-    new THREE.ConeGeometry(0.016, 0.07, 5),
+    new THREE.ConeGeometry(0.01, 0.042, 5),
     new THREE.MeshBasicMaterial({
       color: PROBE_COLOR,
       depthWrite: false,
