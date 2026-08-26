@@ -6,8 +6,9 @@ import { TILE_THICKNESS } from '../board/TileRenderer'
 import { prefersReducedMotion } from '../motion'
 
 const RING_COUNT = 2
+const HEX_SCANS = 5
 const BLUE = palette.engine
-const CRT_LINES = 18
+export const PROBE_FEED_OPACITY = 0.25
 
 export class ProbeRenderer {
   readonly group = new THREE.Group()
@@ -24,16 +25,21 @@ export class ProbeRenderer {
   tick(time: number): void {
     const reduced = prefersReducedMotion()
     const wave = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(time * ((Math.PI * 2) / 2.4))
-    const scroll = reduced ? 0 : (time * 0.07) % 1
     this.group.traverse((obj) => {
       if (obj.userData.probeFill) {
         const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial
-        mat.opacity = 0.42 + 0.08 * wave
+        mat.opacity = PROBE_FEED_OPACITY + 0.04 * wave
       }
-      if (obj.userData.crt) {
-        const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial
-        if (mat.map) mat.map.offset.y = scroll
-        mat.opacity = 0.38 + 0.1 * wave
+      if (obj.userData.hexScan) {
+        const mat = (obj as THREE.Line).material as THREE.LineBasicMaterial
+        mat.opacity = 0.18 + 0.08 * wave
+      }
+      if (obj.userData.hexSweep) {
+        const cycle = reduced ? 0.45 : (time * 0.12) % 1
+        const scale = 0.18 + cycle * 0.82
+        obj.scale.set(scale, 1, scale)
+        const mat = (obj as THREE.Line).material as THREE.LineBasicMaterial
+        mat.opacity = (1 - cycle) * 0.28
       }
       if (obj.userData.probeBody) {
         obj.position.y = TILE_THICKNESS + 0.07 + wave * 0.012
@@ -44,7 +50,7 @@ export class ProbeRenderer {
         const scale = 0.06 + cycle * 0.18
         obj.scale.set(scale, 1, scale)
         const mat = (obj as THREE.Line).material as THREE.LineBasicMaterial
-        mat.opacity = (1 - cycle) * 0.55
+        mat.opacity = (1 - cycle) * 0.4
       }
     })
   }
@@ -62,7 +68,7 @@ function makeProbeSite(q: number, r: number): THREE.Group {
     new THREE.MeshBasicMaterial({
       color: BLUE,
       transparent: true,
-      opacity: 0.48,
+      opacity: PROBE_FEED_OPACITY,
       side: THREE.DoubleSide,
       depthWrite: false,
     }),
@@ -72,32 +78,15 @@ function makeProbeSite(q: number, r: number): THREE.Group {
   fill.userData.probeFill = true
   g.add(fill)
 
-  const crt = new THREE.Mesh(
-    new THREE.ShapeGeometry(shape),
-    new THREE.MeshBasicMaterial({
-      map: crtScanTexture(),
-      transparent: true,
-      opacity: 0.42,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  )
-  crt.rotation.x = -Math.PI / 2
-  crt.position.y = TILE_THICKNESS + 0.016
-  crt.userData.crt = true
-  g.add(crt)
-
-  const edge: THREE.Vector3[] = []
-  for (let i = 0; i <= 6; i++) {
-    const angle = (Math.PI / 3) * (i % 6)
-    edge.push(new THREE.Vector3(radius * Math.cos(angle), TILE_THICKNESS + 0.018, radius * Math.sin(angle)))
+  for (let i = 1; i <= HEX_SCANS; i++) {
+    const scan = hexLine(radius * (i / HEX_SCANS), 0.2)
+    scan.userData.hexScan = true
+    g.add(scan)
   }
-  g.add(
-    new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(edge),
-      new THREE.LineBasicMaterial({ color: BLUE, transparent: true, opacity: 0.85 }),
-    ),
-  )
+
+  const sweep = hexLine(radius, 0.22)
+  sweep.userData.hexSweep = true
+  g.add(sweep)
 
   const body = makeProbeMesh()
   body.userData.probeBody = true
@@ -115,7 +104,7 @@ function makeProbeSite(q: number, r: number): THREE.Group {
       new THREE.LineBasicMaterial({
         color: BLUE,
         transparent: true,
-        opacity: 0.35,
+        opacity: 0.28,
         depthWrite: false,
       }),
     )
@@ -139,33 +128,23 @@ function hexShape(radius: number): THREE.Shape {
   return shape
 }
 
-let crtTex: THREE.CanvasTexture | null = null
-
-function crtScanTexture(): THREE.CanvasTexture {
-  if (crtTex) return crtTex
-  const size = 128
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (ctx) {
-    ctx.clearRect(0, 0, size, size)
-    const pitch = size / CRT_LINES
-    for (let i = 0; i < CRT_LINES; i++) {
-      const y = i * pitch
-      ctx.fillStyle = 'rgba(0, 12, 28, 0.72)'
-      ctx.fillRect(0, y, size, pitch * 0.45)
-      ctx.fillStyle = 'rgba(126, 200, 255, 0.22)'
-      ctx.fillRect(0, y + pitch * 0.45, size, pitch * 0.55)
-    }
+function hexLine(radius: number, opacity: number): THREE.Line {
+  const pts: THREE.Vector3[] = []
+  for (let i = 0; i <= 6; i++) {
+    const angle = (Math.PI / 3) * (i % 6)
+    pts.push(
+      new THREE.Vector3(radius * Math.cos(angle), TILE_THICKNESS + 0.018, radius * Math.sin(angle)),
+    )
   }
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.wrapS = THREE.RepeatWrapping
-  tex.wrapT = THREE.RepeatWrapping
-  tex.repeat.set(1, 1)
-  tex.needsUpdate = true
-  crtTex = tex
-  return tex
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({
+      color: BLUE,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+    }),
+  )
 }
 
 function makeProbeMesh(): THREE.Group {
