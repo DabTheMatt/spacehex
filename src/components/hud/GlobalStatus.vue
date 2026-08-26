@@ -28,6 +28,7 @@ function newGame(): void {
   ui.seedInput = seed
   ui.selectedTile = null
   ui.hover = null
+  ui.probeAiming = false
   game.dispatch({ type: 'START_GAME', seed })
   ui.selectedShipId = game.ship.id
 }
