@@ -8,10 +8,10 @@ import { prefersReducedMotion } from '../motion'
 const RING_COUNT = 2
 const HEX_SCANS = 4
 const BLUE = palette.engine
-/** Glass slab only — no stacked overlay fill. */
-export const PROBE_TILE_OPACITY = 0.1
-export const PROBE_STROKE_OPACITY = 0.22
-export const PROBE_SCAN_OPACITY = 0.12
+/** No fill slab — wireframe hologram only. */
+export const PROBE_TILE_OPACITY = 0
+export const PROBE_STROKE_OPACITY = 0.34
+export const PROBE_SCAN_OPACITY = 0.11
 
 export class ProbeRenderer {
   readonly group = new THREE.Group()

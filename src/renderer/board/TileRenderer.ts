@@ -37,26 +37,44 @@ export function createHexMesh(options: {
   const radius = options.radius ?? HEX_SIZE * 0.96
   const opacity = options.opacity ?? 1
   const translucent = opacity < 1 || Boolean(options.dashed)
-  const shape = hexShape(radius)
-  const geom = new THREE.ExtrudeGeometry(shape, {
-    depth: TILE_THICKNESS,
-    bevelEnabled: false,
-    steps: 1,
-  })
-  const mat = new THREE.MeshBasicMaterial({
-    color: options.fill,
-    transparent: translucent,
-    opacity: options.dashed ? Math.min(opacity, 0.2) : opacity,
-    side: THREE.DoubleSide,
-    depthWrite: !translucent,
-    polygonOffset: true,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits: 1,
-  })
-  const mesh = new THREE.Mesh(geom, mat)
-  mesh.rotation.x = -Math.PI / 2
-  mesh.position.y = options.y ?? 0
-  group.add(mesh)
+  const skipFill = opacity <= 0 && !options.dashed
+  if (!skipFill) {
+    const shape = hexShape(radius)
+    const geom = new THREE.ExtrudeGeometry(shape, {
+      depth: TILE_THICKNESS,
+      bevelEnabled: false,
+      steps: 1,
+    })
+    const mat = new THREE.MeshBasicMaterial({
+      color: options.fill,
+      transparent: translucent,
+      opacity: options.dashed ? Math.min(opacity, 0.2) : opacity,
+      side: THREE.DoubleSide,
+      depthWrite: !translucent,
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
+    })
+    const mesh = new THREE.Mesh(geom, mat)
+    mesh.rotation.x = -Math.PI / 2
+    mesh.position.y = options.y ?? 0
+    group.add(mesh)
+  } else {
+    const hit = new THREE.Mesh(
+      new THREE.ShapeGeometry(hexShape(radius)),
+      new THREE.MeshBasicMaterial({
+        color: options.stroke,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        depthTest: false,
+      }),
+    )
+    hit.rotation.x = -Math.PI / 2
+    hit.position.y = (options.y ?? 0) + TILE_THICKNESS
+    group.add(hit)
+  }
 
   const topY = (options.y ?? 0) + TILE_THICKNESS + 0.002
   const botY = options.y ?? 0

@@ -27,11 +27,10 @@ describe('planet inspect framing', () => {
 })
 
 describe('probe feed', () => {
-  it('keeps the scanned hex glass-thin with blue edges, not a solid ivory slab', () => {
-    expect(PROBE_TILE_OPACITY).toBeGreaterThan(0.05)
-    expect(PROBE_TILE_OPACITY).toBeLessThanOrEqual(0.14)
-    expect(PROBE_STROKE_OPACITY).toBeGreaterThan(PROBE_TILE_OPACITY)
-    expect(PROBE_STROKE_OPACITY).toBeLessThanOrEqual(0.28)
-    expect(PROBE_SCAN_OPACITY).toBeLessThanOrEqual(0.16)
+  it('keeps the scanned hex a wireframe hologram, not a filled slab', () => {
+    expect(PROBE_TILE_OPACITY).toBe(0)
+    expect(PROBE_STROKE_OPACITY).toBeGreaterThan(0.25)
+    expect(PROBE_STROKE_OPACITY).toBeLessThanOrEqual(0.4)
+    expect(PROBE_SCAN_OPACITY).toBeLessThanOrEqual(0.14)
   })
 })
