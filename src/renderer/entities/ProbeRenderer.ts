@@ -10,8 +10,13 @@ const HEX_SCANS = 4
 const BLUE = palette.engine
 /** No fill slab — wireframe hologram only. */
 export const PROBE_TILE_OPACITY = 0
-export const PROBE_STROKE_OPACITY = 0.34
-export const PROBE_SCAN_OPACITY = 0.11
+export const PROBE_STROKE_OPACITY = 0.4
+export const PROBE_SCAN_OPACITY = 0.16
+export const PROBE_LED_HZ = 2.2
+
+export function probeOwnerColor(playerId: string): number {
+  return playerId === 'player-2' ? palette.player2 : palette.player1
+}
 
 export class ProbeRenderer {
   readonly group = new THREE.Group()
@@ -21,13 +26,14 @@ export class ProbeRenderer {
     for (const probe of Object.values(state.probes)) {
       const key = `${probe.coord.q},${probe.coord.r}`
       if (inflightKeys?.has(key)) continue
-      this.group.add(makeProbeSite(probe.coord.q, probe.coord.r))
+      this.group.add(makeProbeSite(probe.coord.q, probe.coord.r, probe.ownerPlayerId))
     }
   }
 
   tick(time: number): void {
     const reduced = prefersReducedMotion()
     const wave = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(time * ((Math.PI * 2) / 2.4))
+    const ledOn = reduced ? true : (time * PROBE_LED_HZ) % 1 < 0.48
     this.group.traverse((obj) => {
       if (obj.userData.hexScan) {
         const mat = (obj as THREE.Line).material as THREE.LineBasicMaterial
@@ -41,8 +47,16 @@ export class ProbeRenderer {
         mat.opacity = (1 - cycle) * 0.16
       }
       if (obj.userData.probeBody) {
-        obj.position.y = TILE_THICKNESS + 0.07 + wave * 0.012
+        obj.position.y = TILE_THICKNESS + 0.08 + wave * 0.01
         obj.rotation.y = time * 0.55
+      }
+      if (obj.userData.probeLed) {
+        const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial
+        mat.opacity = ledOn ? 1 : 0.08
+      }
+      if (obj.userData.probeLedGlow) {
+        const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial
+        mat.opacity = ledOn ? 0.42 : 0.05
       }
       if (typeof obj.userData.ringPhase === 'number') {
         const cycle = reduced ? 0.35 : (time * 0.16 + obj.userData.ringPhase) % 1
@@ -55,7 +69,7 @@ export class ProbeRenderer {
   }
 }
 
-function makeProbeSite(q: number, r: number): THREE.Group {
+function makeProbeSite(q: number, r: number, ownerPlayerId: string): THREE.Group {
   const g = new THREE.Group()
   const pos = getWorldPosition({ q, r })
   g.position.set(pos.x, 0, pos.z)
@@ -71,9 +85,9 @@ function makeProbeSite(q: number, r: number): THREE.Group {
   sweep.userData.hexSweep = true
   g.add(sweep)
 
-  const body = makeProbeMesh()
+  const body = makeProbeMesh(probeOwnerColor(ownerPlayerId))
   body.userData.probeBody = true
-  body.position.y = TILE_THICKNESS + 0.07
+  body.position.y = TILE_THICKNESS + 0.08
   g.add(body)
 
   for (let i = 0; i < RING_COUNT; i++) {
@@ -117,19 +131,47 @@ function hexLine(radius: number, opacity: number): THREE.Line {
   )
 }
 
-function makeProbeMesh(): THREE.Group {
+function makeProbeMesh(ledColor: number): THREE.Group {
   const g = new THREE.Group()
   const mat = new THREE.MeshBasicMaterial({
     color: BLUE,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.92,
     depthWrite: false,
   })
-  const needle = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.038, 5), mat)
+  const needle = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.055, 5), mat)
   needle.rotation.x = Math.PI
-  needle.position.y = 0.042
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.011, 0.022, 5), mat)
-  body.position.y = 0.016
-  g.add(body, needle)
+  needle.position.y = 0.058
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.032, 5), mat)
+  body.position.y = 0.022
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(0.038, 10, 8),
+    new THREE.MeshBasicMaterial({
+      color: ledColor,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  )
+  glow.position.y = 0.092
+  glow.renderOrder = 12
+  glow.userData.probeLedGlow = true
+  const led = new THREE.Mesh(
+    new THREE.SphereGeometry(0.016, 10, 8),
+    new THREE.MeshBasicMaterial({
+      color: ledColor,
+      transparent: true,
+      opacity: 1,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  )
+  led.position.y = 0.092
+  led.renderOrder = 13
+  led.userData.probeLed = true
+  g.add(body, needle, glow, led)
   return g
 }

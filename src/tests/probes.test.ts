@@ -4,6 +4,8 @@ import { getNeighbor } from '../game/board/hexMath'
 import { coordKey } from '../game/board/HexCoord'
 import { STARTING_PROBES } from '../game/definitions/constants'
 import { formatLogLine } from '../ui/eventLog'
+import { palette } from '../renderer/theme'
+import { probeOwnerColor } from '../renderer/entities/ProbeRenderer'
 
 describe('probes', () => {
   it('starts each ship with two probes', () => {
@@ -28,6 +30,7 @@ describe('probes', () => {
     expect(state.board.tiles[coordKey(target)].definitionId).toBe(top)
     expect(state.explorationDeck.drawPile).toHaveLength(23)
     expect(state.probes[coordKey(target)]?.ownerShipId).toBe('mewa-1')
+    expect(state.probes[coordKey(target)]?.ownerPlayerId).toBe('player-1')
     const again = applyCommand(state, { type: 'LAUNCH_PROBE', direction: 2 })
     expect(again.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(true)
   })
@@ -46,6 +49,13 @@ describe('probes', () => {
     expect(state.ships['mewa-1'].coord).toEqual(target)
     expect(state.probes[coordKey(target)]).toBeUndefined()
     expect(moved.events.some((e) => e.type === 'PROBE_DISMISSED')).toBe(true)
+  })
+})
+
+describe('probe owner lamp', () => {
+  it('uses player paint for the blinking LED', () => {
+    expect(probeOwnerColor('player-1')).toBe(palette.player1)
+    expect(probeOwnerColor('player-2')).toBe(palette.player2)
   })
 })
 

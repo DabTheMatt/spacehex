@@ -37,7 +37,7 @@ describe('probe feed', () => {
   it('keeps the scanned hex a wireframe hologram, not a filled slab', () => {
     expect(PROBE_TILE_OPACITY).toBe(0)
     expect(PROBE_STROKE_OPACITY).toBeGreaterThan(0.25)
-    expect(PROBE_STROKE_OPACITY).toBeLessThanOrEqual(0.4)
-    expect(PROBE_SCAN_OPACITY).toBeLessThanOrEqual(0.14)
+    expect(PROBE_STROKE_OPACITY).toBeLessThanOrEqual(0.45)
+    expect(PROBE_SCAN_OPACITY).toBeLessThanOrEqual(0.18)
   })
 })
