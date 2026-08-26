@@ -11,10 +11,11 @@ import { CombatFx } from '../fx/CombatFx'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
+import { getWorldPosition } from '../../game/board/hexMath'
 import type { ResourceId } from '../../game/definitions/resources'
 import { userDataFromHits } from './pickHelpers'
 import type { BoardHover } from '../../ui/boardHover'
-import { TILE_SETTLED_Y, TILE_SLOT_Y } from '../board/TileRenderer'
+import { TILE_SETTLED_Y, TILE_SLOT_Y, TILE_THICKNESS } from '../board/TileRenderer'
 import {
   clamp01,
   easeOutCubic,
@@ -70,6 +71,8 @@ export class SpaceScene {
   private flightsByTile = new Map<string, Array<{ shipId: string; from: HexCoord; to: HexCoord }>>()
   private hideGlyphKeys = new Set<string>()
   private revealWhenSettled = new Set<string>()
+  private inflightProbeKeys = new Set<string>()
+  private prevProbeKeys = new Set<string>()
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -154,6 +157,27 @@ export class SpaceScene {
       this.ships.setDuel(started.attackerId, started.defenderId, started.coord)
       this.camera.inspectCombat(started.coord, 0)
     }
+    for (const event of events) {
+      if (event.type !== 'PROBE_LAUNCHED') continue
+      this.launchProbeFlight(event.shipId, event.coord)
+    }
+  }
+
+  private launchProbeFlight(shipId: string, coord: HexCoord): void {
+    const key = coordKey(coord)
+    const destHex = getWorldPosition(coord)
+    const target = { x: destHex.x, y: TILE_THICKNESS + 0.12, z: destHex.z }
+    const from = this.ships.worldPose(shipId)
+    this.inflightProbeKeys.add(key)
+    const land = (): void => {
+      this.inflightProbeKeys.delete(key)
+      this.applySync()
+    }
+    if (!from) {
+      land()
+      return
+    }
+    this.combat.spawnProbe(from, from.yaw, target, performance.now(), land)
   }
 
   pickPlacement(clientX: number, clientY: number): boolean {
@@ -218,8 +242,12 @@ export class SpaceScene {
     }
 
     for (const key of tileKeys) {
-      if (!this.prevTileKeys.has(key)) this.beginRise(key)
+      if (!this.prevTileKeys.has(key) && !state.probes[key]) this.beginRise(key)
     }
+    for (const key of this.prevProbeKeys) {
+      if (!state.probes[key] && state.board.tiles[key]) this.beginRise(key)
+    }
+    this.prevProbeKeys = new Set(Object.keys(state.probes))
 
     for (const ship of Object.values(state.ships)) {
       const prev = this.prevShipCoords.get(ship.id)
@@ -253,7 +281,7 @@ export class SpaceScene {
     this.ships.sync(this.lastState)
     this.ships.setThreat(this.duel ? null : (this.lastOptions.threatShipId ?? null))
     this.hoverTargets.sync(this.lastState, this.lastOptions.hover ?? null)
-    this.probes.sync(this.lastState)
+    this.probes.sync(this.lastState, this.inflightProbeKeys)
   }
 
   private advanceRise(now: number): boolean {
@@ -306,6 +334,8 @@ export class SpaceScene {
     this.flightsByTile.clear()
     this.hideGlyphKeys.clear()
     this.revealWhenSettled.clear()
+    this.inflightProbeKeys.clear()
+    this.prevProbeKeys.clear()
     this.ships.reset()
     this.combat.dispose()
     this.duel = null

@@ -95,6 +95,7 @@ export class BoardRenderer {
     const keep = new Set<string>()
     for (const tile of Object.values(state.board.tiles)) {
       const key = coordKey(tile.coord)
+      if (probeAt(state, tile.coord)) continue
       keep.add(key)
       const selected = options.selectedKey === key
       const hideGlyph = options.hideGlyphKeys?.has(key) === true

@@ -168,6 +168,7 @@ function onDown(ev: PointerEvent): void {
 
 function onMove(ev: PointerEvent): void {
   if (!scene) return
+  if (isTouchLike(ev.pointerType)) ev.preventDefault()
   if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
   const pair = pinchPair()
   if (pinch && pair) {
@@ -405,6 +406,7 @@ watch(
     ui.inspectPlanet,
     ui.showTileNames,
     ui.showMarketIcons,
+    ui.probeAiming,
   ],
   () => sync(),
   { deep: true },

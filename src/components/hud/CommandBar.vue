@@ -49,7 +49,7 @@
       <button
         v-if="showProbe"
         type="button"
-        :class="['action', { accent: ui.probeAiming }]"
+        :class="['action', 'probe', { aiming: ui.probeAiming }]"
         @click="toggleProbe"
       >
         {{ ui.probeAiming ? 'AIMING' : 'PROBE' }}

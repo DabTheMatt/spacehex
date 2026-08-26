@@ -413,35 +413,69 @@ function moveShip(state: GameState, target: HexCoord, fuelCost: number): EngineR
 function launchProbe(state: GameState, direction: number): EngineResult {
   const check = canLaunchProbe(state, direction)
   if (!check.ok) return reject(state, 'LAUNCH_PROBE', check.reason)
+  const drawn = drawFromDeck(state.explorationDeck)
+  if (!drawn) return reject(state, 'LAUNCH_PROBE', 'EMPTY_DECK')
   const ship = activeShip(state)
   const player = activePlayer(state)
-  const key = coordKey(check.target)
+  const dest = check.target
+  const key = coordKey(dest)
+  const placed = makePlacedTile(state, drawn.tileId, dest, 0, player.id, state.round)
   const probe = {
     id: `probe-${ship.id}-${state.round}-${direction}`,
-    coord: check.target,
+    coord: dest,
     ownerPlayerId: player.id,
     ownerShipId: ship.id,
   }
-  const event: GameEvent = {
+  const placeEvents: GameEvent[] = [
+    { type: 'TILE_DRAWN', tileId: drawn.tileId },
+    { type: 'TILE_PLACED', tileId: placed.id, coord: dest },
+    { type: 'HEX_DISCOVERED', tileId: placed.id },
+  ]
+  let next = spendFuel(state, FUEL_COST_EXPLORE)
+  const fuelEvent: GameEvent = {
+    type: 'FUEL_CHANGED',
+    playerId: player.id,
+    fuel: next.players[player.id].fuel,
+  }
+  const launchEvent: GameEvent = {
     type: 'PROBE_LAUNCHED',
     playerId: player.id,
     shipId: ship.id,
-    coord: check.target,
+    coord: dest,
   }
-  const next = append(
-    {
-      ...state,
-      ships: {
-        ...state.ships,
-        [ship.id]: { ...ship, probes: ship.probes - 1 },
+  next = {
+    ...next,
+    board: {
+      tiles: {
+        ...next.board.tiles,
+        [key]: placed,
       },
-      probes: { ...state.probes, [key]: probe },
-      movementSpent: true,
-      exploration: { status: 'NONE' },
     },
-    [event],
-  )
-  return { state: next, events: [event] }
+    explorationDeck: drawn.deck,
+    ships: {
+      ...next.ships,
+      [ship.id]: { ...ship, probes: ship.probes - 1 },
+    },
+    probes: { ...next.probes, [key]: probe },
+    movementSpent: true,
+    exploration: { status: 'NONE' },
+    phase: 'PLAYER_TURN',
+  }
+  next = append(next, [...placeEvents, fuelEvent, launchEvent])
+  const beforeMarket = next
+  next = stockPlanetIfNeeded(next, placed.id, dest)
+  const extra: GameEvent[] = []
+  if (next.planetMarkets[key] && !beforeMarket.planetMarkets[key]) {
+    extra.push({ type: 'PLANET_STOCKED', tileId: placed.id, coord: dest })
+  }
+  const discovered = resolveDiscovery(next, placed.id, dest, player.id)
+  next = discovered.state
+  extra.push(...discovered.events)
+  next = append(next, extra)
+  return {
+    state: next,
+    events: [...placeEvents, fuelEvent, launchEvent, ...extra],
+  }
 }
 
 function declareAttack(state: GameState, defenderId: string): EngineResult {

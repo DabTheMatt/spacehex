@@ -1,15 +1,23 @@
 import * as THREE from 'three'
-import { missileSidePoint, missileWorldPos, type Vec3 } from './missilePath'
+import { missileSidePoint, missileWorldPos, probeWorldPos, type Vec3 } from './missilePath'
 import { clamp01, prefersReducedMotion } from '../motion'
+import { palette } from '../theme'
 
 export const MISSILE_SIDE_MS = 280
 export const MISSILE_FLY_MS = 520
 export const MISSILE_BOOM_MS = 220
 export const MISSILE_SHOT_MS = MISSILE_SIDE_MS + MISSILE_FLY_MS + MISSILE_BOOM_MS
+export const PROBE_SIDE_MS = 280
+export const PROBE_FLY_MS = 780
+export const PROBE_FADE_MS = 160
 const TRAIL = 14
 const ROCKET_COLOR = 0xc45c4a
+const PROBE_COLOR = palette.engine
+
+type ShotKind = 'missile' | 'probe'
 
 type Shot = {
+  kind: ShotKind
   origin: Vec3
   side: Vec3
   target: Vec3
@@ -54,7 +62,23 @@ export class CombatFx {
       return
     }
     this.shots.push(
-      this.makeShot(origin, missileSidePoint(origin, yaw, sideIndex), target, now, onHit),
+      this.makeShot('missile', origin, missileSidePoint(origin, yaw, sideIndex), target, now, onHit),
+    )
+  }
+
+  spawnProbe(
+    origin: Vec3,
+    yaw: number,
+    target: Vec3,
+    now: number,
+    onHit?: (target: Vec3) => void,
+  ): void {
+    if (prefersReducedMotion()) {
+      onHit?.(target)
+      return
+    }
+    this.shots.push(
+      this.makeShot('probe', origin, missileSidePoint(origin, yaw, 0), target, now, onHit),
     )
   }
 
@@ -74,19 +98,21 @@ export class CombatFx {
         shot.trail.visible = false
         continue
       }
-      if (elapsed <= MISSILE_SIDE_MS + MISSILE_FLY_MS) {
-        const t =
-          elapsed <= MISSILE_SIDE_MS
-            ? elapsed / MISSILE_SIDE_MS
-            : 1 + (elapsed - MISSILE_SIDE_MS) / MISSILE_FLY_MS
-        const p = missileWorldPos(shot.origin, shot.side, shot.target, t)
+      const sideMs = shot.kind === 'probe' ? PROBE_SIDE_MS : MISSILE_SIDE_MS
+      const flyMs = shot.kind === 'probe' ? PROBE_FLY_MS : MISSILE_FLY_MS
+      if (elapsed <= sideMs + flyMs) {
+        const t = elapsed <= sideMs ? elapsed / sideMs : 1 + (elapsed - sideMs) / flyMs
+        const p =
+          shot.kind === 'probe'
+            ? probeWorldPos(shot.origin, shot.side, shot.target, t)
+            : missileWorldPos(shot.origin, shot.side, shot.target, t)
         const prev = {
           x: shot.rocket.position.x,
           y: shot.rocket.position.y,
           z: shot.rocket.position.z,
         }
         shot.rocket.visible = true
-        const homing = elapsed > MISSILE_SIDE_MS
+        const homing = elapsed > sideMs
         shot.trail.visible = homing
         shot.rocket.position.set(p.x, p.y, p.z)
         const dx = p.x - prev.x
@@ -107,6 +133,17 @@ export class CombatFx {
         if (!shot.hit) {
           shot.hit = true
           shot.onHit?.(shot.target)
+        }
+        if (shot.kind === 'probe') {
+          const fadeT = (elapsed - sideMs - flyMs) / PROBE_FADE_MS
+          if (fadeT >= 1) {
+            shot.done = true
+            shot.trail.visible = false
+            shot.boom.visible = false
+            continue
+          }
+          this.fadeTrail(shot, 1 - fadeT)
+          continue
         }
         const boomT = (elapsed - MISSILE_SIDE_MS - MISSILE_FLY_MS) / MISSILE_BOOM_MS
         if (boomT >= 1) {
@@ -160,6 +197,7 @@ export class CombatFx {
   }
 
   private makeShot(
+    kind: ShotKind,
     origin: Vec3,
     side: Vec3,
     target: Vec3,
@@ -173,13 +211,14 @@ export class CombatFx {
       positions[i * 3 + 1] = origin.y
       positions[i * 3 + 2] = origin.z
     }
-    const rocket = makeRocket()
+    const rocket = kind === 'probe' ? makeProbeDart() : makeRocket()
     rocket.position.set(origin.x, origin.y, origin.z)
     rocket.visible = false
     const trail = makeTrail(positions, colors)
     const boom = makeBoom()
     this.group.add(rocket, trail, boom)
     return {
+      kind,
       origin,
       side,
       target,
@@ -215,9 +254,10 @@ export class CombatFx {
     shot.positions[2] = p.z
     for (let i = 0; i < TRAIL; i++) {
       const a = 1 - i / (TRAIL - 1)
-      shot.colors[i * 3] = 0.85 * a
-      shot.colors[i * 3 + 1] = 0.18 * a
-      shot.colors[i * 3 + 2] = 0.16 * a
+      const tint = shot.kind === 'probe' ? [0.49, 0.78, 1] : [0.85, 0.18, 0.16]
+      shot.colors[i * 3] = tint[0] * a
+      shot.colors[i * 3 + 1] = tint[1] * a
+      shot.colors[i * 3 + 2] = tint[2] * a
     }
     const geo = shot.trail.geometry as THREE.BufferGeometry
     geo.attributes.position.needsUpdate = true
@@ -227,9 +267,10 @@ export class CombatFx {
   private fadeTrail(shot: Shot, opacity: number): void {
     for (let i = 0; i < TRAIL; i++) {
       const a = (1 - i / (TRAIL - 1)) * opacity
-      shot.colors[i * 3] = 0.85 * a
-      shot.colors[i * 3 + 1] = 0.18 * a
-      shot.colors[i * 3 + 2] = 0.16 * a
+      const tint = shot.kind === 'probe' ? [0.49, 0.78, 1] : [0.85, 0.18, 0.16]
+      shot.colors[i * 3] = tint[0] * a
+      shot.colors[i * 3 + 1] = tint[1] * a
+      shot.colors[i * 3 + 2] = tint[2] * a
     }
     const geo = shot.trail.geometry as THREE.BufferGeometry
     geo.attributes.color.needsUpdate = true
@@ -268,6 +309,20 @@ function makeRocket(): THREE.Mesh {
     new THREE.ConeGeometry(0.012, 0.046, 5),
     new THREE.MeshBasicMaterial({
       color: ROCKET_COLOR,
+      depthWrite: false,
+      depthTest: true,
+    }),
+  )
+  mesh.rotation.x = Math.PI / 2
+  mesh.renderOrder = 12
+  return mesh
+}
+
+function makeProbeDart(): THREE.Mesh {
+  const mesh = new THREE.Mesh(
+    new THREE.ConeGeometry(0.016, 0.07, 5),
+    new THREE.MeshBasicMaterial({
+      color: PROBE_COLOR,
       depthWrite: false,
       depthTest: true,
     }),

@@ -5,15 +5,17 @@ import { palette } from '../theme'
 import { TILE_THICKNESS } from '../board/TileRenderer'
 import { prefersReducedMotion } from '../motion'
 
-const RING_COUNT = 3
-const BLUE = palette.resourceBlue
+const RING_COUNT = 2
+const BLUE = palette.engine
 
 export class ProbeRenderer {
   readonly group = new THREE.Group()
 
-  sync(state: GameState): void {
+  sync(state: GameState, inflightKeys?: Set<string>): void {
     this.group.clear()
     for (const probe of Object.values(state.probes)) {
+      const key = `${probe.coord.q},${probe.coord.r}`
+      if (inflightKeys?.has(key)) continue
       this.group.add(makeProbeSite(probe.coord.q, probe.coord.r))
     }
   }
@@ -31,7 +33,7 @@ export class ProbeRenderer {
         obj.rotation.y = time * 0.35
       }
       if (typeof obj.userData.ringPhase === 'number') {
-        const cycle = reduced ? 0.35 : (time * 0.42 + obj.userData.ringPhase) % 1
+        const cycle = reduced ? 0.35 : (time * 0.16 + obj.userData.ringPhase) % 1
         const scale = 0.22 + cycle * 0.78
         obj.scale.set(scale, 1, scale)
         const mat = (obj as THREE.Line).material as THREE.LineBasicMaterial

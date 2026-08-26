@@ -1,3 +1,5 @@
+import { easeOutCubic } from '../motion'
+
 export interface Vec3 {
   x: number
   y: number
@@ -16,6 +18,12 @@ export function lerpVec(a: Vec3, b: Vec3, t: number): Vec3 {
 export function missileWorldPos(origin: Vec3, side: Vec3, target: Vec3, t: number): Vec3 {
   if (t <= 1) return lerpVec(origin, side, Math.max(0, t))
   return lerpVec(side, target, Math.min(1, t - 1))
+}
+
+/** Same peel as a missile, then ease-out so the probe brakes onto the hex. */
+export function probeWorldPos(origin: Vec3, side: Vec3, target: Vec3, t: number): Vec3 {
+  if (t <= 1) return lerpVec(origin, side, Math.max(0, t))
+  return lerpVec(side, target, easeOutCubic(Math.min(1, t - 1)))
 }
 
 /** Alternate port/starboard, then step farther out. Nose is +Z at yaw 0. */

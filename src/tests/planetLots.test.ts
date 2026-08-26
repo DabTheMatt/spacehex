@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { dicePips, EDGE_MARGIN, OVERLAY_HOVER } from '../renderer/board/planetLots'
 import { BASE_HOVER } from '../renderer/entities/ShipRenderer'
 import { EVA_HUB_SPIN } from '../renderer/board/evaDocks'
-import { missileSidePoint, missileWorldPos } from '../renderer/fx/missilePath'
+import { missileSidePoint, missileWorldPos, probeWorldPos } from '../renderer/fx/missilePath'
 
 describe('dice pips', () => {
   it('uses a six-sided die layout', () => {
@@ -44,6 +44,17 @@ describe('missiles', () => {
     expect(midSide.x).toBeCloseTo(0.1)
     const midFly = missileWorldPos(origin, side, target, 1.5)
     expect(midFly.x).toBeCloseTo(0.6)
+  })
+
+  it('brakes onto the target hex instead of arriving at constant speed', () => {
+    const origin = { x: 0, y: 0.24, z: 0 }
+    const side = { x: 0.2, y: 0.26, z: 0 }
+    const target = { x: 1, y: 0.24, z: 1 }
+    expect(probeWorldPos(origin, side, target, 0)).toEqual(origin)
+    expect(probeWorldPos(origin, side, target, 2)).toEqual(target)
+    const linear = missileWorldPos(origin, side, target, 1.5)
+    const braked = probeWorldPos(origin, side, target, 1.5)
+    expect(braked.x).toBeGreaterThan(linear.x)
   })
 
   it('peels to alternating flanks', () => {

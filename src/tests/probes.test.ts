@@ -16,12 +16,17 @@ describe('probes', () => {
   it('launches onto an empty neighbor instead of moving', () => {
     let state = createInitialState('probe-launch')
     const target = getNeighbor({ q: 0, r: 0 }, 1)
+    const top = state.explorationDeck.drawPile[0]
     const result = applyCommand(state, { type: 'LAUNCH_PROBE', direction: 1 })
     state = result.state
     expect(result.events.some((e) => e.type === 'PROBE_LAUNCHED')).toBe(true)
+    expect(result.events.some((e) => e.type === 'TILE_DRAWN' && e.tileId === top)).toBe(true)
+    expect(result.events.some((e) => e.type === 'HEX_DISCOVERED' && e.tileId === top)).toBe(true)
     expect(state.ships['mewa-1'].probes).toBe(STARTING_PROBES - 1)
     expect(state.movementSpent).toBe(true)
     expect(state.ships['mewa-1'].coord).toEqual({ q: 0, r: 0 })
+    expect(state.board.tiles[coordKey(target)].definitionId).toBe(top)
+    expect(state.explorationDeck.drawPile).toHaveLength(23)
     expect(state.probes[coordKey(target)]?.ownerShipId).toBe('mewa-1')
     const again = applyCommand(state, { type: 'LAUNCH_PROBE', direction: 2 })
     expect(again.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(true)
@@ -35,12 +40,12 @@ describe('probes', () => {
     state = applyCommand(state, { type: 'END_TURN' }).state
     const target = getNeighbor({ q: 0, r: 0 }, 0)
     expect(state.probes[coordKey(target)]).toBeTruthy()
-    state = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 }).state
-    const placed = applyCommand(state, { type: 'CONFIRM_TILE_PLACEMENT' })
-    state = placed.state
+    expect(state.board.tiles[coordKey(target)]).toBeTruthy()
+    const moved = applyCommand(state, { type: 'DECLARE_MOVE', target })
+    state = moved.state
     expect(state.ships['mewa-1'].coord).toEqual(target)
     expect(state.probes[coordKey(target)]).toBeUndefined()
-    expect(placed.events.some((e) => e.type === 'PROBE_DISMISSED')).toBe(true)
+    expect(moved.events.some((e) => e.type === 'PROBE_DISMISSED')).toBe(true)
   })
 })
 

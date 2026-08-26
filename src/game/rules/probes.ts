@@ -3,9 +3,15 @@ import { getNeighbor } from '../board/hexMath'
 import { coordKey } from '../board/HexCoord'
 import type { HexCoord } from '../board/HexCoord'
 import type { GameState, ProbeState } from '../state/GameState'
-import { activeShip } from './fuel'
+import { activeShip, canAffordExplore } from './fuel'
 
-export type ProbeReject = 'NOT_IN_MOVEMENT' | 'NO_PROBES' | 'ILLEGAL_HEX' | 'OCCUPIED'
+export type ProbeReject =
+  | 'NOT_IN_MOVEMENT'
+  | 'NO_PROBES'
+  | 'ILLEGAL_HEX'
+  | 'OCCUPIED'
+  | 'NO_FUEL'
+  | 'EMPTY_DECK'
 
 export function probeAt(state: GameState, coord: HexCoord): ProbeState | undefined {
   return state.probes[coordKey(coord)]
@@ -27,6 +33,8 @@ export function canLaunchProbe(
   }
   const ship = activeShip(state)
   if ((ship.probes ?? 0) <= 0) return { ok: false, reason: 'NO_PROBES' }
+  if (!canAffordExplore(state)) return { ok: false, reason: 'NO_FUEL' }
+  if (state.explorationDeck.drawPile.length === 0) return { ok: false, reason: 'EMPTY_DECK' }
   const target = getNeighbor(ship.coord, direction)
   if (isTilePlaced(state.board, target)) return { ok: false, reason: 'OCCUPIED' }
   if (probeAt(state, target)) return { ok: false, reason: 'OCCUPIED' }
