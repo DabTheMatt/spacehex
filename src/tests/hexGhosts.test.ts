@@ -4,7 +4,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js'
 import { makeDashedHexGhost } from '../renderer/board/TileRenderer'
 
 describe('move / explore hex ghosts', () => {
-  it('uses a 2px screen-space dashed line so destinations stay readable', () => {
+  it('uses a 2px screen-space line so destinations stay readable', () => {
     const ghost = makeDashedHexGhost(0, 0.72, 'EXPLORE')
     const lines: LineMaterial[] = []
     ghost.traverse((obj) => {
@@ -14,7 +14,7 @@ describe('move / explore hex ghosts', () => {
     expect(lines).toHaveLength(1)
     expect(lines[0].opacity).toBeGreaterThanOrEqual(0.65)
     expect(lines[0].linewidth).toBeGreaterThanOrEqual(2)
-    expect(lines[0].dashed).toBe(true)
+    expect(lines[0].dashed).toBe(false)
   })
 
   it('does not fill a placed move-target hex', () => {
