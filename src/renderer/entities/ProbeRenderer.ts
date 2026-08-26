@@ -56,7 +56,7 @@ export class ProbeRenderer {
       }
       if (obj.userData.probeLedGlow) {
         const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial
-        mat.opacity = ledOn ? 0.42 : 0.05
+        mat.opacity = ledOn ? 0.55 : 0.06
       }
       if (typeof obj.userData.ringPhase === 'number') {
         const cycle = reduced ? 0.35 : (time * 0.16 + obj.userData.ringPhase) % 1
@@ -145,28 +145,27 @@ function makeProbeMesh(ledColor: number): THREE.Group {
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.032, 5), mat)
   body.position.y = 0.022
   const glow = new THREE.Mesh(
-    new THREE.SphereGeometry(0.038, 10, 8),
+    new THREE.SphereGeometry(0.07, 12, 10),
     new THREE.MeshBasicMaterial({
       color: ledColor,
       transparent: true,
-      opacity: 0.42,
+      opacity: 0.5,
       depthWrite: false,
       depthTest: false,
       blending: THREE.AdditiveBlending,
     }),
   )
-  glow.position.y = 0.092
+  glow.position.y = 0.098
   glow.renderOrder = 12
   glow.userData.probeLedGlow = true
   const led = new THREE.Mesh(
-    new THREE.SphereGeometry(0.016, 10, 8),
+    new THREE.SphereGeometry(0.022, 12, 10),
     new THREE.MeshBasicMaterial({
       color: ledColor,
       transparent: true,
       opacity: 1,
       depthWrite: false,
       depthTest: false,
-      blending: THREE.AdditiveBlending,
     }),
   )
   led.position.y = 0.092
