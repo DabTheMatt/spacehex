@@ -1,15 +1,5 @@
 <template>
-  <canvas
-    ref="canvasEl"
-    class="space-canvas"
-    tabindex="0"
-    @pointerdown="onDown"
-    @pointermove="onMove"
-    @pointerup="onUp"
-    @pointercancel="onUp"
-    @pointerleave="onLeave"
-    @contextmenu.prevent
-  />
+  <canvas ref="canvasEl" class="space-canvas" tabindex="0" @contextmenu.prevent />
   <p v-if="bootError" class="boot-error">{{ bootError }}</p>
 </template>
 
@@ -41,7 +31,7 @@ let pinch = false
 let tapConsumed = false
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 let lastTapShip: { id: string; at: number } | null = null
-const pointers = new Set<number>()
+const pointers = new Map<number, { x: number; y: number }>()
 
 function sync(): void {
   if (!scene) return
@@ -116,6 +106,16 @@ function tryAttack(shipId: string): boolean {
   return true
 }
 
+function pinchPair(): [{ x: number; y: number }, { x: number; y: number }] | null {
+  if (pointers.size < 2) return null
+  const pts = [...pointers.values()]
+  return [pts[0], pts[1]]
+}
+
+function blockSafariGesture(ev: Event): void {
+  ev.preventDefault()
+}
+
 function onLeave(): void {
   if (dragging || pinch || pointers.size > 0) return
   ui.hover = null
@@ -125,18 +125,23 @@ function onLeave(): void {
 }
 
 function onDown(ev: PointerEvent): void {
-  pointers.add(ev.pointerId)
+  pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
   downX = ev.clientX
   downY = ev.clientY
   dragging = false
   tapConsumed = false
   canvasEl.value?.focus()
-  if (pointers.size >= 2) {
+  if (isTouchLike(ev.pointerType)) {
+    ev.preventDefault()
+    ev.stopImmediatePropagation()
+  }
+  const pair = pinchPair()
+  if (pair && scene) {
     pinch = true
     clearLongPress()
-    if (dragging) scene?.camera.endPan()
+    scene.camera.endPan()
     dragging = false
-    scene?.camera.setOrbitEnabled(true)
+    scene.camera.beginPinch(pair[0], pair[1])
     return
   }
   pinch = false
@@ -163,9 +168,14 @@ function onDown(ev: PointerEvent): void {
 
 function onMove(ev: PointerEvent): void {
   if (!scene) return
-  if (pinch || pointers.size >= 2) return
-    const held =
-      isTouchLike(ev.pointerType) || (ev.pointerType === 'mouse' && (ev.buttons & 1) === 1)
+  if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY })
+  const pair = pinchPair()
+  if (pinch && pair) {
+    scene.camera.updatePinch(pair[0], pair[1])
+    return
+  }
+  const held =
+    isTouchLike(ev.pointerType) || (ev.pointerType === 'mouse' && (ev.buttons & 1) === 1)
   if (held && pointers.has(ev.pointerId)) {
     const dist = Math.hypot(ev.clientX - downX, ev.clientY - downY)
     if (!dragging && dist > dragThreshold(ev.pointerType)) {
@@ -186,7 +196,10 @@ function onUp(ev: PointerEvent): void {
   pointers.delete(ev.pointerId)
   const wasDrag = dragging
   const wasPinch = pinch
-  if (pointers.size === 0) pinch = false
+  if (pointers.size < 2) {
+    scene.camera.endPinch()
+    pinch = false
+  }
   clearLongPress()
   if (!isTouchLike(ev.pointerType) && ev.button === 0) {
     scene.camera.endPan()
@@ -318,8 +331,17 @@ function handleTap(clientX: number, clientY: number): void {
 
 onMounted(() => {
   if (!canvasEl.value) return
+  const el = canvasEl.value
+  const pointerOpts: AddEventListenerOptions = { capture: true, passive: false }
+  el.addEventListener('pointerdown', onDown, pointerOpts)
+  el.addEventListener('pointermove', onMove, pointerOpts)
+  el.addEventListener('pointerup', onUp, pointerOpts)
+  el.addEventListener('pointercancel', onUp, pointerOpts)
+  el.addEventListener('pointerleave', onLeave, pointerOpts)
+  el.addEventListener('gesturestart', blockSafariGesture, { passive: false })
+  el.addEventListener('gesturechange', blockSafariGesture, { passive: false })
   try {
-    scene = new SpaceScene(canvasEl.value)
+    scene = new SpaceScene(el)
   } catch (err) {
     bootError.value = err instanceof Error ? err.message : String(err)
     return
@@ -338,6 +360,17 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  const el = canvasEl.value
+  if (el) {
+    const pointerOpts: AddEventListenerOptions = { capture: true }
+    el.removeEventListener('pointerdown', onDown, pointerOpts)
+    el.removeEventListener('pointermove', onMove, pointerOpts)
+    el.removeEventListener('pointerup', onUp, pointerOpts)
+    el.removeEventListener('pointercancel', onUp, pointerOpts)
+    el.removeEventListener('pointerleave', onLeave, pointerOpts)
+    el.removeEventListener('gesturestart', blockSafariGesture)
+    el.removeEventListener('gesturechange', blockSafariGesture)
+  }
   window.removeEventListener('resize', resize)
   window.visualViewport?.removeEventListener('resize', resize)
   window.visualViewport?.removeEventListener('scroll', resize)

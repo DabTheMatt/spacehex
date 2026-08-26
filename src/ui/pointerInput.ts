@@ -23,3 +23,16 @@ export function prefersCoarsePointer(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false
   return window.matchMedia('(pointer: coarse)').matches
 }
+
+/** Pinch-out (larger span) moves the camera closer. */
+export function pinchDollyRadius(
+  startRadius: number,
+  startSpan: number,
+  span: number,
+  min: number,
+  max: number,
+): number {
+  if (startSpan < 1 || span < 1) return startRadius
+  const next = startRadius * (startSpan / span)
+  return Math.min(max, Math.max(min, next))
+}

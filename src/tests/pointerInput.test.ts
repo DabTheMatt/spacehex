@@ -5,6 +5,7 @@ import {
   isAttackConfirmTap,
   isTouchLike,
   MOUSE_DRAG_PX,
+  pinchDollyRadius,
   TOUCH_DRAG_PX,
 } from '../ui/pointerInput'
 
@@ -24,5 +25,11 @@ describe('pointer input', () => {
     )
     expect(isAttackConfirmTap({ id: 'mewa-2', at: 1000 }, 'mewa-1', 1100)).toBe(false)
     expect(isAttackConfirmTap(null, 'mewa-2', 1100)).toBe(false)
+  })
+
+  it('pinches out to move the camera closer', () => {
+    expect(pinchDollyRadius(10, 100, 200, 2, 40)).toBe(5)
+    expect(pinchDollyRadius(10, 100, 50, 2, 40)).toBe(20)
+    expect(pinchDollyRadius(10, 100, 50, 2, 12)).toBe(12)
   })
 })

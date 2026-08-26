@@ -4,6 +4,7 @@ import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { palette } from '../theme'
 import { isTypingTarget } from '../../ui/actionHotkeys'
+import { pinchDollyRadius } from '../../ui/pointerInput'
 import { clamp01, easeInOutSmooth, lerp, prefersReducedMotion, CAMERA_FOCUS_MS, shortestAngleDelta } from '../motion'
 
 const WASD_SPEED = 6
@@ -16,6 +17,7 @@ export class CameraController {
   private panX = 0
   private panY = 0
   private grabbing = false
+  private pinch: { span: number; radius: number } | null = null
   private panAnim: {
     start: number
     duration: number
@@ -307,6 +309,36 @@ export class CameraController {
     this.canvas.style.cursor = 'grab'
   }
 
+  beginPinch(a: { x: number; y: number }, b: { x: number; y: number }): void {
+    this.endPan()
+    this.releaseFollow()
+    this.breakInspect()
+    this.pinch = {
+      span: Math.hypot(a.x - b.x, a.y - b.y),
+      radius: this.camera.position.distanceTo(this.controls.target),
+    }
+  }
+
+  updatePinch(a: { x: number; y: number }, b: { x: number; y: number }): void {
+    if (!this.pinch) return
+    const span = Math.hypot(a.x - b.x, a.y - b.y)
+    const radius = pinchDollyRadius(
+      this.pinch.radius,
+      this.pinch.span,
+      span,
+      this.controls.minDistance,
+      this.controls.maxDistance,
+    )
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    if (offset.lengthSq() < 1e-8) offset.set(0, 1, 0)
+    offset.setLength(radius)
+    this.camera.position.copy(this.controls.target).add(offset)
+  }
+
+  endPinch(): void {
+    this.pinch = null
+  }
+
   get panning(): boolean {
     return this.grabbing
   }
@@ -328,7 +360,7 @@ export class CameraController {
     this.applyWasd(dt)
     this.applyMapRotate(dt)
     this.applyFollow(dt)
-    if (!this.grabbing && !this.panAnim && !this.orbitAnim && !this.follow) this.controls.update()
+    if (!this.grabbing && !this.pinch && !this.panAnim && !this.orbitAnim && !this.follow) this.controls.update()
   }
 
   dispose(): void {
