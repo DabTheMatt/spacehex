@@ -84,6 +84,8 @@ import { shipsAt } from '@/game/rules/combat'
 import { buyPrice, evaSellParts, formatSellParts, isEvaHex } from '@/game/rules/planetMarket'
 import { canLaunchAnyProbe } from '@/game/rules/probes'
 import { prefersCoarsePointer } from '@/ui/pointerInput'
+import { hudPaneLabel } from '@/ui/sectorPane'
+import { getTileDefinition } from '@/game/definitions/tiles'
 
 const game = useGameStore()
 const ui = useUiStore()
@@ -105,7 +107,11 @@ const stationName = computed(() => {
   return tile?.designation ?? ''
 })
 
-const paneLabel = computed(() => (isEvaHex(planetCoord.value) ? 'STATION' : 'PLANET'))
+const paneLabel = computed(() => {
+  if (isEvaHex(planetCoord.value)) return 'STATION'
+  const tile = game.state.board.tiles[coordKey(planetCoord.value)]
+  return hudPaneLabel(tile ? getTileDefinition(tile.definitionId).type : undefined)
+})
 
 const planetLots = computed(() => {
   if (isEvaHex(planetCoord.value)) {

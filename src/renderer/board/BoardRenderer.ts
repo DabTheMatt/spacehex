@@ -96,6 +96,7 @@ export class BoardRenderer {
     for (const tile of Object.values(state.board.tiles)) {
       const key = coordKey(tile.coord)
       keep.add(key)
+      const probed = Boolean(probeAt(state, tile.coord))
       const selected = options.selectedKey === key
       const hideGlyph = options.hideGlyphKeys?.has(key) === true
       const def = getTileDefinition(tile.definitionId)
@@ -132,6 +133,7 @@ export class BoardRenderer {
         evaSig,
         options.showTileNames === false ? 'nn' : 'n',
         options.showMarketIcons === false ? 'nm' : 'm',
+        probed ? 'p' : '',
       ].join('|')
       const existing = this.tileCache.get(key)
       if (existing?.sig === sig) {
@@ -160,13 +162,13 @@ export class BoardRenderer {
           }),
         )
       }
-      if (market && options.showMarketIcons !== false) {
+      if (market && options.showMarketIcons !== false && !probed) {
         const prices = Object.fromEntries(
           RESOURCE_IDS.map((id) => [id, buyPrice(state, id)]),
         ) as Record<(typeof RESOURCE_IDS)[number], number>
         glyph.add(createPlanetOverlay(market, tile.coord, prices))
       }
-      if (def.type === 'EVA_1' && options.showMarketIcons !== false) {
+      if (def.type === 'EVA_1' && options.showMarketIcons !== false && !probed) {
         glyph.add(createEvaOverlay(tile.coord, ship?.cargo ?? emptyCargo(), atEva))
       }
       mesh.userData.glyph = glyph

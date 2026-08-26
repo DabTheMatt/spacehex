@@ -24,6 +24,11 @@ export function prefersCoarsePointer(): boolean {
   return window.matchMedia('(pointer: coarse)').matches
 }
 
+/** Angle of the segment from a to b, for two-finger orbit. */
+export function pinchPairAngle(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.atan2(b.y - a.y, b.x - a.x)
+}
+
 /** Pinch-out (larger span) moves the camera closer. */
 export function pinchDollyRadius(
   startRadius: number,

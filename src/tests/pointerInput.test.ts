@@ -6,6 +6,7 @@ import {
   isTouchLike,
   MOUSE_DRAG_PX,
   pinchDollyRadius,
+  pinchPairAngle,
   TOUCH_DRAG_PX,
 } from '../ui/pointerInput'
 
@@ -31,5 +32,10 @@ describe('pointer input', () => {
     expect(pinchDollyRadius(10, 100, 200, 2, 40)).toBe(5)
     expect(pinchDollyRadius(10, 100, 50, 2, 40)).toBe(20)
     expect(pinchDollyRadius(10, 100, 50, 2, 12)).toBe(12)
+  })
+
+  it('reads the twist angle of a two-finger pair', () => {
+    expect(pinchPairAngle({ x: 0, y: 0 }, { x: 1, y: 0 })).toBeCloseTo(0)
+    expect(pinchPairAngle({ x: 0, y: 0 }, { x: 0, y: 1 })).toBeCloseTo(Math.PI / 2)
   })
 })

@@ -11,7 +11,7 @@ import { CombatFx } from '../fx/CombatFx'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
-import { getNeighbor, getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
+import { getNeighbor, getWorldPosition } from '../../game/board/hexMath'
 import { activeShip } from '../../game/rules/fuel'
 import type { ResourceId } from '../../game/definitions/resources'
 import { userDataFromHits } from './pickHelpers'
@@ -169,7 +169,7 @@ export class SpaceScene {
     if (this.startedProbeFlights.has(key)) return
     this.startedProbeFlights.add(key)
     const destHex = getWorldPosition(coord)
-    const target = { x: destHex.x + HEX_SIZE * 0.22, y: TILE_THICKNESS + 0.07, z: destHex.z + HEX_SIZE * 0.09 }
+    const target = { x: destHex.x, y: TILE_THICKNESS + 0.08, z: destHex.z }
     const from = this.ships.worldPose(shipId) ?? fallbackShipPose(this.lastState, shipId)
     this.inflightProbeKeys.add(key)
     this.hideGlyphKeys.add(key)

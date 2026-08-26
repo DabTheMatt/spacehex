@@ -11,7 +11,6 @@ import { useUiStore } from '@/stores/uiStore'
 import { coordKey } from '@/game/board/HexCoord'
 import { planetInspectTheta } from '@/renderer/board/planetLots'
 import { canDeclareAttack, hostileOnHex } from '@/game/rules/combat'
-import { isEvaHex } from '@/game/rules/planetMarket'
 import {
   dragThreshold,
   isAttackConfirmTap,
@@ -270,8 +269,7 @@ function handleTap(clientX: number, clientY: number): void {
   const name = scene.pickPlanetName(clientX, clientY)
   if (name && !ui.probeAiming) {
     const key = coordKey(name)
-    const inspectable = Boolean(game.state.planetMarkets[key] || isEvaHex(name))
-    if (inspectable) {
+    if (game.state.board.tiles[key]) {
       const same =
         ui.inspectPlanet && ui.inspectPlanet.q === name.q && ui.inspectPlanet.r === name.r
       if (same) {

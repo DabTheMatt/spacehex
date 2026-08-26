@@ -4,11 +4,13 @@ import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { palette } from '../theme'
 import { isTypingTarget } from '../../ui/actionHotkeys'
-import { pinchDollyRadius } from '../../ui/pointerInput'
+import { pinchDollyRadius, pinchPairAngle } from '../../ui/pointerInput'
 import { clamp01, easeInOutSmooth, lerp, prefersReducedMotion, CAMERA_FOCUS_MS, shortestAngleDelta } from '../motion'
 
 const WASD_SPEED = 6
 const MAP_ROTATE_SPEED = 1.15
+/** Planet/sector name inspect: hex fills this fraction of the shorter viewport. */
+export const CAMERA_INSPECT_FILL = 0.9
 
 export class CameraController {
   readonly camera: THREE.PerspectiveCamera
@@ -17,7 +19,14 @@ export class CameraController {
   private panX = 0
   private panY = 0
   private grabbing = false
-  private pinch: { span: number; radius: number } | null = null
+  private pinch: {
+    span: number
+    radius: number
+    angle: number
+    phi: number
+    theta: number
+    midY: number
+  } | null = null
   private panAnim: {
     start: number
     duration: number
@@ -132,6 +141,7 @@ export class CameraController {
     this.followReleased = true
     this.panAnim = null
     this.inspectLimits = true
+    this.controls.minDistance = 1.2
     const instant = prefersReducedMotion()
     this.orbitAnim = {
       start: performance.now(),
@@ -245,7 +255,7 @@ export class CameraController {
     const vFov = (this.camera.fov * Math.PI) / 180
     const diameter = HEX_SIZE * 2
     const visibleMinFactor = Math.min(1, this.camera.aspect)
-    const visibleHeight = diameter / 0.6 / visibleMinFactor
+    const visibleHeight = diameter / CAMERA_INSPECT_FILL / visibleMinFactor
     return visibleHeight / (2 * Math.tan(vFov / 2))
   }
 
@@ -313,9 +323,15 @@ export class CameraController {
     this.endPan()
     this.releaseFollow()
     this.breakInspect()
+    const offset = this.camera.position.clone().sub(this.controls.target)
+    const sph = new THREE.Spherical().setFromVector3(offset)
     this.pinch = {
       span: Math.hypot(a.x - b.x, a.y - b.y),
-      radius: this.camera.position.distanceTo(this.controls.target),
+      radius: sph.radius,
+      angle: pinchPairAngle(a, b),
+      phi: sph.phi,
+      theta: sph.theta,
+      midY: (a.y + b.y) / 2,
     }
   }
 
@@ -329,10 +345,18 @@ export class CameraController {
       this.controls.minDistance,
       this.controls.maxDistance,
     )
-    const offset = this.camera.position.clone().sub(this.controls.target)
-    if (offset.lengthSq() < 1e-8) offset.set(0, 1, 0)
-    offset.setLength(radius)
+    const dTheta = shortestAngleDelta(this.pinch.angle, pinchPairAngle(a, b))
+    const dPhi = ((a.y + b.y) / 2 - this.pinch.midY) * 0.0045
+    const phi = Math.min(
+      this.controls.maxPolarAngle,
+      Math.max(this.controls.minPolarAngle, this.pinch.phi + dPhi),
+    )
+    const offset = new THREE.Vector3().setFromSpherical(
+      new THREE.Spherical(radius, phi, this.pinch.theta - dTheta),
+    )
     this.camera.position.copy(this.controls.target).add(offset)
+    this.camera.up.set(0, 1, 0)
+    this.camera.lookAt(this.controls.target)
   }
 
   endPinch(): void {
