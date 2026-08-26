@@ -1,7 +1,6 @@
 import * as THREE from 'three'
-import type { GameState } from '../../game/state/GameState'
+import type { GameState, NpcShipState, ShipState } from '../../game/state/GameState'
 import type { GameEvent } from '../../game/engine/events'
-import type { ShipState } from '../../game/state/GameState'
 import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
@@ -28,6 +27,18 @@ import {
   SHIP_APPROACH_MS,
   SHIP_TURN_MS,
 } from '../motion'
+
+type Parkable = Pick<ShipState, 'id' | 'class' | 'coord'> & { playerId?: string }
+
+function roster(state: GameState): Parkable[] {
+  const players: Parkable[] = Object.values(state.ships)
+  const npcs: Parkable[] = Object.values(state.npcShips).map((npc: NpcShipState) => ({
+    id: npc.id,
+    class: npc.class,
+    coord: npc.coord,
+  }))
+  return [...players, ...npcs]
+}
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0)
 const ENGINES_OFF = { main: 0, port: 0, starboard: 0, brakePort: 0, brakeStarboard: 0 }
@@ -200,13 +211,13 @@ export class ShipRenderer {
   }
 
   sync(state: GameState): void {
-    for (const ship of Object.values(state.ships)) {
+    for (const ship of roster(state)) {
       const parked = this.visualPark.get(ship.id)
       if (parked && coordKey(parked) === coordKey(ship.coord)) this.visualPark.delete(ship.id)
     }
 
-    const groups = new Map<string, { coord: HexCoord; ships: ShipState[]; yaw: number }>()
-    for (const ship of Object.values(state.ships)) {
+    const groups = new Map<string, { coord: HexCoord; ships: Parkable[]; yaw: number }>()
+    for (const ship of roster(state)) {
       const motion = this.motion.get(ship.id)
       const coord = motion?.kind === 'fly' ? motion.to : this.parkedCoord(ship) ?? ship.coord
       const key = coordKey(coord)
@@ -243,20 +254,20 @@ export class ShipRenderer {
     }
 
     this.group.clear()
-    for (const ship of Object.values(state.ships)) {
+    for (const ship of roster(state)) {
       const coord = this.parkedCoord(ship) ?? ship.coord
       const target = targets.get(ship.id) ?? getWorldPosition(coord)
       const last = this.lastXZ.get(ship.id) ?? target
       const flying = this.motion.get(ship.id)?.kind === 'fly'
       let yaw = yaws.get(ship.id) ?? this.visualYaw(state.log, ship.id, coord)
-      if (!flying && isEvaCoord(coord) && !this.duel.has(ship.id)) {
+      if (!flying && isEvaCoord(coord) && ship.playerId && !this.duel.has(ship.id)) {
         yaw = evaDockWorldOffset(evaDockIndexForPlayer(ship.playerId), evaHubAngleAt(this.hubTime)).yaw
       }
       if (!flying && !this.duel.has(ship.id)) this.facing.set(ship.id, yaw)
-      const playerNo = Number(ship.playerId.replace(/\D/g, '')) || 1
-      const active = state.players[state.activePlayerId]?.shipId === ship.id
+      const playerNo = ship.playerId ? Number(ship.playerId.replace(/\D/g, '')) || 1 : 0
+      const active = Boolean(ship.playerId) && state.players[state.activePlayerId]?.shipId === ship.id
       const wrapper = new THREE.Group()
-      const marker = createNavMarker(ship.class, playerNo, active, `SG-${playerNo}`)
+      const marker = createNavMarker(ship.class, playerNo, active, hullLabel(ship))
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
       wrapper.userData.beacon = marker.userData.beacon
@@ -272,7 +283,7 @@ export class ShipRenderer {
       if (flying) {
         continue
       }
-      if (isEvaCoord(coord) && !this.duel.has(ship.id)) {
+      if (isEvaCoord(coord) && ship.playerId && !this.duel.has(ship.id)) {
         this.parkAtEva(ship.id, ship.playerId, last, target, yaw)
       } else {
         this.maybeSlide(ship.id, last, target, yaw)
@@ -311,7 +322,7 @@ export class ShipRenderer {
     return this.group.children
   }
 
-  private parkedCoord(ship: ShipState): HexCoord | null {
+  private parkedCoord(ship: Parkable): HexCoord | null {
     const motion = this.motion.get(ship.id)
     if (motion?.kind === 'fly') return null
     if (motion?.kind === 'hold') return motion.coord
@@ -586,13 +597,13 @@ function slideBurn(
 
 function parkWorld(
   coord: HexCoord,
-  ship: ShipState,
-  group: ShipState[],
+  ship: Parkable,
+  group: Parkable[],
   yaw: number,
   time: number,
 ): { x: number; z: number } {
   const pos = getWorldPosition(coord)
-  if (isEvaCoord(coord)) {
+  if (isEvaCoord(coord) && ship.playerId) {
     const dock = evaDockWorldOffset(evaDockIndexForPlayer(ship.playerId), evaHubAngleAt(time))
     return { x: pos.x + dock.x, z: pos.z + dock.z }
   }
@@ -621,6 +632,39 @@ function lastMoveYaw(log: GameEvent[], shipId: string, fallback: HexCoord): numb
   return Math.atan2(east.x - here.x, east.z - here.z)
 }
 
+function hullLabel(ship: Parkable): string {
+  if (ship.playerId) {
+    const n = Number(ship.playerId.replace(/\D/g, '')) || 1
+    return `SG-${n}`
+  }
+  return SHIP_DEFINITIONS[ship.class].label.toUpperCase()
+}
+
+function hullShape(shipClass: keyof typeof SHIP_DEFINITIONS): THREE.Shape {
+  const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
+  const half = shipClass === 'DRZAZGA' ? 0.1 : shipClass === 'CIERN' ? 0.16 : 0.12
+  const shape = new THREE.Shape()
+  if (shipClass === 'CIERN') {
+    shape.moveTo(0, -length * 0.5)
+    shape.lineTo(-half, 0)
+    shape.lineTo(0, length * 0.5)
+    shape.lineTo(half, 0)
+    shape.closePath()
+    return shape
+  }
+  shape.moveTo(0, -length * 0.5)
+  shape.lineTo(-half, length * 0.5)
+  shape.lineTo(half, length * 0.5)
+  shape.closePath()
+  return shape
+}
+
+function hullExtents(shipClass: keyof typeof SHIP_DEFINITIONS): { length: number; half: number } {
+  const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
+  const half = shipClass === 'DRZAZGA' ? 0.1 : shipClass === 'CIERN' ? 0.16 : 0.12
+  return { length, half }
+}
+
 function createNavMarker(
   shipClass: keyof typeof SHIP_DEFINITIONS,
   playerNo: number,
@@ -629,13 +673,8 @@ function createNavMarker(
 ): THREE.Group {
   const color = hullColor(playerNo, active)
   const g = new THREE.Group()
-  const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
-  const half = shipClass === 'DRZAZGA' ? 0.1 : 0.12
-  const shape = new THREE.Shape()
-  shape.moveTo(0, -length * 0.5)
-  shape.lineTo(-half, length * 0.5)
-  shape.lineTo(half, length * 0.5)
-  shape.closePath()
+  const { length, half } = hullExtents(shipClass)
+  const shape = hullShape(shipClass)
   const hull = new THREE.Mesh(
     new THREE.ExtrudeGeometry(shape, { depth: HULL_HEIGHT, bevelEnabled: false, steps: 1 }),
     new THREE.MeshBasicMaterial({ color, depthWrite: true, depthTest: true }),
@@ -717,6 +756,7 @@ function tintThreat(wrapper: THREE.Object3D, on: boolean): void {
 }
 
 function hullColor(playerNo: number, active: boolean): number {
+  if (playerNo === 0) return palette.blood
   if (playerNo === 1) return active ? palette.player1 : 0x8a6a38
   return active ? palette.player2 : 0x4f6070
 }

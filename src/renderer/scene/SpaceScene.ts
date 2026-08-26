@@ -428,7 +428,7 @@ function fallbackShipPose(
   state: GameState | null,
   shipId: string,
 ): { x: number; y: number; z: number; yaw: number } | null {
-  const ship = state?.ships[shipId]
+  const ship = state?.ships[shipId] ?? state?.npcShips[shipId]
   if (!ship) return null
   const pos = getWorldPosition(ship.coord)
   return { x: pos.x, y: TILE_THICKNESS + 0.14, z: pos.z, yaw: 0 }

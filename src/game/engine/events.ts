@@ -1,6 +1,7 @@
 import type { HexCoord } from '../board/HexCoord'
 import type { Rotation } from '../board/tileRotation'
 import type { ResourceId } from '../definitions/resources'
+import type { ShipClass } from '../definitions/ships'
 
 export type GameEvent =
   | { type: 'GAME_STARTED'; seed: string }
@@ -35,5 +36,6 @@ export type GameEvent =
   | { type: 'FUEL_CHANGED'; playerId: string; fuel: number }
   | { type: 'PROBE_LAUNCHED'; playerId: string; shipId: string; coord: HexCoord }
   | { type: 'PROBE_DISMISSED'; coord: HexCoord; shipId: string }
+  | { type: 'NPC_SPAWNED'; shipId: string; class: ShipClass; coord: HexCoord }
   | { type: 'SHIP_DAMAGED'; shipId: string; damage: number; hullAfter: number }
   | { type: 'COMMAND_REJECTED'; command: string; reason: string }

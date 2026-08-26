@@ -1,12 +1,17 @@
 import type { GameEvent } from '@/game/engine/events'
 import type { GameState } from '@/game/state/GameState'
 import { RESOURCE_LABEL } from '@/game/definitions/resources'
+import { SHIP_DEFINITIONS } from '@/game/definitions/ships'
 
 export function shipCallsign(state: GameState, shipId: string): string {
   const ship = state.ships[shipId]
-  if (!ship) return shipId.toUpperCase()
-  const n = ship.playerId.replace(/\D/g, '') || '1'
-  return `SG-${n}`
+  if (ship) {
+    const n = ship.playerId.replace(/\D/g, '') || '1'
+    return `SG-${n}`
+  }
+  const npc = state.npcShips[shipId]
+  if (npc) return SHIP_DEFINITIONS[npc.class].label.toUpperCase()
+  return shipId.toUpperCase()
 }
 
 export function formatLogLine(state: GameState, event: GameEvent): string | null {
@@ -17,6 +22,8 @@ export function formatLogLine(state: GameState, event: GameEvent): string | null
     }
     case 'PROBE_DISMISSED':
       return `Probe recovered · ${shipCallsign(state, event.shipId)}.`
+    case 'NPC_SPAWNED':
+      return `A ${SHIP_DEFINITIONS[event.class].label} appeared.`
     case 'SHIP_DAMAGED':
       return `${shipCallsign(state, event.shipId)} took ${event.damage} damage.`
     case 'COMBAT_SHOT':

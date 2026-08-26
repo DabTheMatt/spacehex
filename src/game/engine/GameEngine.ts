@@ -19,6 +19,7 @@ import { resolveDeclaredCombat, canDeclareAttack } from '../rules/combat'
 import { resolveDiscovery, addGlory } from '../rules/glory'
 import { buyResource, sellResource, stockPlanetIfNeeded } from '../rules/planetMarket'
 import { canLaunchProbe, dismissProbesUnderShips } from '../rules/probes'
+import { spawnThornsForPlacedTile } from '../rules/npcs'
 import { rollSectorName } from '../definitions/sectorNames'
 import type { ResourceId } from '../definitions/resources'
 import type { HexCoord } from '../board/HexCoord'
@@ -177,19 +178,29 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return { state: append(next, [event]), events: [event] }
     }
     case 'DEV_DAMAGE_SHIP': {
-      const ship = state.ships[command.shipId]
+      const playerShip = state.ships[command.shipId]
+      const npcShip = state.npcShips[command.shipId]
+      const ship = playerShip ?? npcShip
       if (!ship) return reject(state, command.type, 'NO_SHIP')
       const hull = Math.max(0, ship.hull - command.amount)
       const damage = ship.hull - hull
       const event: GameEvent = { type: 'SHIP_DAMAGED', shipId: ship.id, damage, hullAfter: hull }
       const next = append(
-        {
-          ...state,
-          ships: {
-            ...state.ships,
-            [ship.id]: { ...ship, hull },
-          },
-        },
+        playerShip
+          ? {
+              ...state,
+              ships: {
+                ...state.ships,
+                [ship.id]: { ...playerShip, hull },
+              },
+            }
+          : {
+              ...state,
+              npcShips: {
+                ...state.npcShips,
+                [ship.id]: { ...npcShip!, hull },
+              },
+            },
         [event],
       )
       return { state: next, events: [event] }
@@ -365,10 +376,20 @@ function confirmPlacement(state: GameState): EngineResult {
     placeEvents,
   )
 
+  const spawn = spawnThornsForPlacedTile(next, placed.id, placed.coord)
+  next = spawn.state
+  const extra: GameEvent[] = []
+  if (spawn.spawned) {
+    extra.push({
+      type: 'NPC_SPAWNED',
+      shipId: spawn.spawned.id,
+      class: spawn.spawned.class,
+      coord: { ...placed.coord },
+    })
+  }
   const moved = moveShip(next, placed.coord, FUEL_COST_EXPLORE)
   const before = moved.state
   next = stockPlanetIfNeeded(before, placed.id, placed.coord)
-  const extra: GameEvent[] = []
   if (next.planetMarkets[coordKey(placed.coord)] && !before.planetMarkets[coordKey(placed.coord)]) {
     extra.push({ type: 'PLANET_STOCKED', tileId: placed.id, coord: placed.coord })
   }
@@ -462,9 +483,19 @@ function launchProbe(state: GameState, direction: number): EngineResult {
     phase: 'PLAYER_TURN',
   }
   next = append(next, [...placeEvents, fuelEvent, launchEvent])
+  const spawn = spawnThornsForPlacedTile(next, placed.id, dest)
+  next = spawn.state
+  const extra: GameEvent[] = []
+  if (spawn.spawned) {
+    extra.push({
+      type: 'NPC_SPAWNED',
+      shipId: spawn.spawned.id,
+      class: spawn.spawned.class,
+      coord: { ...dest },
+    })
+  }
   const beforeMarket = next
   next = stockPlanetIfNeeded(next, placed.id, dest)
-  const extra: GameEvent[] = []
   if (next.planetMarkets[key] && !beforeMarket.planetMarkets[key]) {
     extra.push({ type: 'PLANET_STOCKED', tileId: placed.id, coord: dest })
   }
@@ -639,6 +670,18 @@ function devPlace(
     },
     events,
   )
+  const spawn = spawnThornsForPlacedTile(next, tileId, coord)
+  next = spawn.state
+  if (spawn.spawned) {
+    const spawned: GameEvent = {
+      type: 'NPC_SPAWNED',
+      shipId: spawn.spawned.id,
+      class: spawn.spawned.class,
+      coord: { ...coord },
+    }
+    next = append(next, [spawned])
+    events.push(spawned)
+  }
   const beforeMarkets = next.planetMarkets
   next = stockPlanetIfNeeded(next, tileId, coord)
   if (next.planetMarkets[coordKey(coord)] && !beforeMarkets[coordKey(coord)]) {
