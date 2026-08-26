@@ -1,7 +1,7 @@
 import type { GameCommand } from './commands'
 import type { GameEvent } from './events'
 import type { GameState } from '../state/GameState'
-import { GAME_STATE_VERSION, PLAYER_IDS, STARTING_FUEL } from '../definitions/constants'
+import { GAME_STATE_VERSION, PLAYER_IDS, STARTING_FUEL, STARTING_PROBES } from '../definitions/constants'
 import { emptyCargo, STARTING_CREDITS } from '../definitions/resources'
 import { EXPLORATION_TILE_IDS, EVA_TILE_ID, getTileDefinition } from '../definitions/tiles'
 import { SHIP_DEFINITIONS } from '../definitions/ships'
@@ -18,6 +18,7 @@ import { canExploreDirection } from '../rules/exploration'
 import { resolveDeclaredCombat, canDeclareAttack } from '../rules/combat'
 import { resolveDiscovery, addGlory } from '../rules/glory'
 import { buyResource, sellResource, stockPlanetIfNeeded } from '../rules/planetMarket'
+import { canLaunchProbe, dismissProbesUnderShips } from '../rules/probes'
 import { rollSectorName } from '../definitions/sectorNames'
 import type { ResourceId } from '../definitions/resources'
 import type { HexCoord } from '../board/HexCoord'
@@ -80,6 +81,7 @@ export function createInitialState(seed: string): GameState {
       hull: mewa.hull,
       maxHull: mewa.hull,
       cargo: emptyCargo(),
+      probes: STARTING_PROBES,
     },
     'mewa-2': {
       id: 'mewa-2',
@@ -89,6 +91,7 @@ export function createInitialState(seed: string): GameState {
       hull: mewa.hull,
       maxHull: mewa.hull,
       cargo: emptyCargo(),
+      probes: STARTING_PROBES,
     },
   }
 
@@ -105,6 +108,7 @@ export function createInitialState(seed: string): GameState {
     ships,
     npcShips: {},
     planetMarkets: {},
+    probes: {},
     log: [{ type: 'GAME_STARTED', seed }, { type: 'ROUND_STARTED', round: 1 }],
     movementSpent: false,
   }
@@ -148,6 +152,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return confirmPlacement(state)
     case 'SKIP_MOVEMENT':
       return skipMovement(state)
+    case 'LAUNCH_PROBE':
+      return launchProbe(state, command.direction)
     case 'BUY_RESOURCE':
       return buyResourceCommand(state, command.coord, command.resource)
     case 'SELL_RESOURCE':
@@ -173,14 +179,20 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
     case 'DEV_DAMAGE_SHIP': {
       const ship = state.ships[command.shipId]
       if (!ship) return reject(state, command.type, 'NO_SHIP')
-      const next = {
-        ...state,
-        ships: {
-          ...state.ships,
-          [ship.id]: { ...ship, hull: Math.max(0, ship.hull - command.amount) },
+      const hull = Math.max(0, ship.hull - command.amount)
+      const damage = ship.hull - hull
+      const event: GameEvent = { type: 'SHIP_DAMAGED', shipId: ship.id, damage, hullAfter: hull }
+      const next = append(
+        {
+          ...state,
+          ships: {
+            ...state.ships,
+            [ship.id]: { ...ship, hull },
+          },
         },
-      }
-      return { state: next, events: [] }
+        [event],
+      )
+      return { state: next, events: [event] }
     }
     case 'DEV_FORCE_NEXT_TILE':
       return {
@@ -393,7 +405,43 @@ function moveShip(state: GameState, target: HexCoord, fuelCost: number): EngineR
     fuel: next.players[activePlayer(state).id].fuel,
   }
   next = append(next, [moveEvent, fuelEvent])
-  return { state: next, events: [moveEvent, fuelEvent] }
+  const dismissed = dismissProbesUnderShips(next)
+  next = append(dismissed.state, dismissed.events)
+  return { state: next, events: [moveEvent, fuelEvent, ...dismissed.events] }
+}
+
+function launchProbe(state: GameState, direction: number): EngineResult {
+  const check = canLaunchProbe(state, direction)
+  if (!check.ok) return reject(state, 'LAUNCH_PROBE', check.reason)
+  const ship = activeShip(state)
+  const player = activePlayer(state)
+  const key = coordKey(check.target)
+  const probe = {
+    id: `probe-${ship.id}-${state.round}-${direction}`,
+    coord: check.target,
+    ownerPlayerId: player.id,
+    ownerShipId: ship.id,
+  }
+  const event: GameEvent = {
+    type: 'PROBE_LAUNCHED',
+    playerId: player.id,
+    shipId: ship.id,
+    coord: check.target,
+  }
+  const next = append(
+    {
+      ...state,
+      ships: {
+        ...state.ships,
+        [ship.id]: { ...ship, probes: ship.probes - 1 },
+      },
+      probes: { ...state.probes, [key]: probe },
+      movementSpent: true,
+      exploration: { status: 'NONE' },
+    },
+    [event],
+  )
+  return { state: next, events: [event] }
 }
 
 function declareAttack(state: GameState, defenderId: string): EngineResult {

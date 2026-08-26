@@ -38,6 +38,14 @@ export interface ShipState {
   hull: number
   maxHull: number
   cargo: Record<ResourceId, number>
+  probes: number
+}
+
+export interface ProbeState {
+  id: string
+  coord: HexCoord
+  ownerPlayerId: string
+  ownerShipId: string
 }
 
 export interface NpcShipState {
@@ -61,6 +69,7 @@ export interface GameState {
   ships: Record<string, ShipState>
   npcShips: Record<string, NpcShipState>
   planetMarkets: Record<string, PlanetMarket>
+  probes: Record<string, ProbeState>
   log: GameEvent[]
   movementSpent: boolean
 }

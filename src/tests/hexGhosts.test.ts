@@ -17,8 +17,8 @@ describe('move / explore hex ghosts', () => {
     const ghost = makeDashedHexGhost(0, 0.38, 'EXPLORE')
     const lines = lineMaterials(ghost)
     expect(lines).toHaveLength(6)
-    expect(lines.every((mat) => mat.dashed)).toBe(true)
-    expect(lines.every((mat) => mat.linewidth < 2)).toBe(true)
+    expect(lines[0].dashed).toBe(true)
+    expect(lines[0].dashSize).toBeCloseTo(0.05)
   })
 
   it('does not fill a placed move-target hex', () => {

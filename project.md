@@ -82,7 +82,9 @@ Talia eksploracji: **24** kafle. Seedowane tasowanie przy `START_GAME`.
 
 ## Zakazy v0.1
 
-Nie implementować: Pelikan, kolonizacja, SOS, holowanie, multiplayer online, pełna ekonomia, synteza, sondy, pełne skanery, rozbudowane AI, finalne modele/tekstury/ilustracje, particle, zaawansowane audio.
+Nie implementować: Pelikan, kolonizacja, SOS, holowanie, multiplayer online, pełna ekonomia, synteza, pełne skanery, rozbudowane AI, finalne modele/tekstury/ilustracje, particle, zaawansowane audio.
+
+Sondy (wyjątek, Maciej): 2 na statek, wystrzał zamiast ruchu na nieodkryty przyległy hex. Marker: przezroczysty błękit + sonda + kręgi. Sonda znika, gdy statek wejdzie na hex.
 
 Nie wolno: generować mapy z góry, traktować planszy jako tablicy prostokątnej, proceduralnego infinite grida, automatycznie wybierać orientacji kafla, przenosić zasad do Three.js, uzależniać logiki od animacji.
 

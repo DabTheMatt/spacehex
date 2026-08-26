@@ -101,6 +101,29 @@ body,
   font-size: var(--font-xs);
 }
 
+.event-log {
+  position: absolute;
+  top: calc(2.15rem + env(safe-area-inset-top, 0px));
+  right: 1.25rem;
+  z-index: 22;
+  max-width: min(22rem, 46vw);
+  pointer-events: none;
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--font-micro);
+  color: color-mix(in srgb, var(--color-primary) 72%, transparent);
+}
+
+.event-log__line {
+  margin-top: 0.22rem;
+  line-height: 1.35;
+}
+
+.event-log__line:first-child {
+  color: var(--color-primary);
+}
+
 .hud-notice {
   position: absolute;
   left: 50%;

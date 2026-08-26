@@ -6,6 +6,7 @@ import { BoardRenderer } from '../board/BoardRenderer'
 import { TilePreviewRenderer } from '../board/TilePreviewRenderer'
 import { ShipRenderer } from '../entities/ShipRenderer'
 import { HoverTargetRenderer } from '../entities/HoverTargetRenderer'
+import { ProbeRenderer } from '../entities/ProbeRenderer'
 import { CombatFx } from '../fx/CombatFx'
 import { palette } from '../theme'
 import type { HexCoord } from '../../game/board/HexCoord'
@@ -34,6 +35,7 @@ export interface SceneOptions {
   showTileNames?: boolean
   showMarketIcons?: boolean
   threatShipId?: string | null
+  probeAim?: boolean
 }
 
 export class SpaceScene {
@@ -44,6 +46,7 @@ export class SpaceScene {
   readonly preview: TilePreviewRenderer
   readonly ships: ShipRenderer
   readonly hoverTargets: HoverTargetRenderer
+  readonly probes: ProbeRenderer
   readonly combat: CombatFx
   readonly raycaster = new THREE.Raycaster()
   private disposed = false
@@ -87,12 +90,14 @@ export class SpaceScene {
     this.preview = new TilePreviewRenderer()
     this.ships = new ShipRenderer()
     this.hoverTargets = new HoverTargetRenderer()
+    this.probes = new ProbeRenderer()
     this.combat = new CombatFx()
     this.scene.add(
       this.board.group,
       this.preview.group,
       this.ships.group,
       this.hoverTargets.group,
+      this.probes.group,
       this.combat.group,
     )
     this.loop()
@@ -248,6 +253,7 @@ export class SpaceScene {
     this.ships.sync(this.lastState)
     this.ships.setThreat(this.duel ? null : (this.lastOptions.threatShipId ?? null))
     this.hoverTargets.sync(this.lastState, this.lastOptions.hover ?? null)
+    this.probes.sync(this.lastState)
   }
 
   private advanceRise(now: number): boolean {
@@ -351,6 +357,7 @@ export class SpaceScene {
     this.preview.tick(time)
     const shipsSettled = this.ships.tick(this.camera.camera, time)
     this.hoverTargets.tick(time)
+    this.probes.tick(time)
     this.advanceDuel(now)
     this.combat.tick(now)
     let glyphsChanged = false

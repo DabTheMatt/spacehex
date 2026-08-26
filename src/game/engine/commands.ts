@@ -14,6 +14,7 @@ export type GameCommand =
   | { type: 'ROTATE_PENDING_TILE'; direction: 'LEFT' | 'RIGHT' }
   | { type: 'CONFIRM_TILE_PLACEMENT' }
   | { type: 'SKIP_MOVEMENT' }
+  | { type: 'LAUNCH_PROBE'; direction: number }
   | { type: 'BUY_RESOURCE'; coord: HexCoord; resource: ResourceId }
   | { type: 'SELL_RESOURCE'; resource: ResourceId }
   | { type: 'END_TURN' }

@@ -47,6 +47,14 @@
         </button>
       </div>
       <button
+        v-if="showProbe"
+        type="button"
+        :class="['action', { accent: ui.probeAiming }]"
+        @click="toggleProbe"
+      >
+        {{ ui.probeAiming ? 'AIMING' : 'PROBE' }}
+      </button>
+      <button
         v-if="showEndTurn"
         type="button"
         class="action accent"
@@ -59,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { commandMode } from '@/ui/commandMode'
@@ -74,6 +82,7 @@ import {
 } from '@/game/definitions/resources'
 import { shipsAt } from '@/game/rules/combat'
 import { buyPrice, evaSellParts, formatSellParts, isEvaHex } from '@/game/rules/planetMarket'
+import { canLaunchAnyProbe } from '@/game/rules/probes'
 import { prefersCoarsePointer } from '@/ui/pointerInput'
 
 const game = useGameStore()
@@ -115,6 +124,7 @@ const planetLots = computed(() => {
 })
 
 const planetHint = computed(() => {
+  if (ui.probeAiming) return prefersCoarsePointer() ? 'TAP UNKNOWN SPACE TO LAUNCH' : 'CLICK UNKNOWN SPACE TO LAUNCH'
   if (mode.value === 'EXPLORE_ROTATION') return prefersCoarsePointer() ? 'TAP HEX TO PLACE' : 'Q / E  ROTATE'
   const others = shipsAt(game.state, game.ship.coord).filter((item) => item.id !== game.ship.id)
   if (others.length && others.some((item) => item.hull > 0)) {
@@ -150,6 +160,7 @@ const shipParams = computed(() => {
     { label: 'FUEL', value: pad(player.fuel) },
     { label: 'CR', value: pad(player.credits) },
     { label: 'HOLD', value: `${cargoUsed(ship.cargo)}/${CARGO_CAPACITY[ship.class]}` },
+    { label: 'PROBES', value: pad(ship.probes ?? 0) },
     { label: 'GLORY', value: pad(player.glory) },
   ]
 })
@@ -168,6 +179,18 @@ const showEndTurn = computed(
     game.state.phase !== 'TILE_PLACEMENT' &&
     (game.state.movementSpent || (game.player.attacksThisTurn ?? 0) > 0),
 )
+
+const showProbe = computed(
+  () => game.state.phase === 'PLAYER_TURN' && !game.state.movementSpent && canLaunchAnyProbe(game.state),
+)
+
+watch(showProbe, (ok) => {
+  if (!ok) ui.probeAiming = false
+})
+
+function toggleProbe(): void {
+  ui.probeAiming = !ui.probeAiming
+}
 
 function pad(value: number): string {
   return String(value).padStart(2, '0')

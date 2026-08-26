@@ -56,6 +56,7 @@ function sync(): void {
     showTileNames: ui.showTileNames,
     showMarketIcons: ui.showMarketIcons,
     threatShipId: ui.threatShipId,
+    probeAim: ui.probeAiming,
   })
 }
 
@@ -287,8 +288,13 @@ function handleTap(clientX: number, clientY: number): void {
     if (hover.kind === 'EXPLORE') {
       ui.inspectPlanet = null
       scene.camera.clearInspectLimits()
-      game.dispatch({ type: 'START_EXPLORATION', direction: hover.direction })
-      game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
+      if (ui.probeAiming) {
+        game.dispatch({ type: 'LAUNCH_PROBE', direction: hover.direction })
+        ui.probeAiming = false
+      } else {
+        game.dispatch({ type: 'START_EXPLORATION', direction: hover.direction })
+        game.dispatch({ type: 'CONFIRM_TILE_PLACEMENT' })
+      }
       ui.hover = null
       return
     }

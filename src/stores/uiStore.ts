@@ -20,6 +20,7 @@ export const useUiStore = defineStore('ui', () => {
   const showTileNames = ref(true)
   const showMarketIcons = ref(true)
   const notice = ref<string | null>(null)
+  const probeAiming = ref(false)
   let noticeTimer: ReturnType<typeof setTimeout> | null = null
 
   function flashNotice(text: string, ms = 2800): void {
@@ -47,6 +48,7 @@ export const useUiStore = defineStore('ui', () => {
     showTileNames,
     showMarketIcons,
     notice,
+    probeAiming,
     flashNotice,
   }
 })

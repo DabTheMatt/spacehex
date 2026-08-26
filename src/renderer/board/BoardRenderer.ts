@@ -22,6 +22,7 @@ import { palette } from '../theme'
 import { coordKey } from '../../game/board/HexCoord'
 import { canExploreDirection } from '../../game/rules/exploration'
 import { canMoveTo } from '../../game/rules/movement'
+import { probeAt } from '../../game/rules/probes'
 import { activeShip } from '../../game/rules/fuel'
 import type { BoardHover } from '../../ui/boardHover'
 import { clamp01, easeOutCubic, prefersReducedMotion, TILE_GLYPH_FADE_MS } from '../motion'
@@ -52,12 +53,13 @@ export class BoardRenderer {
       inspectKey?: string | null
       showTileNames?: boolean
       showMarketIcons?: boolean
+      probeAim?: boolean
     },
   ): void {
     this.syncTiles(state, options)
     this.markers.clear()
     this.drawActionMarkers(state)
-    this.drawExploreGhosts(state, options.hover)
+    this.drawExploreGhosts(state, options.hover, options.probeAim === true)
     this.drawMoveGhosts(state, options.hover)
     if (options.hover?.kind === 'STAY') {
       this.drawHoverGhost(-1, options.hover.coord, 0.35, TILE_THICKNESS, 'MOVE', false)
@@ -263,22 +265,32 @@ export class BoardRenderer {
     y = TILE_SETTLED_Y,
     kind: 'EXPLORE' | 'MOVE' = 'EXPLORE',
     pulse = true,
-  ): void {
+  ): THREE.Group {
     const ghost = makeDashedHexGhost(direction, opacity, kind, pulse)
     const pos = getWorldPosition(coord)
     ghost.position.set(pos.x, y, pos.z)
     this.markers.add(ghost)
+    return ghost
   }
 
-  private drawExploreGhosts(state: GameState, hover: BoardHover | null | undefined): void {
+  private drawExploreGhosts(
+    state: GameState,
+    hover: BoardHover | null | undefined,
+    probeAim: boolean,
+  ): void {
     if (state.phase !== 'PLAYER_TURN' || state.movementSpent) return
     const origin = activeShip(state).coord
     for (let dir = 0; dir < 6; dir++) {
       if (!canExploreDirection(state, dir)) continue
       const target = getNeighbor(origin, dir)
+      if (probeAt(state, target)) continue
       const hot =
         hover?.kind === 'EXPLORE' && hover.coord.q === target.q && hover.coord.r === target.r
-      this.drawHoverGhost(dir, target, hot ? 0.55 : 0.38, TILE_SETTLED_Y, 'EXPLORE')
+      const ghost = this.drawHoverGhost(dir, target, hot ? 0.55 : 0.38, TILE_SETTLED_Y, 'EXPLORE')
+      if (typeof document === 'undefined') continue
+      const caption = createEdgeLabel(probeAim ? 'LAUNCH PROBE' : 'UNKNOWN SPACE', { width: 0.78 })
+      caption.position.y = 0.02
+      ghost.add(caption)
     }
   }
 

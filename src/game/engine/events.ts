@@ -33,4 +33,7 @@ export type GameEvent =
   | { type: 'TURN_ENDED'; playerId: string }
   | { type: 'ROUND_STARTED'; round: number }
   | { type: 'FUEL_CHANGED'; playerId: string; fuel: number }
+  | { type: 'PROBE_LAUNCHED'; playerId: string; shipId: string; coord: HexCoord }
+  | { type: 'PROBE_DISMISSED'; coord: HexCoord; shipId: string }
+  | { type: 'SHIP_DAMAGED'; shipId: string; damage: number; hullAfter: number }
   | { type: 'COMMAND_REJECTED'; command: string; reason: string }

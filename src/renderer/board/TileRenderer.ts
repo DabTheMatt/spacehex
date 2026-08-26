@@ -264,8 +264,8 @@ export function makeDashedHexGhost(
     const mat = new LineMaterial({
       color: palette.preview,
       dashed: true,
-      dashSize: 0.1,
-      gapSize: 0.08,
+      dashSize: 0.05,
+      gapSize: 0.04,
       transparent: true,
       opacity: rest,
       depthTest: false,

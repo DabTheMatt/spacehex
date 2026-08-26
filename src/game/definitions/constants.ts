@@ -10,4 +10,7 @@ export const MAX_ATTACKS_PER_TURN = 1
 
 export const PLAYER_IDS = ['player-1', 'player-2'] as const
 
-export const GAME_STATE_VERSION = 1
+/** Maciej: 2 sondy na statek; wystrzał zamiast ruchu. */
+export const STARTING_PROBES = 2
+
+export const GAME_STATE_VERSION = 2
