@@ -5,6 +5,7 @@ export interface ShipDefinition {
   label: string
   symbol: string
   hull: number
+  /** Base combat ability; fight strength is this plus a d6. */
   attack: number
 }
 

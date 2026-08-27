@@ -265,7 +265,10 @@ export class SpaceScene {
     if (!this.primed) {
       this.prevTileKeys = new Set(tileKeys)
       this.prevShipCoords = new Map(
-        Object.values(state.ships).map((ship) => [ship.id, { ...ship.coord }]),
+        [...Object.values(state.ships), ...Object.values(state.npcShips)].map((ship) => [
+          ship.id,
+          { ...ship.coord },
+        ]),
       )
       this.primed = true
       return
@@ -275,7 +278,7 @@ export class SpaceScene {
       if (!this.prevTileKeys.has(key)) this.beginRise(key)
     }
 
-    for (const ship of Object.values(state.ships)) {
+    for (const ship of [...Object.values(state.ships), ...Object.values(state.npcShips)]) {
       const prev = this.prevShipCoords.get(ship.id)
       if (!prev) {
         this.prevShipCoords.set(ship.id, { ...ship.coord })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, createInitialState } from '../game/engine/GameEngine'
-import { canDeclareAttack, hostileOnHex } from '../game/rules/combat'
+import { canDeclareAttack, hostileOnHex, planContestShot, rollCombatDice } from '../game/rules/combat'
 import { GLORY_DAMAGE, GLORY_DESTROY } from '../game/rules/glory'
 import { SHIP_DEFINITIONS } from '../game/definitions/ships'
 import { getNeighbor } from '../game/board/hexMath'
@@ -95,25 +95,46 @@ describe('Thorn combat', () => {
     state = applyCommand(state, { type: 'DEV_DAMAGE_SHIP', shipId: id, amount: 2 }).state
     expect(state.npcShips[id].hull).toBe(1)
     const gloryBefore = state.players['player-1'].glory
+    const dice = rollCombatDice(state, 'mewa-1', id)
+    const shot = planContestShot(
+      { ...state.ships['mewa-1'], playerId: 'player-1' },
+      { id, class: 'CIERN', coord, hull: 1 },
+      dice,
+    )
     const fight = applyCommand(state, { type: 'DECLARE_ATTACK', defenderId: id })
     expect(fight.events.some((e) => e.type === 'COMBAT_STARTED')).toBe(true)
-    expect(fight.state.npcShips[id].hull).toBe(0)
-    expect(fight.state.players['player-1'].glory).toBe(
-      gloryBefore + GLORY_DAMAGE + GLORY_DESTROY.CIERN,
-    )
+    if (shot?.defenderId === id) {
+      expect(fight.state.npcShips[id].hull).toBe(0)
+      expect(fight.state.players['player-1'].glory).toBe(
+        gloryBefore + GLORY_DAMAGE + GLORY_DESTROY.CIERN,
+      )
+    } else {
+      expect(fight.state.npcShips[id].hull).toBe(1)
+    }
     expect(fight.state.players['player-1'].attacksThisTurn).toBe(1)
     expect(canDeclareAttack(fight.state, id).ok).toBe(false)
   })
 
-  it('lets the Thorn return fire without awarding it glory', () => {
+  it('lets only the contest loser take damage, with no glory for the Thorn', () => {
     let { state, coord } = placeShadow('thorn-duel')
     const id = `ciern-${coordKey(coord)}`
     state = applyCommand(state, { type: 'DECLARE_MOVE', target: coord }).state
     const gloryBefore = state.players['player-1'].glory
+    const dice = rollCombatDice(state, 'mewa-1', id)
+    const shot = planContestShot(
+      { ...state.ships['mewa-1'], playerId: 'player-1' },
+      { id, class: 'CIERN', coord, hull: state.npcShips[id].hull },
+      dice,
+    )
     const fight = applyCommand(state, { type: 'DECLARE_ATTACK', defenderId: id })
-    expect(fight.state.ships['mewa-1'].hull).toBe(2)
-    expect(fight.state.npcShips[id].hull).toBe(2)
-    expect(fight.state.players['player-1'].glory).toBe(gloryBefore + GLORY_DAMAGE)
+    const playerHull = fight.state.ships['mewa-1'].hull
+    const thornHull = fight.state.npcShips[id].hull
+    expect(playerHull + thornHull).toBe(shot ? 5 : 6)
+    if (shot?.defenderId === id) {
+      expect(fight.state.players['player-1'].glory).toBe(gloryBefore + GLORY_DAMAGE)
+    } else {
+      expect(fight.state.players['player-1'].glory).toBe(gloryBefore)
+    }
     const npcGlory = fight.events.filter(
       (e) => e.type === 'GLORY_CHANGED' && e.playerId !== 'player-1',
     )

@@ -2,9 +2,10 @@ import type { GameState, NpcShipState, ShipState } from '../state/GameState'
 import { COMBAT_DAMAGE, MAX_ATTACKS_PER_TURN } from '../definitions/constants'
 import type { HexCoord } from '../board/HexCoord'
 import type { GameEvent } from '../engine/events'
-import type { ShipClass } from '../definitions/ships'
+import { SHIP_DEFINITIONS, type ShipClass } from '../definitions/ships'
 import { addGlory, GLORY_DAMAGE, GLORY_DESTROY } from './glory'
 import { activeShip } from './fuel'
+import { RNG } from '../random/RNG'
 
 export type Combatant = {
   id: string
@@ -12,6 +13,10 @@ export type Combatant = {
   coord: HexCoord
   hull: number
   playerId?: string
+}
+
+export function combatAbility(shipClass: ShipClass): number {
+  return SHIP_DEFINITIONS[shipClass].attack
 }
 
 export function shipsAt(state: GameState, coord: HexCoord): ShipState[] {
@@ -31,7 +36,7 @@ export function getCombatant(state: GameState, id: string): Combatant | undefine
       playerId: ship.playerId,
     }
   }
-  const npc = state.npcShips[id]
+  const npc: NpcShipState | undefined = state.npcShips[id]
   if (!npc) return undefined
   return { id: npc.id, class: npc.class, coord: npc.coord, hull: npc.hull }
 }
@@ -77,26 +82,59 @@ export function canDeclareAttack(
   return { ok: true }
 }
 
+export interface CombatDice {
+  attackerDie: number
+  defenderDie: number
+}
+
+/** Seeded d6 pair for one contest. Faces are 1–6. */
+export function rollCombatDice(
+  state: GameState,
+  attackerId: string,
+  defenderId: string,
+): CombatDice {
+  const rng = new RNG(`${state.seed}:combat:${state.log.length}:${attackerId}:${defenderId}`)
+  return {
+    attackerDie: rng.nextInt(6) + 1,
+    defenderDie: rng.nextInt(6) + 1,
+  }
+}
+
+export function combatStrength(ability: number, die: number): number {
+  return ability + die
+}
+
 export interface PlannedShot {
   attackerId: string
   defenderId: string
   damage: number
 }
 
-/** One exchange per declaration: attacker fires once, defender answers if still up. */
-export function planDuelShots(attacker: Combatant, defender: Combatant): PlannedShot[] {
-  const shots: PlannedShot[] = []
-  let bHull = defender.hull
-  if (attacker.hull > 0 && bHull > 0) {
-    const damage = Math.min(COMBAT_DAMAGE, bHull)
-    bHull -= damage
-    shots.push({ attackerId: attacker.id, defenderId: defender.id, damage })
+/**
+ * One contest: each side rolls ability + d6. Only the loser takes 1 hull.
+ * A tie deals no damage.
+ */
+export function planContestShot(
+  attacker: Combatant,
+  defender: Combatant,
+  dice: CombatDice,
+): PlannedShot | null {
+  if (attacker.hull <= 0 || defender.hull <= 0) return null
+  const a = combatStrength(combatAbility(attacker.class), dice.attackerDie)
+  const b = combatStrength(combatAbility(defender.class), dice.defenderDie)
+  if (a === b) return null
+  if (a > b) {
+    return {
+      attackerId: attacker.id,
+      defenderId: defender.id,
+      damage: Math.min(COMBAT_DAMAGE, defender.hull),
+    }
   }
-  if (bHull > 0 && defender.hull > 0 && attacker.hull > 0) {
-    const damage = Math.min(COMBAT_DAMAGE, attacker.hull)
-    shots.push({ attackerId: defender.id, defenderId: attacker.id, damage })
+  return {
+    attackerId: defender.id,
+    defenderId: attacker.id,
+    damage: Math.min(COMBAT_DAMAGE, attacker.hull),
   }
-  return shots
 }
 
 function withHull(state: GameState, id: string, hull: number): GameState {
@@ -109,17 +147,50 @@ function withHull(state: GameState, id: string, hull: number): GameState {
   return { ...state, npcShips: { ...state.npcShips, [id]: { ...npc, hull } } }
 }
 
-/** TODO RULE CLARIFICATION T5 — 1 obrażenie na rakietę, liczba rakiet = atak. */
-export function resolveDeclaredCombat(
+function awardDamageGlory(
   state: GameState,
+  shooter: Combatant | undefined,
+  defenderClass: ShipClass,
+  hullAfter: number,
+  hullBefore: number,
+): { state: GameState; events: GameEvent[] } {
+  const events: GameEvent[] = []
+  if (!shooter?.playerId || !state.players[shooter.playerId]) return { state, events }
+  let next = addGlory(state, shooter.playerId, GLORY_DAMAGE)
+  events.push({
+    type: 'GLORY_CHANGED',
+    playerId: shooter.playerId,
+    glory: next.players[shooter.playerId].glory,
+    delta: GLORY_DAMAGE,
+  })
+  if (hullAfter === 0 && hullBefore > 0) {
+    const bonus = GLORY_DESTROY[defenderClass]
+    next = addGlory(next, shooter.playerId, bonus)
+    events.push({
+      type: 'GLORY_CHANGED',
+      playerId: shooter.playerId,
+      glory: next.players[shooter.playerId].glory,
+      delta: bonus,
+    })
+  }
+  return { state: next, events }
+}
+
+/** Resolve a contested exchange. Does not consume the player's attack. */
+export function resolveCombatExchange(
+  state: GameState,
+  attackerId: string,
   defenderId: string,
 ): { state: GameState; events: GameEvent[] } {
-  const check = canDeclareAttack(state, defenderId)
-  if (!check.ok) return { state, events: [] }
-  const attacker = activeShip(state)
+  const attacker = getCombatant(state, attackerId)
   const defender = getCombatant(state, defenderId)
-  if (!defender) return { state, events: [] }
-  const planned = planDuelShots(attacker, defender)
+  if (!attacker || !defender) return { state, events: [] }
+  if (attacker.hull <= 0 || defender.hull <= 0) return { state, events: [] }
+  if (attacker.coord.q !== defender.coord.q || attacker.coord.r !== defender.coord.r) {
+    return { state, events: [] }
+  }
+  const dice = rollCombatDice(state, attacker.id, defender.id)
+  const shot = planContestShot(attacker, defender, dice)
   const events: GameEvent[] = [
     {
       type: 'COMBAT_STARTED',
@@ -129,20 +200,20 @@ export function resolveDeclaredCombat(
       attackerHull: attacker.hull,
       defenderHull: defender.hull,
     },
+    {
+      type: 'COMBAT_ROLL',
+      attackerId: attacker.id,
+      defenderId: defender.id,
+      attackerAbility: combatAbility(attacker.class),
+      defenderAbility: combatAbility(defender.class),
+      attackerDie: dice.attackerDie,
+      defenderDie: dice.defenderDie,
+    },
   ]
   let nextState: GameState = state
-  const hullLeft: Record<string, number> = {
-    [attacker.id]: attacker.hull,
-    [defender.id]: defender.hull,
-  }
-  const classes: Record<string, ShipClass> = {
-    [attacker.id]: attacker.class,
-    [defender.id]: defender.class,
-  }
-  for (const shot of planned) {
-    const before = hullLeft[shot.defenderId]
+  if (shot) {
+    const before = shot.defenderId === defender.id ? defender.hull : attacker.hull
     const hullAfter = Math.max(0, before - shot.damage)
-    hullLeft[shot.defenderId] = hullAfter
     nextState = withHull(nextState, shot.defenderId, hullAfter)
     events.push({
       type: 'COMBAT_SHOT',
@@ -152,36 +223,10 @@ export function resolveDeclaredCombat(
       hullAfter,
     })
     const shooter = getCombatant(nextState, shot.attackerId)
-    if (shooter?.playerId && nextState.players[shooter.playerId]) {
-      nextState = addGlory(nextState, shooter.playerId, GLORY_DAMAGE)
-      events.push({
-        type: 'GLORY_CHANGED',
-        playerId: shooter.playerId,
-        glory: nextState.players[shooter.playerId].glory,
-        delta: GLORY_DAMAGE,
-      })
-      if (hullAfter === 0 && before > 0) {
-        const bonus = GLORY_DESTROY[classes[shot.defenderId]]
-        nextState = addGlory(nextState, shooter.playerId, bonus)
-        events.push({
-          type: 'GLORY_CHANGED',
-          playerId: shooter.playerId,
-          glory: nextState.players[shooter.playerId].glory,
-          delta: bonus,
-        })
-      }
-    }
-  }
-  const player = nextState.players[attacker.playerId]
-  nextState = {
-    ...nextState,
-    players: {
-      ...nextState.players,
-      [attacker.playerId]: {
-        ...player,
-        attacksThisTurn: (player.attacksThisTurn ?? 0) + 1,
-      },
-    },
+    const loserClass = shot.defenderId === defender.id ? defender.class : attacker.class
+    const glory = awardDamageGlory(nextState, shooter, loserClass, hullAfter, before)
+    nextState = glory.state
+    events.push(...glory.events)
   }
   events.push({
     type: 'COMBAT_ENDED',
@@ -189,4 +234,26 @@ export function resolveDeclaredCombat(
     defenderId: defender.id,
   })
   return { state: nextState, events }
+}
+
+export function resolveDeclaredCombat(
+  state: GameState,
+  defenderId: string,
+): { state: GameState; events: GameEvent[] } {
+  const check = canDeclareAttack(state, defenderId)
+  if (!check.ok) return { state, events: [] }
+  const attacker = activeShip(state)
+  const exchange = resolveCombatExchange(state, attacker.id, defenderId)
+  const player = exchange.state.players[attacker.playerId]
+  const nextState: GameState = {
+    ...exchange.state,
+    players: {
+      ...exchange.state.players,
+      [attacker.playerId]: {
+        ...player,
+        attacksThisTurn: (player.attacksThisTurn ?? 0) + 1,
+      },
+    },
+  }
+  return { state: nextState, events: exchange.events }
 }

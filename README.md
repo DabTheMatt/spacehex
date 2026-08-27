@@ -2,7 +2,7 @@
 
 Przeglądarkowy prototyp 3D strategicznej gry planszowej. Specyfikacja: [`project.md`](./project.md). UI: [`interface.md`](./interface.md).
 
-## Prototype v0.1.8
+## Prototype v0.1.9
 
 Wireframe: Vue 3 + TypeScript + Vite + Pinia + Three.js. Statyczny build pod GitHub Pages.
 

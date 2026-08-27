@@ -1,7 +1,7 @@
 import type { GameCommand } from './commands'
 import type { GameEvent } from './events'
 import type { GameState } from '../state/GameState'
-import { GAME_STATE_VERSION, PLAYER_IDS, STARTING_FUEL, STARTING_PROBES } from '../definitions/constants'
+import { GAME_STATE_VERSION, PLAYER_IDS, STARTING_FUEL, STARTING_PROBES, FUEL_COST_EXPLORE, FUEL_COST_MOVE } from '../definitions/constants'
 import { emptyCargo, STARTING_CREDITS } from '../definitions/resources'
 import { EXPLORATION_TILE_IDS, EVA_TILE_ID, getTileDefinition } from '../definitions/tiles'
 import { SHIP_DEFINITIONS } from '../definitions/ships'
@@ -11,15 +11,14 @@ import { coordKey } from '../board/HexCoord'
 import { getNeighbor } from '../board/hexMath'
 import { wrapRotation } from '../board/tileRotation'
 import { drawFromDeck, forceNextTile } from '../board/TileDeck'
-import { FUEL_COST_EXPLORE, FUEL_COST_MOVE, FUEL_COST_SKIP } from '../definitions/constants'
-import { activePlayer, activeShip, spendFuel } from '../rules/fuel'
+import { activePlayer, activeShip, spendFuel, stayFuelCost } from '../rules/fuel'
 import { canMoveTo } from '../rules/movement'
 import { canExploreDirection } from '../rules/exploration'
 import { resolveDeclaredCombat, canDeclareAttack } from '../rules/combat'
 import { resolveDiscovery, addGlory } from '../rules/glory'
 import { buyFuel, buyResource, sellResource, stockPlanetIfNeeded } from '../rules/planetMarket'
 import { canLaunchProbe, dismissProbesUnderShips } from '../rules/probes'
-import { spawnThornsForPlacedTile } from '../rules/npcs'
+import { spawnThornsForPlacedTile, runNpcPhase } from '../rules/npcs'
 import { resolveEntryHazards } from '../rules/sectorHazards'
 import { applyHullDamage } from '../rules/damage'
 import { rollSectorName } from '../definitions/sectorNames'
@@ -511,13 +510,18 @@ function skipMovement(state: GameState): EngineResult {
   if (!requireTurn(state) || state.movementSpent) {
     return reject(state, 'SKIP_MOVEMENT', 'NOT_IN_MOVEMENT')
   }
-  let next = spendFuel(state, FUEL_COST_SKIP)
+  const cost = stayFuelCost(state)
+  let next = spendFuel(state, cost)
+  const player = activePlayer(next)
   next = {
     ...next,
     movementSpent: true,
     exploration: { status: 'NONE' },
   }
-  return { state: next, events: [] }
+  const events: GameEvent[] =
+    cost > 0 ? [{ type: 'FUEL_CHANGED', playerId: player.id, fuel: player.fuel }] : []
+  if (events.length) next = append(next, events)
+  return { state: next, events }
 }
 
 function buyResourceCommand(
@@ -602,20 +606,24 @@ function endTurn(state: GameState): EngineResult {
   const nextPlayerId = PLAYER_IDS[nextIndex]
   const newRound = nextIndex === 0 ? state.round + 1 : state.round
   const events: GameEvent[] = [{ type: 'TURN_ENDED', playerId: state.activePlayerId }]
+  let working = state
   if (nextIndex === 0) {
+    const hunt = runNpcPhase(working)
+    working = hunt.state
+    events.push(...hunt.events)
     events.push({ type: 'ROUND_STARTED', round: newRound })
   }
-  const nextPlayer = state.players[nextPlayerId]
+  const nextPlayer = working.players[nextPlayerId]
   const next = append(
     {
-      ...state,
+      ...working,
       activePlayerId: nextPlayerId,
       round: newRound,
       movementSpent: false,
       exploration: { status: 'NONE' },
       phase: 'PLAYER_TURN',
       players: {
-        ...state.players,
+        ...working.players,
         [nextPlayerId]: { ...nextPlayer, buysThisTurn: 0, salvagesThisTurn: 0, attacksThisTurn: 0 },
       },
     },

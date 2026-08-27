@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, createInitialState } from '../game/engine/GameEngine'
-import { canDeclareAttack, planDuelShots } from '../game/rules/combat'
+import { canDeclareAttack, combatAbility, planContestShot, rollCombatDice } from '../game/rules/combat'
 import { discoveryGlory, GLORY_DAMAGE, GLORY_DESTROY } from '../game/rules/glory'
 import { COMBAT_DAMAGE, MAX_ATTACKS_PER_TURN } from '../game/definitions/constants'
 
@@ -57,11 +57,22 @@ describe('declared combat', () => {
     let state = createInitialState('glory-fight')
     state = applyCommand(state, { type: 'DEV_DAMAGE_SHIP', shipId: 'mewa-2', amount: 2 }).state
     expect(state.ships['mewa-2'].hull).toBe(1)
+    const dice = rollCombatDice(state, 'mewa-1', 'mewa-2')
+    const shot = planContestShot(state.ships['mewa-1'], state.ships['mewa-2'], dice)
     const fight = applyCommand(state, { type: 'DECLARE_ATTACK', defenderId: 'mewa-2' })
     expect(fight.events.some((event) => event.type === 'COMBAT_STARTED')).toBe(true)
-    expect(fight.events.some((event) => event.type === 'COMBAT_SHOT')).toBe(true)
-    expect(fight.state.ships['mewa-2'].hull).toBe(0)
-    expect(fight.state.players['player-1'].glory).toBe(GLORY_DAMAGE + GLORY_DESTROY.MEWA)
+    expect(fight.events.some((event) => event.type === 'COMBAT_ROLL')).toBe(true)
+    if (shot?.defenderId === 'mewa-2') {
+      expect(fight.state.ships['mewa-2'].hull).toBe(0)
+      expect(fight.state.players['player-1'].glory).toBe(GLORY_DAMAGE + GLORY_DESTROY.MEWA)
+    } else if (shot?.defenderId === 'mewa-1') {
+      expect(fight.state.ships['mewa-1'].hull).toBe(2)
+      expect(fight.state.ships['mewa-2'].hull).toBe(1)
+      expect(fight.state.players['player-1'].glory).toBe(0)
+    } else {
+      expect(fight.state.ships['mewa-2'].hull).toBe(1)
+      expect(fight.state.players['player-1'].glory).toBe(0)
+    }
     expect(fight.state.players['player-1'].attacksThisTurn).toBe(1)
     expect(COMBAT_DAMAGE).toBe(1)
     expect(MAX_ATTACKS_PER_TURN).toBe(1)
@@ -84,16 +95,24 @@ describe('declared combat', () => {
     expect(canDeclareAttack(again.state, 'mewa-2').ok).toBe(false)
   })
 
-  it('fires one shot each way and lets the next player attack on their turn', () => {
+  it('resolves one contest (ability + d6) and lets the next player attack on their turn', () => {
     const state = createInitialState('duel-plan')
-    const shots = planDuelShots(state.ships['mewa-1'], state.ships['mewa-2'])
-    expect(shots).toHaveLength(2)
-    expect(shots[0]?.attackerId).toBe('mewa-1')
-    expect(shots[1]?.attackerId).toBe('mewa-2')
+    expect(combatAbility('MEWA')).toBe(3)
+    const dice = rollCombatDice(state, 'mewa-1', 'mewa-2')
+    const shot = planContestShot(state.ships['mewa-1'], state.ships['mewa-2'], dice)
+    if (shot) expect(shot.damage).toBe(1)
 
     let next = applyCommand(state, { type: 'DECLARE_ATTACK', defenderId: 'mewa-2' }).state
-    expect(next.ships['mewa-1'].hull).toBe(2)
-    expect(next.ships['mewa-2'].hull).toBe(2)
+    const aHull = next.ships['mewa-1'].hull
+    const bHull = next.ships['mewa-2'].hull
+    expect(aHull + bHull).toBe(shot ? 5 : 6)
+    if (shot?.defenderId === 'mewa-2') {
+      expect(bHull).toBe(2)
+      expect(aHull).toBe(3)
+    } else if (shot?.defenderId === 'mewa-1') {
+      expect(aHull).toBe(2)
+      expect(bHull).toBe(3)
+    }
     next = applyCommand(next, { type: 'END_TURN' }).state
     expect(next.activePlayerId).toBe('player-2')
     expect(canDeclareAttack(next, 'mewa-1').ok).toBe(true)

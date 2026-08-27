@@ -41,6 +41,11 @@ export function formatLogLine(state: GameState, event: GameEvent): string | null
       return `A ${SHIP_DEFINITIONS[event.class].label} appeared.`
     case 'SHIP_DAMAGED':
       return `${shipCallsign(state, event.shipId)} took ${event.damage} damage.`
+    case 'COMBAT_ROLL': {
+      const a = shipCallsign(state, event.attackerId)
+      const b = shipCallsign(state, event.defenderId)
+      return `${a} ${event.attackerAbility}+${event.attackerDie} vs ${b} ${event.defenderAbility}+${event.defenderDie}.`
+    }
     case 'COMBAT_SHOT':
       return `${shipCallsign(state, event.defenderId)} took ${event.damage} damage.`
     case 'COMBAT_STARTED':

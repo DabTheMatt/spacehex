@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type { TileType } from '../../game/board/tileRotation'
 import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
+import { isRefuelTileType } from '../../game/definitions/refuel'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
@@ -290,6 +291,23 @@ function blackHoleGlyph(color: number): THREE.Group {
   return g
 }
 
+function fuelCellGlyph(color: number): THREE.Group {
+  const g = new THREE.Group()
+  g.userData.fuelCell = true
+  const r = 0.08
+  const hex: Array<[number, number]> = []
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i
+    hex.push([Math.cos(a) * r, Math.sin(a) * r])
+  }
+  g.add(poly(hex, color, true))
+  g.add(poly([[-0.045, 0], [0.045, 0]], color))
+  g.add(poly([[-0.028, -0.028], [0.028, -0.028]], color))
+  g.add(poly([[0.07, -0.02], [0.07, 0.02], [0.09, 0.012], [0.09, -0.012]], color, true))
+  g.position.set(0.58, 0, 0.42)
+  return g
+}
+
 export function createTileGlyph(
   def: TileDefinition,
   color = palette.paper,
@@ -333,6 +351,7 @@ export function createTileGlyph(
     default:
       root.add(voidGlyph(color))
   }
+  if (isRefuelTileType(type)) root.add(fuelCellGlyph(scan ? color : palette.ochre))
   return root
 }
 
