@@ -1,5 +1,6 @@
 <template>
   <footer class="command-bar">
+    <ActionStrip />
     <section class="hud-pane hud-pane--planet">
       <div class="hud-pane__label muted">{{ paneLabel }}</div>
       <div v-if="stationName" class="hud-pane__id">{{ stationName }}</div>
@@ -58,14 +59,6 @@
         </button>
       </div>
       <button
-        v-if="showProbe"
-        type="button"
-        :class="['action', 'probe', { aiming: ui.probeAiming }]"
-        @click="toggleProbe"
-      >
-        {{ ui.probeAiming ? 'AIMING' : 'PROBE' }}
-      </button>
-      <button
         v-if="showEndTurn"
         type="button"
         class="action accent"
@@ -79,6 +72,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import ActionStrip from './ActionStrip.vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { commandMode } from '@/ui/commandMode'
@@ -146,7 +140,7 @@ const planetLots = computed(() => {
 })
 
 const planetHint = computed(() => {
-  if (ui.probeAiming) return prefersCoarsePointer() ? 'TAP UNKNOWN SPACE TO LAUNCH' : 'CLICK UNKNOWN SPACE TO LAUNCH'
+  if (ui.probeAiming) return prefersCoarsePointer() ? 'TAP EMPTY HEX TO LAUNCH' : 'CLICK EMPTY HEX TO LAUNCH'
   if (mode.value === 'EXPLORE_ROTATION') return prefersCoarsePointer() ? 'TAP HEX TO PLACE' : 'Q / E  ROTATE'
   const others = shipsAt(game.state, game.ship.coord).filter((item) => item.id !== game.ship.id)
   if (others.length && others.some((item) => item.hull > 0)) {
@@ -211,10 +205,6 @@ const showProbe = computed(
 watch(showProbe, (ok) => {
   if (!ok) ui.probeAiming = false
 })
-
-function toggleProbe(): void {
-  ui.probeAiming = !ui.probeAiming
-}
 
 function pad(value: number): string {
   return String(value).padStart(2, '0')

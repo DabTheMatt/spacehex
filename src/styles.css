@@ -208,6 +208,52 @@ body,
   pointer-events: none;
 }
 
+.action-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  z-index: 21;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem 1.35rem;
+  padding: 0.28rem 1.2rem 0.42rem;
+  pointer-events: auto;
+}
+
+.action-strip__item {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0.1rem 0;
+  margin: 0;
+  font: inherit;
+  font-size: var(--font-xs);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  cursor: default;
+}
+
+.action-strip__item.on {
+  color: var(--color-accent);
+}
+
+.action-strip__item.on:not(:disabled) {
+  cursor: pointer;
+}
+
+.action-strip__item.aiming {
+  border-bottom: var(--line-width) solid var(--color-accent);
+}
+
+.action-strip__item:focus-visible {
+  outline: var(--line-width) solid var(--color-accent);
+  outline-offset: 3px;
+}
+
 .command-bar > * {
   pointer-events: auto;
 }
@@ -396,16 +442,6 @@ body,
 
 .action:hover .num {
   color: var(--color-accent);
-}
-
-.action.probe {
-  color: #7ec8ff;
-}
-
-.action.probe:hover,
-.action.probe.aiming {
-  color: #b5e0ff;
-  border-bottom-color: #7ec8ff;
 }
 
 .action.accent {

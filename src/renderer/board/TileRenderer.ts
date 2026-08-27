@@ -281,6 +281,91 @@ export function makeDashedHexGhost(
   return g
 }
 
-/** Legal hexes have no frame to pulse; kept so the board tick stays a no-op. */
-export function pulseHexGhosts(_root: THREE.Object3D, _timeSeconds: number): void {}
+export function makeHoverHighlight(radius = HEX_SIZE * 0.96): THREE.Group {
+  const g = makeSelectionMarks(radius)
+  g.traverse((obj) => {
+    obj.userData.pulse = true
+    const mesh = obj as THREE.Line
+    const mat = mesh.material as THREE.LineBasicMaterial | undefined
+    if (mat && 'opacity' in mat) {
+      mat.transparent = true
+      mat.opacity = 0.9
+    }
+  })
+  g.userData.pulse = true
+  return g
+}
+
+/** Pulsing arrow from the occupied hex toward a hovered legal hex. */
+export function makeHoverArrow(
+  origin: { x: number; z: number },
+  target: { x: number; z: number },
+): THREE.Group {
+  const g = new THREE.Group()
+  const dx = target.x - origin.x
+  const dz = target.z - origin.z
+  const len = Math.hypot(dx, dz) || 1
+  const ux = dx / len
+  const uz = dz / len
+  const px = -uz
+  const pz = ux
+  const y = TILE_THICKNESS + 0.05
+  const start = HEX_SIZE * 0.42
+  const end = len - HEX_SIZE * 0.38
+  const ax = origin.x + ux * start
+  const az = origin.z + uz * start
+  const bx = origin.x + ux * end
+  const bz = origin.z + uz * end
+  const lineMat = new THREE.LineBasicMaterial({
+    color: palette.ochre,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+  })
+  const shaft = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(ax, y, az),
+      new THREE.Vector3(bx - ux * 0.12, y, bz - uz * 0.12),
+    ]),
+    lineMat,
+  )
+  shaft.userData.pulse = true
+  g.add(shaft)
+
+  const tip = new THREE.Vector3(bx, y, bz)
+  const left = new THREE.Vector3(bx - ux * 0.16 + px * 0.1, y, bz - uz * 0.16 + pz * 0.1)
+  const right = new THREE.Vector3(bx - ux * 0.16 - px * 0.1, y, bz - uz * 0.16 - pz * 0.1)
+  const shape = new THREE.Shape()
+  shape.moveTo(left.x, -left.z)
+  shape.lineTo(tip.x, -tip.z)
+  shape.lineTo(right.x, -right.z)
+  shape.closePath()
+  const head = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape),
+    new THREE.MeshBasicMaterial({
+      color: palette.ochre,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+    }),
+  )
+  head.rotation.x = -Math.PI / 2
+  head.position.y = y
+  head.userData.pulse = true
+  g.add(head)
+  g.userData.pulse = true
+  return g
+}
+
+export function pulseHexGhosts(root: THREE.Object3D, timeSeconds: number): void {
+  const wave = 0.42 + 0.58 * (0.5 + 0.5 * Math.sin(timeSeconds * 5.2))
+  root.traverse((obj) => {
+    if (!obj.userData.pulse) return
+    const mat = (obj as THREE.Mesh).material as THREE.Material & { opacity?: number }
+    if (!mat || Array.isArray(mat) || typeof mat.opacity !== 'number') return
+    mat.transparent = true
+    mat.opacity = wave
+  })
+}
 

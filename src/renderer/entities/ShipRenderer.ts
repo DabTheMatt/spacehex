@@ -644,16 +644,11 @@ function hullLabel(ship: Parkable): string {
 
 function hullShape(shipClass: keyof typeof SHIP_DEFINITIONS): THREE.Shape {
   const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
-  const half = shipClass === 'DRZAZGA' ? 0.1 : shipClass === 'CIERN' ? 0.16 : 0.12
-  const shape = new THREE.Shape()
-  if (shipClass === 'CIERN') {
-    shape.moveTo(0, -length * 0.5)
-    shape.lineTo(-half, 0)
-    shape.lineTo(0, length * 0.5)
-    shape.lineTo(half, 0)
-    shape.closePath()
-    return shape
+  const half = shipClass === 'DRZAZGA' ? 0.1 : 0.12
+  if (shipClass === 'CIERN' || shipClass === 'DRZAZGA') {
+    return sawTriangle(length, half, shipClass === 'DRZAZGA' ? 3 : 4)
   }
+  const shape = new THREE.Shape()
   shape.moveTo(0, -length * 0.5)
   shape.lineTo(-half, length * 0.5)
   shape.lineTo(half, length * 0.5)
@@ -661,9 +656,35 @@ function hullShape(shipClass: keyof typeof SHIP_DEFINITIONS): THREE.Shape {
   return shape
 }
 
+/** Enemy hull: triangle with saw teeth along the long edges. */
+export function sawTriangle(length: number, half: number, teeth: number): THREE.Shape {
+  const shape = new THREE.Shape()
+  const nose = -length * 0.5
+  const stern = length * 0.5
+  shape.moveTo(0, nose)
+  for (let i = 1; i <= teeth; i++) {
+    const t = i / (teeth + 1)
+    const y = nose + t * length
+    const xEdge = -half * t
+    const spike = i % 2 === 1 ? 0.055 : 0
+    shape.lineTo(xEdge - spike, y)
+  }
+  shape.lineTo(-half, stern)
+  shape.lineTo(half, stern)
+  for (let i = teeth; i >= 1; i--) {
+    const t = i / (teeth + 1)
+    const y = nose + t * length
+    const xEdge = half * t
+    const spike = i % 2 === 1 ? 0.055 : 0
+    shape.lineTo(xEdge + spike, y)
+  }
+  shape.closePath()
+  return shape
+}
+
 function hullExtents(shipClass: keyof typeof SHIP_DEFINITIONS): { length: number; half: number } {
   const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
-  const half = shipClass === 'DRZAZGA' ? 0.1 : shipClass === 'CIERN' ? 0.16 : 0.12
+  const half = shipClass === 'DRZAZGA' ? 0.1 : 0.12
   return { length, half }
 }
 
