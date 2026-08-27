@@ -13,6 +13,9 @@ export const TILE_TYPE_ABBR: Record<TileType, string> = {
   WRECK_TANKER: 'wt',
   WRECK_TRANSPORT: 'wr',
   BLACK_HOLE: 'bh',
+  VORTEX: 'vx',
+  SPACE_GATE: 'gt',
+  STRAIT: 'st',
 }
 
 export function discovererSlot(playerId: string | null | undefined): 1 | 2 {

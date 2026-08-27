@@ -73,4 +73,28 @@ describe('tile glyphs', () => {
     expect(hubs).toBe(1)
     expect(pulses.sort()).toEqual([0, 1, 2])
   })
+
+  it('marks a fuel cell, EVA repair, asteroid chance, and edge numbers', () => {
+    const eva = createTileGlyph(TILE_DEFINITIONS['eva-1'], palette.paper, 'eva-1', false, [1, 2, 3, 4, 5, 6])
+    let fuel = 0
+    let repair = 0
+    let digits = 0
+    eva.traverse((obj) => {
+      if (obj.userData.fuelCell) fuel += 1
+      if (obj.userData.repairMark) repair += 1
+      if (obj.userData.edgeDigit) digits += 1
+    })
+    expect(fuel).toBe(1)
+    expect(repair).toBe(1)
+    expect(digits).toBe(6)
+    const rock = createTileGlyph(TILE_DEFINITIONS['asteroid-1'])
+    let chance = 0
+    rock.traverse((obj) => {
+      if (obj.userData.collisionChance) chance += 1
+    })
+    expect(chance).toBe(1)
+    expect(createTileGlyph(TILE_DEFINITIONS['vortex-1']).children.length).toBeGreaterThan(0)
+    expect(createTileGlyph(TILE_DEFINITIONS['space-gate-1']).children.length).toBeGreaterThan(0)
+    expect(createTileGlyph(TILE_DEFINITIONS['strait-1']).children.length).toBeGreaterThan(0)
+  })
 })

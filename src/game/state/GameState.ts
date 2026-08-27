@@ -2,6 +2,7 @@ import type { BoardState } from '../board/HexMap'
 import type { ExplorationDeck } from '../board/TileDeck'
 import type { HexCoord } from '../board/HexCoord'
 import type { Rotation } from '../board/tileRotation'
+import type { EdgeNumbers } from '../board/edgeNumbers'
 import type { GameEvent } from '../engine/events'
 import type { ShipClass } from '../definitions/ships'
 import type { PlanetMarket, ResourceId } from '../definitions/resources'
@@ -16,6 +17,7 @@ export interface ExplorationState {
   target?: HexCoord
   pendingTileId?: string
   rotation?: Rotation
+  pendingEdgeNumbers?: EdgeNumbers
 }
 
 export interface PlayerState {

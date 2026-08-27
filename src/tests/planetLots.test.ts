@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dicePips, EDGE_MARGIN, OVERLAY_HOVER } from '../renderer/board/planetLots'
+import { dicePips, EDGE_MARGIN, OVERLAY_HOVER, PRICE_TAG_WIDTH } from '../renderer/board/planetLots'
 import { BASE_HOVER } from '../renderer/entities/ShipRenderer'
 import { EVA_HUB_SPIN } from '../renderer/board/evaDocks'
 import { missileSidePoint, missileWorldPos, probeWorldPos } from '../renderer/fx/missilePath'
@@ -23,6 +23,10 @@ describe('dice pips', () => {
 
   it('floats names and markets closer to the tile face', () => {
     expect(OVERLAY_HOVER).toBeCloseTo(BASE_HOVER * 0.25, 5)
+  })
+
+  it('enlarges resource prices and labels EVA as sell containers with fuel and repair', () => {
+    expect(PRICE_TAG_WIDTH).toBeGreaterThan(0.28)
   })
 })
 

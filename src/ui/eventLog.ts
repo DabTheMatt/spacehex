@@ -31,12 +31,18 @@ export function formatLogLine(state: GameState, event: GameEvent): string | null
       return `${shipCallsign(state, event.shipId)} was destroyed.`
     case 'FUEL_BOUGHT':
       return `${state.players[event.playerId]?.name ?? 'Player'} bought fuel.`
+    case 'HULL_REPAIRED':
+      return `${shipCallsign(state, event.shipId)} repaired hull (−${event.price} CR).`
     case 'PROBE_LAUNCHED': {
       const name = state.players[event.playerId]?.name ?? event.playerId
       return `${name} launched a probe.`
     }
     case 'PROBE_DISMISSED':
       return `Probe recovered · ${shipCallsign(state, event.shipId)}.`
+    case 'NPC_FACE_ROLLED':
+      return `${shipCallsign(state, event.shipId)} rolled ${event.face}.`
+    case 'VORTEX_ROLL':
+      return `${shipCallsign(state, event.shipId)} swept by a vortex (${event.face}).`
     case 'NPC_SPAWNED':
       return `A ${SHIP_DEFINITIONS[event.class].label} appeared.`
     case 'SHIP_DAMAGED':

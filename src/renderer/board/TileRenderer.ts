@@ -300,6 +300,7 @@ export function makeHoverHighlight(radius = HEX_SIZE * 0.96): THREE.Group {
 export function makeHoverArrow(
   origin: { x: number; z: number },
   target: { x: number; z: number },
+  color = palette.ochre,
 ): THREE.Group {
   const g = new THREE.Group()
   const dx = target.x - origin.x
@@ -317,7 +318,7 @@ export function makeHoverArrow(
   const bx = origin.x + ux * end
   const bz = origin.z + uz * end
   const lineMat = new THREE.LineBasicMaterial({
-    color: palette.ochre,
+    color,
     transparent: true,
     opacity: 0.85,
     depthWrite: false,
@@ -343,7 +344,7 @@ export function makeHoverArrow(
   const head = new THREE.Mesh(
     new THREE.ShapeGeometry(shape),
     new THREE.MeshBasicMaterial({
-      color: palette.ochre,
+      color,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.9,

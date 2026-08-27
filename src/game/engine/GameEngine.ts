@@ -6,17 +6,18 @@ import { emptyCargo, STARTING_CREDITS } from '../definitions/resources'
 import { EXPLORATION_TILE_IDS, EVA_TILE_ID, getTileDefinition } from '../definitions/tiles'
 import { SHIP_DEFINITIONS } from '../definitions/ships'
 import { RNG } from '../random/RNG'
-import { emptyBoard, getPlacedTile, isTilePlaced, validateTilePlacement } from '../board/HexMap'
+import { emptyBoard, getPlacedTile, isTilePlaced, oppositeDirection, validateTilePlacement } from '../board/HexMap'
 import { coordKey } from '../board/HexCoord'
+import { rollEdgeNumbers } from '../board/edgeNumbers'
 import { getNeighbor } from '../board/hexMath'
-import { wrapRotation } from '../board/tileRotation'
+import { getRotatedEdge, wrapRotation, type Rotation } from '../board/tileRotation'
 import { drawFromDeck, forceNextTile } from '../board/TileDeck'
 import { activePlayer, activeShip, spendFuel, stayFuelCost } from '../rules/fuel'
 import { canMoveTo } from '../rules/movement'
 import { canExploreDirection } from '../rules/exploration'
 import { resolveDeclaredCombat, canDeclareAttack } from '../rules/combat'
 import { resolveDiscovery, addGlory } from '../rules/glory'
-import { buyFuel, buyResource, sellResource, stockPlanetIfNeeded } from '../rules/planetMarket'
+import { buyFuel, buyResource, sellResource, stockPlanetIfNeeded, repairHull } from '../rules/planetMarket'
 import { canLaunchProbe, dismissProbesUnderShips } from '../rules/probes'
 import { spawnThornsForPlacedTile, runNpcPhase } from '../rules/npcs'
 import { resolveEntryHazards } from '../rules/sectorHazards'
@@ -46,6 +47,7 @@ export function createInitialState(seed: string): GameState {
     discoveredByPlayerId: null,
     discoveredRound: 0,
     designation: rollSectorName(seed, EVA_TILE_ID, 'EVA_1', null),
+    edgeNumbers: rollEdgeNumbers(seed, EVA_TILE_ID, '0,0'),
   }
 
   const players: GameState['players'] = {
@@ -164,6 +166,8 @@ export function applyCommand(state: GameState, command: GameCommand): EngineResu
       return buyResourceCommand(state, command.coord, command.resource)
     case 'BUY_FUEL':
       return buyFuelCommand(state, command.coord)
+    case 'REPAIR_HULL':
+      return repairHullCommand(state)
     case 'SELL_RESOURCE':
       return sellResourceCommand(state, command.resource)
     case 'END_TURN':
@@ -276,6 +280,11 @@ function startExploration(state: GameState, direction: number): EngineResult {
   if (!drawn) {
     return reject(state, 'START_EXPLORATION', 'EMPTY_DECK')
   }
+  const pendingEdgeNumbers = rollEdgeNumbers(state.seed, drawn.tileId, coordKey(target))
+  let rotation: Rotation = 0
+  if (getTileDefinition(drawn.tileId).type === 'STRAIT') {
+    rotation = straitRotationForEntry(state, drawn.tileId, target, direction)
+  }
   const events: GameEvent[] = [
     { type: 'EXPLORATION_STARTED' },
     { type: 'TILE_DRAWN', tileId: drawn.tileId },
@@ -290,7 +299,8 @@ function startExploration(state: GameState, direction: number): EngineResult {
         origin,
         target,
         pendingTileId: drawn.tileId,
-        rotation: 0,
+        rotation,
+        pendingEdgeNumbers,
       },
     },
     events,
@@ -341,6 +351,7 @@ function confirmPlacement(state: GameState): EngineResult {
     rotation,
     state.activePlayerId,
     state.round,
+    exp.pendingEdgeNumbers,
   )
 
   const placeEvents: GameEvent[] = [
@@ -429,7 +440,11 @@ function launchProbe(state: GameState, direction: number): EngineResult {
   const player = activePlayer(state)
   const dest = check.target
   const key = coordKey(dest)
-  const placed = makePlacedTile(state, drawn.tileId, dest, 0, player.id, state.round)
+  let rotation = 0
+  if (getTileDefinition(drawn.tileId).type === 'STRAIT') {
+    rotation = straitRotationForEntry(state, drawn.tileId, dest, direction)
+  }
+  const placed = makePlacedTile(state, drawn.tileId, dest, rotation, player.id, state.round)
   const probe = {
     id: `probe-${ship.id}-${state.round}-${direction}`,
     coord: dest,
@@ -573,6 +588,33 @@ function sellResourceCommand(state: GameState, resource: ResourceId): EngineResu
   return { state: append(result.state, events), events }
 }
 
+function repairHullCommand(state: GameState): EngineResult {
+  if (!requireTurn(state)) return reject(state, 'REPAIR_HULL', 'NOT_IN_TURN')
+  const result = repairHull(state)
+  if (!result.ok) return reject(state, 'REPAIR_HULL', result.reason)
+  const ship = activeShip(result.state)
+  const player = activePlayer(result.state)
+  const events: GameEvent[] = [
+    { type: 'HULL_REPAIRED', shipId: ship.id, hullAfter: ship.hull, price: result.price },
+    { type: 'CREDITS_CHANGED', playerId: player.id, credits: player.credits },
+  ]
+  return { state: append(result.state, events), events }
+}
+
+function straitRotationForEntry(
+  state: GameState,
+  tileId: string,
+  coord: HexCoord,
+  exploreDir: number,
+) {
+  const enter = oppositeDirection(exploreDir)
+  const def = getTileDefinition(tileId)
+  const open = [0, 1, 2, 3, 4, 5].filter((rot) => getRotatedEdge(def, enter, rot) === 'OPEN')
+  const rng = new RNG(`${state.seed}:strait:${tileId}:${coordKey(coord)}`)
+  if (!open.length) return wrapRotation(rng.nextInt(6))
+  return wrapRotation(open[rng.nextInt(open.length)])
+}
+
 function makePlacedTile(
   state: GameState,
   tileId: string,
@@ -580,6 +622,7 @@ function makePlacedTile(
   rotation: number,
   discovererId: string | null,
   discoveredRound: number | null,
+  edgeNumbers?: PlacedTile['edgeNumbers'],
 ): PlacedTile {
   const definition = getTileDefinition(tileId)
   return {
@@ -590,6 +633,7 @@ function makePlacedTile(
     discoveredByPlayerId: discovererId,
     discoveredRound,
     designation: rollSectorName(state.seed, tileId, definition.type, discovererId),
+    edgeNumbers: edgeNumbers ?? rollEdgeNumbers(state.seed, tileId, coordKey(coord)),
   }
 }
 
@@ -606,29 +650,26 @@ function endTurn(state: GameState): EngineResult {
   const nextPlayerId = PLAYER_IDS[nextIndex]
   const newRound = nextIndex === 0 ? state.round + 1 : state.round
   const events: GameEvent[] = [{ type: 'TURN_ENDED', playerId: state.activePlayerId }]
-  let working = state
   if (nextIndex === 0) {
-    const hunt = runNpcPhase(working)
-    working = hunt.state
-    events.push(...hunt.events)
     events.push({ type: 'ROUND_STARTED', round: newRound })
   }
-  const nextPlayer = working.players[nextPlayerId]
-  const next = append(
-    {
-      ...working,
-      activePlayerId: nextPlayerId,
-      round: newRound,
-      movementSpent: false,
-      exploration: { status: 'NONE' },
-      phase: 'PLAYER_TURN',
-      players: {
-        ...working.players,
-        [nextPlayerId]: { ...nextPlayer, buysThisTurn: 0, salvagesThisTurn: 0, attacksThisTurn: 0 },
-      },
+  const nextPlayer = state.players[nextPlayerId]
+  let working: GameState = {
+    ...state,
+    activePlayerId: nextPlayerId,
+    round: newRound,
+    movementSpent: false,
+    exploration: { status: 'NONE' },
+    phase: 'PLAYER_TURN',
+    players: {
+      ...state.players,
+      [nextPlayerId]: { ...nextPlayer, buysThisTurn: 0, salvagesThisTurn: 0, attacksThisTurn: 0 },
     },
-    events,
-  )
+  }
+  const hunt = runNpcPhase(working)
+  working = hunt.state
+  events.push(...hunt.events)
+  const next = append(working, events)
   return { state: next, events }
 }
 

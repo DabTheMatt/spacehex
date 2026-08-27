@@ -87,6 +87,42 @@ export const TILE_DEFINITIONS: Record<string, TileDefinition> = {
     'SPECIAL',
     'SPECIAL',
   ]),
+
+  'vortex-1': def('vortex-1', 'VORTEX', 'Cosmic Vortex', '↯'),
+
+  'space-gate-1': def('space-gate-1', 'SPACE_GATE', 'Space Gate', '⬡', [
+    'GATE',
+    'GATE',
+    'GATE',
+    'GATE',
+    'GATE',
+    'GATE',
+  ]),
+
+  'strait-1': def('strait-1', 'STRAIT', 'Strait', '═', [
+    'OPEN',
+    'BLOCKED',
+    'BLOCKED',
+    'OPEN',
+    'BLOCKED',
+    'BLOCKED',
+  ]),
+  'strait-2': def('strait-2', 'STRAIT', 'Strait', '═', [
+    'OPEN',
+    'BLOCKED',
+    'BLOCKED',
+    'OPEN',
+    'BLOCKED',
+    'BLOCKED',
+  ]),
+  'strait-3': def('strait-3', 'STRAIT', 'Strait', '═', [
+    'OPEN',
+    'BLOCKED',
+    'BLOCKED',
+    'OPEN',
+    'BLOCKED',
+    'BLOCKED',
+  ]),
 }
 
 export const EXPLORATION_TILE_IDS: string[] = Object.keys(TILE_DEFINITIONS).filter(
@@ -94,6 +130,15 @@ export const EXPLORATION_TILE_IDS: string[] = Object.keys(TILE_DEFINITIONS).filt
 )
 
 export const EVA_TILE_ID = 'eva-1'
+
+export function asteroidEdgeCount(edges: readonly string[]): number {
+  return edges.filter((edge) => edge === 'ASTEROID').length
+}
+
+/** Printed collision chance from asteroid edges / 6. */
+export function asteroidCollisionPercent(edges: readonly string[]): number {
+  return Math.round((asteroidEdgeCount(edges) / 6) * 100)
+}
 
 export function getTileDefinition(id: string): TileDefinition {
   const defn = TILE_DEFINITIONS[id]

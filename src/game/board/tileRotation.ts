@@ -13,6 +13,9 @@ export type TileType =
   | 'WRECK_TANKER'
   | 'WRECK_TRANSPORT'
   | 'BLACK_HOLE'
+  | 'VORTEX'
+  | 'SPACE_GATE'
+  | 'STRAIT'
 
 export interface TileDefinition {
   id: string

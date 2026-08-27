@@ -16,6 +16,12 @@ describe('available actions', () => {
     expect(lit.REFUEL).toBe(false)
   })
 
+  it('lights refuel on EVA after a fuel cell is spent', () => {
+    let state = createInitialState('actions-eva-fuel')
+    state = applyCommand(state, { type: 'DEV_REMOVE_FUEL', playerId: 'player-1', amount: 1 }).state
+    expect(availableActions(state).REFUEL).toBe(true)
+  })
+
   it('lights move after a neighbor tile exists, and refuel on a planet', () => {
     let state = createInitialState('actions-planet')
     state = applyCommand(state, {

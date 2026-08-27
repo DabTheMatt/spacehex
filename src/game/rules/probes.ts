@@ -4,6 +4,7 @@ import { coordKey } from '../board/HexCoord'
 import type { HexCoord } from '../board/HexCoord'
 import type { GameState, ProbeState } from '../state/GameState'
 import { activeShip, canAffordExplore } from './fuel'
+import { canLeaveDirection } from './passage'
 
 export type ProbeReject =
   | 'NOT_IN_MOVEMENT'
@@ -38,6 +39,7 @@ export function canLaunchProbe(
   if (!canAffordExplore(state)) return { ok: false, reason: 'NO_FUEL' }
   if (state.explorationDeck.drawPile.length === 0) return { ok: false, reason: 'EMPTY_DECK' }
   const target = getNeighbor(ship.coord, direction)
+  if (!canLeaveDirection(state, ship.coord, direction)) return { ok: false, reason: 'ILLEGAL_HEX' }
   if (isTilePlaced(state.board, target)) return { ok: false, reason: 'OCCUPIED' }
   if (probeAt(state, target)) return { ok: false, reason: 'OCCUPIED' }
   if (direction < 0 || direction > 5) return { ok: false, reason: 'ILLEGAL_HEX' }

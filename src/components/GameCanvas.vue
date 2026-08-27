@@ -291,6 +291,14 @@ function handleTap(clientX: number, clientY: number): void {
     return
   }
 
+  if (scene.pickRepair(clientX, clientY) && game.state.phase === 'PLAYER_TURN' && !ui.probeAiming) {
+    const events = game.dispatch({ type: 'REPAIR_HULL' })
+    if (events.some((event) => event.type === 'COMMAND_REJECTED' && event.reason === 'HULL_FULL')) {
+      ui.flashNotice('HULL FULL')
+    }
+    return
+  }
+
   const buy = scene.pickBuy(clientX, clientY)
   if (buy && game.state.phase === 'PLAYER_TURN' && !ui.probeAiming) {
     const events = game.dispatch({ type: 'BUY_RESOURCE', coord: buy.coord, resource: buy.resource })

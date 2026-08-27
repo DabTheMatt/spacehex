@@ -8,6 +8,9 @@ describe('glory', () => {
   it('awards 1 for void, 2 for other features, and 3 plus range for planets', () => {
     expect(discoveryGlory('VOID', { q: 1, r: 0 })).toBe(1)
     expect(discoveryGlory('ASTEROID', { q: 1, r: 0 })).toBe(2)
+    expect(discoveryGlory('VORTEX', { q: 1, r: 0 })).toBe(2)
+    expect(discoveryGlory('SPACE_GATE', { q: 1, r: 0 })).toBe(2)
+    expect(discoveryGlory('STRAIT', { q: 1, r: 0 })).toBe(2)
     expect(discoveryGlory('PLANET_SMALL', { q: 1, r: 0 })).toBe(4)
     expect(discoveryGlory('PLANET_LARGE', { q: 2, r: 0 })).toBe(5)
   })

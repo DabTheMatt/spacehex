@@ -1,5 +1,6 @@
 import type { HexCoord } from './HexCoord'
 import type { Rotation } from './tileRotation'
+import type { EdgeNumbers } from './edgeNumbers'
 
 export interface PlacedTile {
   id: string
@@ -9,4 +10,5 @@ export interface PlacedTile {
   discoveredByPlayerId: string | null
   discoveredRound: number | null
   designation: string
+  edgeNumbers: EdgeNumbers
 }

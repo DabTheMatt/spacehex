@@ -1,13 +1,16 @@
 import type { GameState, NpcShipState, ShipState } from '../state/GameState'
 import type { HexCoord } from '../board/HexCoord'
 import { coordKey } from '../board/HexCoord'
-import { getNeighbor, hexDistance } from '../board/hexMath'
+import { getNeighbor } from '../board/hexMath'
 import { getPlacedTile, isTilePlaced } from '../board/HexMap'
+import { worldDirectionForFace } from '../board/edgeNumbers'
 import { SHIP_DEFINITIONS } from '../definitions/ships'
 import { TILE_DEFINITIONS, getTileDefinition } from '../definitions/tiles'
+import { RNG } from '../random/RNG'
 import type { GameEvent } from '../engine/events'
 import { resolveCombatExchange } from './combat'
 import { resolveEntryHazards } from './sectorHazards'
+import { canTraverse } from './passage'
 
 export function npcPresentAt(state: GameState, coord: HexCoord): boolean {
   return Object.values(state.npcShips).some(
@@ -56,49 +59,31 @@ export function livingPlayerShips(state: GameState): ShipState[] {
   return Object.values(state.ships).filter((ship) => ship.hull > 0)
 }
 
-export function nearestPlayerShip(state: GameState, from: HexCoord): ShipState | null {
-  const living = livingPlayerShips(state)
-  if (!living.length) return null
-  return [...living].sort((a, b) => {
-    const da = hexDistance(from, a.coord)
-    const db = hexDistance(from, b.coord)
-    if (da !== db) return da - db
-    return a.id.localeCompare(b.id)
-  })[0]
+export function rollNpcFace(state: GameState, npcId: string): number {
+  return (
+    new RNG(`${state.seed}:npc-face:${state.round}:${state.activePlayerId}:${npcId}:${state.log.length}`).nextInt(
+      6,
+    ) + 1
+  )
 }
 
-function blockedForNpc(state: GameState, coord: HexCoord): boolean {
-  const tile = getPlacedTile(state.board, coord)
-  if (!tile) return true
-  return getTileDefinition(tile.definitionId).type === 'BLACK_HOLE'
-}
-
-/** One hex toward the nearest living player, only onto placed tiles. */
-export function npcStepCoord(state: GameState, npc: NpcShipState): HexCoord | null {
+export function npcStepByFace(state: GameState, npc: NpcShipState, face: number): HexCoord | null {
   if (npc.hull <= 0) return null
-  const prey = nearestPlayerShip(state, npc.coord)
-  if (!prey) return null
-  const here = hexDistance(npc.coord, prey.coord)
-  if (here === 0) return null
-  let best: HexCoord | null = null
-  let bestDist = here
-  let bestDir = 99
-  for (let dir = 0; dir < 6; dir++) {
-    const step = getNeighbor(npc.coord, dir)
-    if (!isTilePlaced(state.board, step) || blockedForNpc(state, step)) continue
-    const dist = hexDistance(step, prey.coord)
-    if (dist >= here) continue
-    if (dist > bestDist) continue
-    if (dist === bestDist && dir > bestDir) continue
-    best = step
-    bestDist = dist
-    bestDir = dir
-  }
-  return best
+  const tile = getPlacedTile(state.board, npc.coord)
+  if (!tile) return null
+  const dir = worldDirectionForFace(tile.edgeNumbers, tile.rotation, face)
+  if (dir === null) return null
+  const dest = getNeighbor(npc.coord, dir)
+  if (!isTilePlaced(state.board, dest)) return null
+  const destTile = getPlacedTile(state.board, dest)
+  if (!destTile) return null
+  if (getTileDefinition(destTile.definitionId).type === 'BLACK_HOLE') return null
+  if (!canTraverse(state, npc.coord, dest)) return null
+  return dest
 }
 
 /**
- * End-of-cycle hunt: each living NPC steps once, then fights if stacked on a player.
+ * Start of the active player's action phase: each living NPC rolls a face and steps that edge.
  */
 export function runNpcPhase(state: GameState): { state: GameState; events: GameEvent[] } {
   const events: GameEvent[] = []
@@ -107,7 +92,9 @@ export function runNpcPhase(state: GameState): { state: GameState; events: GameE
   for (const id of ids) {
     const npc = next.npcShips[id]
     if (!npc || npc.hull <= 0) continue
-    const dest = npcStepCoord(next, npc)
+    const face = rollNpcFace(next, id)
+    const dest = npcStepByFace(next, npc, face)
+    events.push({ type: 'NPC_FACE_ROLLED', shipId: id, face })
     if (!dest) continue
     const from = { ...npc.coord }
     next = {

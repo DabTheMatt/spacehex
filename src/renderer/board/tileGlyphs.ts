@@ -3,6 +3,8 @@ import type { TileType } from '../../game/board/tileRotation'
 import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
 import { isRefuelTileType } from '../../game/definitions/refuel'
+import { asteroidCollisionPercent } from '../../game/definitions/tiles'
+import type { EdgeNumbers } from '../../game/board/edgeNumbers'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
@@ -294,17 +296,126 @@ function blackHoleGlyph(color: number): THREE.Group {
 function fuelCellGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
   g.userData.fuelCell = true
-  const r = 0.08
-  const hex: Array<[number, number]> = []
-  for (let i = 0; i < 6; i++) {
-    const a = (Math.PI / 3) * i
-    hex.push([Math.cos(a) * r, Math.sin(a) * r])
+  g.add(poly([[-0.05, -0.032], [0.038, -0.032], [0.038, 0.032], [-0.05, 0.032]], color, true))
+  g.add(poly([[-0.028, -0.016], [0.016, -0.016]], color))
+  g.add(poly([[-0.028, 0.016], [0.016, 0.016]], color))
+  g.add(poly([[0.038, -0.014], [0.058, -0.014], [0.058, 0.014], [0.038, 0.014]], color, true))
+  g.position.set(0.52, 0, 0.48)
+  return g
+}
+
+function repairGlyph(color: number): THREE.Group {
+  const g = new THREE.Group()
+  g.userData.repairMark = true
+  g.add(circle(0.07, color, 24))
+  g.add(poly([[-0.04, 0], [0.04, 0]], color))
+  g.add(poly([[0, -0.04], [0, 0.04]], color))
+  g.position.set(0.68, 0, 0.28)
+  return g
+}
+
+function vortexGlyph(color: number): THREE.Group {
+  const g = new THREE.Group()
+  g.add(circle(0.42, color, 40, 0.85))
+  const spiral: Array<[number, number]> = []
+  for (let i = 0; i <= 32; i++) {
+    const t = i / 32
+    const a = t * Math.PI * 2.4
+    const r = 0.06 + t * 0.38
+    spiral.push([Math.cos(a) * r, Math.sin(a) * r])
   }
-  g.add(poly(hex, color, true))
-  g.add(poly([[-0.045, 0], [0.045, 0]], color))
-  g.add(poly([[-0.028, -0.028], [0.028, -0.028]], color))
-  g.add(poly([[0.07, -0.02], [0.07, 0.02], [0.09, 0.012], [0.09, -0.012]], color, true))
-  g.position.set(0.58, 0, 0.42)
+  g.add(poly(spiral, color))
+  return g
+}
+
+function spaceGateGlyph(color: number): THREE.Group {
+  const g = new THREE.Group()
+  const hex = (r: number): Array<[number, number]> => {
+    const pts: Array<[number, number]> = []
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i
+      pts.push([Math.cos(a) * r, Math.sin(a) * r])
+    }
+    return pts
+  }
+  g.add(poly(hex(0.46), color, true))
+  g.add(poly(hex(0.28), color, true))
+  g.add(poly([[-0.12, 0], [0.12, 0]], color))
+  return g
+}
+
+function straitGlyph(color: number): THREE.Group {
+  const g = new THREE.Group()
+  g.add(poly([[-0.72, -0.12], [0.72, -0.12]], color))
+  g.add(poly([[-0.72, 0.12], [0.72, 0.12]], color))
+  g.add(poly([[-0.72, -0.12], [-0.72, 0.12]], color))
+  g.add(poly([[0.72, -0.12], [0.72, 0.12]], color))
+  return g
+}
+
+function canvasSprite(
+  width: number,
+  height: number,
+  draw: (ctx: CanvasRenderingContext2D) => void,
+  userData: Record<string, unknown>,
+): THREE.Object3D {
+  if (typeof document === 'undefined') {
+    const stub = new THREE.Group()
+    Object.assign(stub.userData, userData)
+    return stub
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (ctx) draw(ctx)
+  const mat = new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(canvas),
+    transparent: true,
+    depthTest: false,
+  })
+  const sprite = new THREE.Sprite(mat)
+  Object.assign(sprite.userData, userData)
+  return sprite
+}
+
+function chanceLabel(text: string, color: number): THREE.Object3D {
+  const sprite = canvasSprite(256, 64, (ctx) => {
+    ctx.clearRect(0, 0, 256, 64)
+    ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`
+    ctx.font = '600 36px "IBM Plex Mono", monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(text, 128, 34)
+  }, { collisionChance: true })
+  sprite.scale.set(0.42, 0.1, 1)
+  sprite.position.set(0, 0.04, 0.55)
+  return sprite
+}
+
+function edgeDigit(n: number, color: number): THREE.Object3D {
+  const sprite = canvasSprite(64, 64, (ctx) => {
+    ctx.clearRect(0, 0, 64, 64)
+    ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`
+    ctx.font = '600 44px "IBM Plex Mono", monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(n), 32, 34)
+  }, { edgeDigit: n })
+  sprite.scale.set(0.14, 0.14, 1)
+  return sprite
+}
+
+function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
+  const g = new THREE.Group()
+  g.userData.edgeNumbers = true
+  const r = 0.82
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i + Math.PI / 6
+    const mark = edgeDigit(numbers[i], color)
+    mark.position.set(Math.cos(a) * r, 0.03, Math.sin(a) * r)
+    g.add(mark)
+  }
   return g
 }
 
@@ -313,6 +424,7 @@ export function createTileGlyph(
   color = palette.paper,
   salt = def.id,
   scan = false,
+  edgeNumbers?: EdgeNumbers,
 ): THREE.Group {
   const root = new THREE.Group()
   const type: TileType = def.type
@@ -335,6 +447,7 @@ export function createTileGlyph(
       break
     case 'ASTEROID':
       root.add(asteroidGlyph(color))
+      root.add(chanceLabel(`${asteroidCollisionPercent(def.edges)}%`, color))
       break
     case 'SHADOW_BASE':
       root.add(shadowBaseGlyph(color))
@@ -348,10 +461,21 @@ export function createTileGlyph(
     case 'BLACK_HOLE':
       root.add(blackHoleGlyph(color))
       break
+    case 'VORTEX':
+      root.add(vortexGlyph(color))
+      break
+    case 'SPACE_GATE':
+      root.add(spaceGateGlyph(color))
+      break
+    case 'STRAIT':
+      root.add(straitGlyph(color))
+      break
     default:
       root.add(voidGlyph(color))
   }
   if (isRefuelTileType(type)) root.add(fuelCellGlyph(scan ? color : palette.ochre))
+  if (type === 'EVA_1') root.add(repairGlyph(scan ? color : palette.ivory))
+  if (edgeNumbers) root.add(edgeNumberMarks(edgeNumbers, scan ? color : palette.dusk))
   return root
 }
 

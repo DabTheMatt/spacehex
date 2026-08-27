@@ -249,6 +249,15 @@ body,
   border-bottom: var(--line-width) solid var(--color-accent);
 }
 
+.action-strip__item.probe.on,
+.action-strip__item.probe.aiming {
+  color: #7ec8ff;
+}
+
+.action-strip__item.probe.aiming {
+  border-bottom-color: #7ec8ff;
+}
+
 .action-strip__item:focus-visible {
   outline: var(--line-width) solid var(--color-accent);
   outline-offset: 3px;

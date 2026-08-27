@@ -3,6 +3,7 @@ import { applyCommand, createInitialState } from '../game/engine/GameEngine'
 import { getNeighbor } from '../game/board/hexMath'
 import { coordKey } from '../game/board/HexCoord'
 import { STARTING_PROBES } from '../game/definitions/constants'
+import { EXPLORATION_TILE_IDS } from '../game/definitions/tiles'
 import { formatLogLine } from '../ui/eventLog'
 import { palette } from '../renderer/theme'
 import { probeOwnerColor, PROBE_LED_GLOW_ON, PROBE_LED_HZ, PROBE_LED_ON } from '../renderer/entities/ProbeRenderer'
@@ -28,7 +29,7 @@ describe('probes', () => {
     expect(state.movementSpent).toBe(true)
     expect(state.ships['mewa-1'].coord).toEqual({ q: 0, r: 0 })
     expect(state.board.tiles[coordKey(target)].definitionId).toBe(top)
-    expect(state.explorationDeck.drawPile).toHaveLength(23)
+    expect(state.explorationDeck.drawPile).toHaveLength(EXPLORATION_TILE_IDS.length - 1)
     expect(state.probes[coordKey(target)]?.ownerShipId).toBe('mewa-1')
     expect(state.probes[coordKey(target)]?.ownerPlayerId).toBe('player-1')
     const again = applyCommand(state, { type: 'LAUNCH_PROBE', direction: 2 })

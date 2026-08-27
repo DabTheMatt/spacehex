@@ -92,7 +92,7 @@ import { prefersCoarsePointer } from '@/ui/pointerInput'
 import { hudPaneLabel } from '@/ui/sectorPane'
 import { getTileDefinition } from '@/game/definitions/tiles'
 import { hullPipCount, hullPipFilled } from '@/ui/hullPips'
-import { FUEL_BUY_PRICE, FUEL_TANK } from '@/game/definitions/constants'
+import { FUEL_BUY_PRICE, FUEL_TANK, REPAIR_PRICE } from '@/game/definitions/constants'
 
 const game = useGameStore()
 const ui = useUiStore()
@@ -123,10 +123,14 @@ const paneLabel = computed(() => {
 const planetLots = computed(() => {
   if (isEvaHex(planetCoord.value)) {
     const cargo = game.ship.cargo
-    return RESOURCE_IDS.map((id) => ({
-      id,
-      text: `${RESOURCE_LABEL[id]} ×${cargo[id]}  ${formatSellParts(evaSellParts(game.state, id))}`,
-    }))
+    return [
+      ...RESOURCE_IDS.map((id) => ({
+        id,
+        text: `${RESOURCE_LABEL[id]} ×${cargo[id]}  ${formatSellParts(evaSellParts(game.state, id))}`,
+      })),
+      { id: 'FUEL' as const, text: `FUEL  ${FUEL_BUY_PRICE}CR  ${game.player.fuel}/${FUEL_TANK}` },
+      { id: 'REPAIR' as const, text: `REPAIR  ${REPAIR_PRICE}CR` },
+    ]
   }
   const market = planet.value
   if (!market) return []
@@ -150,7 +154,7 @@ const planetHint = computed(() => {
   if (isEvaHex(planetCoord.value)) {
     const here = isEvaHex(game.ship.coord)
     if (!here) return 'DOCK TO SELL'
-    return 'CLICK SQUARE TO SELL'
+    return 'CLICK CONTAINER TO SELL'
   }
   if (!planet.value) return ''
   const coord = planetCoord.value

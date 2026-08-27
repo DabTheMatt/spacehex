@@ -6,7 +6,7 @@ import { canMoveTo } from '@/game/rules/movement'
 import { canLaunchAnyProbe } from '@/game/rules/probes'
 import { canDeclareAttack } from '@/game/rules/combat'
 import { buyPrice, isEvaHex } from '@/game/rules/planetMarket'
-import { activePlayer, activeShip } from '@/game/rules/fuel'
+import { activePlayer, activeShip, isRefuelHex } from '@/game/rules/fuel'
 import { getNeighbor } from '@/game/board/hexMath'
 import { coordKey } from '@/game/board/HexCoord'
 
@@ -75,7 +75,7 @@ export function canRefuel(state: GameState): boolean {
   if (state.phase !== 'PLAYER_TURN') return false
   const ship = activeShip(state)
   if (ship.hull <= 0) return false
-  if (!state.planetMarkets[coordKey(ship.coord)]) return false
+  if (!state.planetMarkets[coordKey(ship.coord)] && !isRefuelHex(state, ship.coord)) return false
   const player = activePlayer(state)
   if (player.fuel >= FUEL_TANK) return false
   return player.credits >= FUEL_BUY_PRICE

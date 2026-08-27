@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { PlanetMarket, ResourceId } from '../../game/definitions/resources'
 import { RESOURCE_IDS } from '../../game/definitions/resources'
-import { FUEL_BUY_PRICE } from '../../game/definitions/constants'
+import { FUEL_BUY_PRICE, REPAIR_PRICE } from '../../game/definitions/constants'
 import { palette, css } from '../theme'
 import { HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
@@ -143,7 +143,7 @@ export function createPlanetOverlay(
 }
 
 export function createEvaOverlay(
-  _coord: HexCoord,
+  coord: HexCoord,
   cargo: Record<ResourceId, number>,
   canSell: boolean,
 ): THREE.Group {
@@ -155,7 +155,7 @@ export function createEvaOverlay(
   const far = new THREE.Group()
   far.userData.lod = 'far'
   RESOURCE_IDS.forEach((id, index) => {
-    const x = (index - 1) * HEX_SPACING
+    const x = (index - 2) * HEX_SPACING
     const cluster = new THREE.Group()
     cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
     const qty = cargo[id] ?? 0
@@ -179,9 +179,54 @@ export function createEvaOverlay(
     close.add(cluster)
     far.add(diceCluster(id, qty, x))
   })
-  const exchange = caption('GIEŁDA SUROWCE', css.priceYellow, 0.62, 0.05)
+  const exchange = caption('SELL CONTAINERS', css.priceYellow, 0.72, 0.055)
   exchange.position.set(0, OVERLAY_HOVER + 0.01, LOT_Z + FOOT_GAP)
   close.add(exchange)
+
+  const fuelX = HEX_SPACING
+  const fuelCluster = new THREE.Group()
+  fuelCluster.position.set(fuelX, OVERLAY_HOVER, LOT_Z)
+  fuelCluster.add(stockHexFuel())
+  const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, css.ochre)
+  fuelTag.position.set(0, 0.01, FOOT_GAP)
+  fuelCluster.add(fuelTag)
+  const fuelHit = new THREE.Mesh(
+    new THREE.CircleGeometry(0.12, 12),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  )
+  fuelHit.rotation.x = -Math.PI / 2
+  fuelHit.position.y = 0.02
+  fuelHit.userData.buyFuel = { coord }
+  fuelHit.userData.pickOnly = true
+  fuelCluster.add(fuelHit)
+  close.add(fuelCluster)
+
+  const repairCluster = new THREE.Group()
+  repairCluster.position.set(fuelX + HEX_SPACING, OVERLAY_HOVER, LOT_Z)
+  repairCluster.add(stockRepair())
+  const repairTag = priceTag(`${REPAIR_PRICE}CR`, css.ivory)
+  repairTag.position.set(0, 0.01, FOOT_GAP)
+  repairCluster.add(repairTag)
+  const repairHit = new THREE.Mesh(
+    new THREE.CircleGeometry(0.12, 12),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  )
+  repairHit.rotation.x = -Math.PI / 2
+  repairHit.position.y = 0.02
+  repairHit.userData.repairHull = true
+  repairHit.userData.pickOnly = true
+  repairCluster.add(repairHit)
+  close.add(repairCluster)
   g.add(close, far)
   g.userData.closeLod = close
   g.userData.farLod = far
@@ -422,18 +467,8 @@ function stockSquare(id: ResourceId, amount: number): THREE.Group {
 function stockHexFuel(): THREE.Group {
   const g = new THREE.Group()
   const color = palette.ochre
-  const shape = new THREE.Shape()
-  const r = 0.072
-  for (let i = 0; i < 6; i++) {
-    const a = (Math.PI / 3) * i
-    const x = r * Math.cos(a)
-    const y = r * Math.sin(a)
-    if (i === 0) shape.moveTo(x, y)
-    else shape.lineTo(x, y)
-  }
-  shape.closePath()
-  const hex = new THREE.Mesh(
-    new THREE.ShapeGeometry(shape),
+  const body = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.09, 0.056),
     new THREE.MeshBasicMaterial({
       color: palette.graphite,
       side: THREE.DoubleSide,
@@ -442,10 +477,10 @@ function stockHexFuel(): THREE.Group {
       opacity: 0.92,
     }),
   )
-  hex.rotation.x = -Math.PI / 2
-  g.add(hex)
+  body.rotation.x = -Math.PI / 2
+  g.add(body)
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(r * 0.94, r, 6),
+    new THREE.RingGeometry(0.048, 0.056, 4),
     new THREE.MeshBasicMaterial({
       color,
       side: THREE.DoubleSide,
@@ -456,6 +491,46 @@ function stockHexFuel(): THREE.Group {
   ring.rotation.x = -Math.PI / 2
   ring.position.y = 0.002
   g.add(ring)
+  const nub = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.018, 0.028),
+    new THREE.MeshBasicMaterial({
+      color,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  )
+  nub.rotation.x = -Math.PI / 2
+  nub.position.set(0.058, 0.002, 0)
+  g.add(nub)
+  return g
+}
+
+function stockRepair(): THREE.Group {
+  const g = new THREE.Group()
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.048, 0.06, 24),
+    new THREE.MeshBasicMaterial({
+      color: palette.ivory,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  )
+  ring.rotation.x = -Math.PI / 2
+  g.add(ring)
+  const barH = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.07, 0.012),
+    new THREE.MeshBasicMaterial({ color: palette.ivory, side: THREE.DoubleSide, depthWrite: false }),
+  )
+  barH.rotation.x = -Math.PI / 2
+  barH.position.y = 0.002
+  g.add(barH)
+  const barV = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.012, 0.07),
+    new THREE.MeshBasicMaterial({ color: palette.ivory, side: THREE.DoubleSide, depthWrite: false }),
+  )
+  barV.rotation.x = -Math.PI / 2
+  barV.position.y = 0.002
+  g.add(barV)
   return g
 }
 
@@ -502,8 +577,11 @@ function caption(text: string, color: string, width = 0.24, height = 0.058): THR
   return textPlane(text, color, width, height, 28)
 }
 
+export const PRICE_TAG_WIDTH = 0.34
+export const PRICE_TAG_HEIGHT = 0.08
+
 function priceTag(text: string, color: string): THREE.Mesh {
-  return textPlane(text, color, 0.2, 0.045, 22)
+  return textPlane(text, color, PRICE_TAG_WIDTH, PRICE_TAG_HEIGHT, 40)
 }
 
 function textPlane(

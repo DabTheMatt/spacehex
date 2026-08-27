@@ -20,11 +20,11 @@ describe('RNG', () => {
 })
 
 describe('exploration engine', () => {
-  it('starts with only EVA-1 and a 24-tile shuffled deck', () => {
+  it('starts with only EVA-1 and a shuffled exploration deck', () => {
     const state = createInitialState('seed-1')
     expect(Object.keys(state.board.tiles)).toEqual(['0,0'])
     expect(state.board.tiles['0,0'].definitionId).toBe('eva-1')
-    expect(state.explorationDeck.drawPile).toHaveLength(24)
+    expect(state.explorationDeck.drawPile).toHaveLength(EXPLORATION_TILE_IDS.length)
     expect(state.explorationDeck.drawPile).toHaveLength(EXPLORATION_TILE_IDS.length)
     const other = createInitialState('seed-2')
     expect(state.explorationDeck.drawPile).not.toEqual(other.explorationDeck.drawPile)
@@ -57,7 +57,7 @@ describe('exploration engine', () => {
     expect(started.events.some((e) => e.type === 'TILE_DRAWN' && e.tileId === top)).toBe(true)
     expect(state.phase).toBe('TILE_PLACEMENT')
     expect(state.exploration.target).toEqual(getNeighbor({ q: 0, r: 0 }, 0))
-    expect(state.explorationDeck.drawPile).toHaveLength(23)
+    expect(state.explorationDeck.drawPile).toHaveLength(EXPLORATION_TILE_IDS.length - 1)
 
     const rotations = new Set<number>()
     for (let i = 0; i < 6; i++) {
@@ -126,5 +126,72 @@ describe('exploration engine', () => {
     expect(placed.state.ships['mewa-2'].coord).toEqual(getNeighbor({ q: 0, r: 0 }, 2))
     expect(placed.state.activePlayerId).toBe('player-2')
     expect(placed.state.movementSpent).toBe(true)
+  })
+})
+
+describe('edge numbers', () => {
+  it('assigns a permutation of 1–6 when a tile is placed', () => {
+    const eva = createInitialState('edges-eva').board.tiles['0,0'].edgeNumbers
+    expect([...eva].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6])
+    let state = createInitialState('edges-place')
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'void-1',
+      coord: { q: 1, r: 0 },
+      rotation: 0,
+    }).state
+    const numbers = state.board.tiles['1,0'].edgeNumbers
+    expect([...numbers].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(new Set(numbers).size).toBe(6)
+  })
+})
+
+describe('straits and vortex', () => {
+  it('blocks travel through a closed strait edge', () => {
+    let state = createInitialState('strait-block')
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'strait-1',
+      coord: { q: 1, r: 0 },
+      rotation: 0,
+    }).state
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'void-1',
+      coord: { q: 1, r: 1 },
+      rotation: 0,
+    }).state
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'void-2',
+      coord: { q: 2, r: 0 },
+      rotation: 0,
+    }).state
+    state = applyCommand(state, { type: 'DECLARE_MOVE', target: { q: 1, r: 0 } }).state
+    const blocked = applyCommand(state, { type: 'END_TURN' }).state
+    const p2 = applyCommand(blocked, { type: 'SKIP_MOVEMENT' }).state
+    const p1 = applyCommand(p2, { type: 'END_TURN' }).state
+    const closed = applyCommand(p1, { type: 'DECLARE_MOVE', target: { q: 1, r: 1 } })
+    expect(closed.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(true)
+    const open = applyCommand(p1, { type: 'DECLARE_MOVE', target: { q: 2, r: 0 } })
+    expect(open.events.some((e) => e.type === 'SHIP_MOVED')).toBe(true)
+  })
+
+  it('sweeps a ship on vortex entry', () => {
+    let state = createInitialState('vortex-in')
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'vortex-1',
+      coord: { q: 1, r: 0 },
+      rotation: 0,
+    }).state
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'void-1',
+      coord: { q: 2, r: 0 },
+      rotation: 0,
+    }).state
+    const moved = applyCommand(state, { type: 'DECLARE_MOVE', target: { q: 1, r: 0 } })
+    expect(moved.events.some((e) => e.type === 'VORTEX_ROLL')).toBe(true)
   })
 })

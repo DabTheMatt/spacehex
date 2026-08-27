@@ -17,6 +17,12 @@ export function discoveryNounForType(type: TileType): string {
       return 'a small planet'
     case 'ASTEROID':
       return 'an asteroid field'
+    case 'VORTEX':
+      return 'a cosmic vortex'
+    case 'SPACE_GATE':
+      return 'a space gate'
+    case 'STRAIT':
+      return 'a strait'
     case 'SHADOW_BASE':
       return 'a Shadow Base'
     case 'WRECK_TANKER':

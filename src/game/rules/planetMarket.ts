@@ -17,8 +17,8 @@ import {
   type ResourceId,
 } from '../definitions/resources'
 import { rollSectorName } from '../definitions/sectorNames'
-import { activePlayer, activeShip } from './fuel'
-import { FUEL_BUY_PRICE, FUEL_TANK } from '../definitions/constants'
+import { activePlayer, activeShip, isRefuelHex } from './fuel'
+import { FUEL_BUY_PRICE, FUEL_TANK, REPAIR_PRICE } from '../definitions/constants'
 
 export type SellQuoteParts = { spot: number; margin: number; total: number }
 
@@ -220,8 +220,7 @@ export function buyFuel(
   state: GameState,
   coord: HexCoord,
 ): { ok: true; state: GameState; price: number } | { ok: false; reason: string } {
-  const key = coordKey(coord)
-  if (!state.planetMarkets[key]) return { ok: false, reason: 'NO_MARKET' }
+  if (!isRefuelHex(state, coord)) return { ok: false, reason: 'NO_MARKET' }
   const ship = activeShip(state)
   if (ship.coord.q !== coord.q || ship.coord.r !== coord.r) {
     return { ok: false, reason: 'NOT_IN_SECTOR' }
@@ -242,6 +241,32 @@ export function buyFuel(
           credits: player.credits - FUEL_BUY_PRICE,
           fuel: player.fuel + 1,
         },
+      },
+    },
+  }
+}
+
+export function repairHull(
+  state: GameState,
+): { ok: true; state: GameState; price: number } | { ok: false; reason: string } {
+  const ship = activeShip(state)
+  if (!isEvaHex(ship.coord)) return { ok: false, reason: 'NOT_EVA' }
+  if (ship.hull <= 0) return { ok: false, reason: 'WRECK' }
+  if (ship.hull >= ship.maxHull) return { ok: false, reason: 'HULL_FULL' }
+  const player = activePlayer(state)
+  if (player.credits < REPAIR_PRICE) return { ok: false, reason: 'NO_CREDITS' }
+  return {
+    ok: true,
+    price: REPAIR_PRICE,
+    state: {
+      ...state,
+      players: {
+        ...state.players,
+        [player.id]: { ...player, credits: player.credits - REPAIR_PRICE },
+      },
+      ships: {
+        ...state.ships,
+        [ship.id]: { ...ship, hull: ship.hull + 1 },
       },
     },
   }

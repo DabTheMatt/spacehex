@@ -242,6 +242,11 @@ export class SpaceScene {
     return userDataFromHits<{ coord: HexCoord }>(hits, 'buyFuel')?.coord ?? null
   }
 
+  pickRepair(clientX: number, clientY: number): boolean {
+    const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
+    return userDataFromHits<boolean>(hits, 'repairHull') === true
+  }
+
   pickSell(clientX: number, clientY: number): { resource: ResourceId } | null {
     const hits = this.intersectAll(clientX, clientY, this.board.tileMeshes())
     return userDataFromHits<{ resource: ResourceId }>(hits, 'sellLot') ?? null

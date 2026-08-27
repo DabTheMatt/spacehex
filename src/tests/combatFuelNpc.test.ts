@@ -3,7 +3,8 @@ import { applyCommand, createInitialState } from '../game/engine/GameEngine'
 import { combatAbility, combatStrength, planContestShot } from '../game/rules/combat'
 import { STARTING_FUEL } from '../game/definitions/constants'
 import { stayFuelCost } from '../game/rules/fuel'
-import { npcStepCoord, nearestPlayerShip } from '../game/rules/npcs'
+import { npcStepByFace } from '../game/rules/npcs'
+import { faceOnWorldEdge } from '../game/board/edgeNumbers'
 import { coordKey } from '../game/board/HexCoord'
 import { TILE_DEFINITIONS } from '../game/definitions/tiles'
 import { createTileGlyph } from '../renderer/board/tileGlyphs'
@@ -48,9 +49,9 @@ describe('stay fuel', () => {
   })
 })
 
-describe('NPC hunt', () => {
-  it('steps one placed hex toward the nearest player at the end of a cycle', () => {
-    let state = createInitialState('npc-hunt')
+describe('NPC face movement', () => {
+  it('steps the numbered face when that neighbor is placed', () => {
+    let state = createInitialState('npc-face')
     state = applyCommand(state, {
       type: 'DEV_PLACE_TILE',
       tileId: 'void-1',
@@ -64,15 +65,19 @@ describe('NPC hunt', () => {
       rotation: 0,
     }).state
     const id = `ciern-${coordKey({ q: 2, r: 0 })}`
-    expect(state.npcShips[id]?.coord).toEqual({ q: 2, r: 0 })
-    expect(nearestPlayerShip(state, state.npcShips[id].coord)?.id).toBe('mewa-1')
-    expect(npcStepCoord(state, state.npcShips[id])).toEqual({ q: 1, r: 0 })
-    state = applyCommand(state, { type: 'SKIP_MOVEMENT' }).state
-    state = applyCommand(state, { type: 'END_TURN' }).state
+    const npc = state.npcShips[id]
+    expect(npc?.coord).toEqual({ q: 2, r: 0 })
+    const tile = state.board.tiles[coordKey({ q: 2, r: 0 })]
+    const faceWest = faceOnWorldEdge(tile.edgeNumbers, tile.rotation, 3)
+    expect(npcStepByFace(state, npc, faceWest)).toEqual({ q: 1, r: 0 })
     state = applyCommand(state, { type: 'SKIP_MOVEMENT' }).state
     const ended = applyCommand(state, { type: 'END_TURN' })
-    expect(ended.state.npcShips[id].coord).toEqual({ q: 1, r: 0 })
-    expect(ended.events.some((e) => e.type === 'SHIP_MOVED' && e.shipId === id)).toBe(true)
+    const rolled = ended.events.find((e) => e.type === 'NPC_FACE_ROLLED' && e.shipId === id)
+    expect(rolled).toMatchObject({ type: 'NPC_FACE_ROLLED', shipId: id })
+    if (rolled && rolled.type === 'NPC_FACE_ROLLED') {
+      expect(rolled.face).toBeGreaterThanOrEqual(1)
+      expect(rolled.face).toBeLessThanOrEqual(6)
+    }
   })
 })
 

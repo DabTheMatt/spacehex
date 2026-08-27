@@ -17,6 +17,7 @@ export type GameCommand =
   | { type: 'LAUNCH_PROBE'; direction: number }
   | { type: 'BUY_RESOURCE'; coord: HexCoord; resource: ResourceId }
   | { type: 'BUY_FUEL'; coord: HexCoord }
+  | { type: 'REPAIR_HULL' }
   | { type: 'SELL_RESOURCE'; resource: ResourceId }
   | { type: 'END_TURN' }
   | { type: 'DEV_ADD_FUEL'; playerId: string; amount: number }

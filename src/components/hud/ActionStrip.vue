@@ -4,7 +4,7 @@
       v-for="id in ACTION_IDS"
       :key="id"
       type="button"
-      :class="['action-strip__item', { on: lit[id], aiming: id === 'PROBE' && ui.probeAiming }]"
+      :class="['action-strip__item', { on: lit[id], aiming: id === 'PROBE' && ui.probeAiming, probe: id === 'PROBE' }]"
       :disabled="!lit[id]"
       @click="onAction(id)"
     >

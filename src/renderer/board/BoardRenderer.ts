@@ -59,7 +59,7 @@ export class BoardRenderer {
     this.syncTiles(state, options)
     this.markers.clear()
     this.drawActionMarkers(state)
-    this.drawHoverIntent(state, options.hover)
+    this.drawHoverIntent(state, options.hover, options.probeAim === true)
   }
 
   tick(time: number, camera: THREE.Camera): void {
@@ -130,6 +130,7 @@ export class BoardRenderer {
         options.showTileNames === false ? 'nn' : 'n',
         options.showMarketIcons === false ? 'nm' : 'm',
         probed ? 'p' : '',
+        tile.edgeNumbers.join(''),
       ].join('|')
       const existing = this.tileCache.get(key)
       if (existing?.sig === sig) {
@@ -157,7 +158,13 @@ export class BoardRenderer {
       mesh.rotation.y = tile.rotation * (Math.PI / 3)
       mesh.userData.tileCoord = tile.coord
       mesh.userData.tileKey = key
-      const glyph = createTileGlyph(def, probed ? palette.engine : palette.paper, tile.id, probed)
+      const glyph = createTileGlyph(
+        def,
+        probed ? palette.engine : palette.paper,
+        tile.id,
+        probed,
+        tile.edgeNumbers,
+      )
       glyph.position.y = TILE_THICKNESS
       if (options.showTileNames !== false) {
         glyph.add(
@@ -267,7 +274,11 @@ export class BoardRenderer {
     }
   }
 
-  private drawHoverIntent(state: GameState, hover: BoardHover | null | undefined): void {
+  private drawHoverIntent(
+    state: GameState,
+    hover: BoardHover | null | undefined,
+    probeAim = false,
+  ): void {
     if (!hover || state.phase !== 'PLAYER_TURN') return
     const origin = getWorldPosition(activeShip(state).coord)
     const dest = getWorldPosition(hover.coord)
@@ -275,7 +286,8 @@ export class BoardRenderer {
     highlight.position.set(dest.x, 0, dest.z)
     this.markers.add(highlight)
     if (hover.kind === 'STAY') return
-    this.markers.add(makeHoverArrow(origin, dest))
+    const color = probeAim && hover.kind === 'EXPLORE' ? palette.engine : palette.ochre
+    this.markers.add(makeHoverArrow(origin, dest, color))
   }
 
   pickables(): THREE.Object3D[] {
