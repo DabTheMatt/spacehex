@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { TILE_DEFINITIONS } from '../game/definitions/tiles'
-import { createTileGlyph, planetTintForId } from '../renderer/board/tileGlyphs'
+import { createTileGlyph, planetTintForId, EDGE_DIGIT_ALONG } from '../renderer/board/tileGlyphs'
+import { TILE_THICKNESS } from '../renderer/board/TileRenderer'
 import { palette } from '../renderer/theme'
 
 describe('tile glyphs', () => {
@@ -87,6 +88,15 @@ describe('tile glyphs', () => {
     expect(fuel).toBe(1)
     expect(repair).toBe(1)
     expect(digits).toBe(6)
+    expect(EDGE_DIGIT_ALONG).toBeCloseTo(1 / 3)
+    eva.traverse((obj) => {
+      if (!obj.userData.edgeDigit) return
+      expect(obj.userData.edgeWall).toBe(true)
+      expect(obj.userData.edgeAlong).toBeCloseTo(1 / 3)
+      expect(obj.position.y).toBeCloseTo(-TILE_THICKNESS * 0.5)
+      expect(obj.userData.digitColor).toBe(palette.paper)
+      expect(obj).not.toBeInstanceOf(THREE.Sprite)
+    })
     const rock = createTileGlyph(TILE_DEFINITIONS['asteroid-1'])
     let chance = 0
     rock.traverse((obj) => {

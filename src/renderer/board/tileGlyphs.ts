@@ -5,8 +5,13 @@ import { palette } from '../theme'
 import { isRefuelTileType } from '../../game/definitions/refuel'
 import { asteroidCollisionPercent } from '../../game/definitions/tiles'
 import type { EdgeNumbers } from '../../game/board/edgeNumbers'
+import { HEX_SIZE } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
+import { TILE_THICKNESS } from './TileRenderer'
 import { RNG } from '../../game/random/RNG'
+
+/** Along each side wall, from the left when looking at the face from outside. */
+export const EDGE_DIGIT_ALONG = 1 / 3
 
 const Y = 0.012
 const PLANET_TINTS = [palette.planetViolet, palette.planetRose, palette.planetSage] as const
@@ -393,27 +398,59 @@ function chanceLabel(text: string, color: number): THREE.Object3D {
   return sprite
 }
 
-function edgeDigit(n: number, color: number): THREE.Object3D {
-  const sprite = canvasSprite(64, 64, (ctx) => {
+function edgeDigitPlane(n: number, color: number): THREE.Object3D {
+  const userData = { edgeDigit: n, edgeWall: true }
+  if (typeof document === 'undefined') {
+    const stub = new THREE.Group()
+    Object.assign(stub.userData, userData)
+    return stub
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = 64
+  canvas.height = 64
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
     ctx.clearRect(0, 0, 64, 64)
     ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`
     ctx.font = '600 44px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(String(n), 32, 34)
-  }, { edgeDigit: n })
-  sprite.scale.set(0.14, 0.14, 1)
-  return sprite
+  }
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.055, 0.055),
+    new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  )
+  Object.assign(mesh.userData, userData)
+  return mesh
 }
 
 function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
   const g = new THREE.Group()
   g.userData.edgeNumbers = true
-  const r = 0.82
+  const r = HEX_SIZE * 0.96
+  const t = EDGE_DIGIT_ALONG
+  const wallY = -TILE_THICKNESS * 0.5
   for (let i = 0; i < 6; i++) {
-    const a = (Math.PI / 3) * i + Math.PI / 6
-    const mark = edgeDigit(numbers[i], color)
-    mark.position.set(Math.cos(a) * r, 0.03, Math.sin(a) * r)
+    const a0 = (Math.PI / 3) * i
+    const a1 = (Math.PI / 3) * (i + 1)
+    const x0 = r * Math.cos(a0)
+    const z0 = r * Math.sin(a0)
+    const x1 = r * Math.cos(a1)
+    const z1 = r * Math.sin(a1)
+    const nx = z1 - z0
+    const nz = -(x1 - x0)
+    const len = Math.hypot(nx, nz) || 1
+    const mark = edgeDigitPlane(numbers[i], color)
+    mark.position.set(x0 + (x1 - x0) * t + (nx / len) * 0.004, wallY, z0 + (z1 - z0) * t + (nz / len) * 0.004)
+    mark.rotation.y = Math.atan2(nx, nz)
+    mark.userData.edgeAlong = t
+    mark.userData.digitColor = color
     g.add(mark)
   }
   return g
@@ -475,7 +512,7 @@ export function createTileGlyph(
   }
   if (isRefuelTileType(type)) root.add(fuelCellGlyph(scan ? color : palette.ochre))
   if (type === 'EVA_1') root.add(repairGlyph(scan ? color : palette.ivory))
-  if (edgeNumbers) root.add(edgeNumberMarks(edgeNumbers, scan ? color : palette.dusk))
+  if (edgeNumbers) root.add(edgeNumberMarks(edgeNumbers, color))
   return root
 }
 
