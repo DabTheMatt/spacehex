@@ -1,11 +1,12 @@
 import * as THREE from 'three'
 import type { GameState } from '../../game/state/GameState'
 import { getWorldPosition } from '../../game/board/hexMath'
-import { createHexMesh, TILE_SLOT_Y } from './TileRenderer'
-import { tickTileGlyphs } from './tileGlyphs'
+import { createHexMesh, TILE_SLOT_Y, TILE_THICKNESS } from './TileRenderer'
+import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
 import { palette } from '../theme'
 import { clamp01, easeOutCubic, prefersReducedMotion, TILE_REVEAL_MS } from '../motion'
 import { coordKey } from '../../game/board/HexCoord'
+import { getTileDefinition } from '../../game/definitions/tiles'
 
 export class TilePreviewRenderer {
   readonly group = new THREE.Group()
@@ -50,6 +51,16 @@ export class TilePreviewRenderer {
     mesh.rotation.y = (exp.rotation ?? 0) * (Math.PI / 3)
     mesh.userData.placementTarget = true
     mesh.userData.tileCoord = exp.target
+    const def = getTileDefinition(exp.pendingTileId)
+    const glyph = createTileGlyph(
+      def,
+      palette.ochre,
+      exp.pendingTileId,
+      false,
+      exp.pendingEdgeNumbers,
+    )
+    glyph.position.y = TILE_THICKNESS
+    mesh.add(glyph)
     this.group.add(mesh)
     this.applyOpacity(0.04)
   }

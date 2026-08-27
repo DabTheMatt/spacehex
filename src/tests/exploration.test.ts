@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { applyCommand, createInitialState } from '../game/engine/GameEngine'
-import { EXPLORATION_TILE_IDS } from '../game/definitions/tiles'
+import { EXPLORATION_TILE_IDS, TILE_DEFINITIONS } from '../game/definitions/tiles'
 import { getNeighbor } from '../game/board/hexMath'
 import { coordKey } from '../game/board/HexCoord'
 import { RNG } from '../game/random/RNG'
+import { getRotatedEdge } from '../game/board/tileRotation'
 
 describe('RNG', () => {
   it('is deterministic for a seed', () => {
@@ -151,7 +152,7 @@ describe('straits and vortex', () => {
     let state = createInitialState('strait-block')
     state = applyCommand(state, {
       type: 'DEV_PLACE_TILE',
-      tileId: 'strait-1',
+      tileId: 'strait-3',
       coord: { q: 1, r: 0 },
       rotation: 0,
     }).state
@@ -175,6 +176,18 @@ describe('straits and vortex', () => {
     expect(closed.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(true)
     const open = applyCommand(p1, { type: 'DECLARE_MOVE', target: { q: 2, r: 0 } })
     expect(open.events.some((e) => e.type === 'SHIP_MOVED')).toBe(true)
+  })
+
+  it('keeps the entry face open when a strait is explored', () => {
+    let state = createInitialState('strait-enter')
+    state = applyCommand(state, { type: 'DEV_FORCE_NEXT_TILE', tileId: 'strait-1' }).state
+    state = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 }).state
+    expect(state.exploration.pendingTileId).toBe('strait-1')
+    const rotation = state.exploration.rotation ?? 0
+    expect(getRotatedEdge(TILE_DEFINITIONS['strait-1'], 3, rotation)).toBe('OPEN')
+    const placed = applyCommand(state, { type: 'CONFIRM_TILE_PLACEMENT' })
+    expect(placed.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(false)
+    expect(placed.state.ships['mewa-1'].coord).toEqual(getNeighbor({ q: 0, r: 0 }, 0))
   })
 
   it('sweeps a ship on vortex entry', () => {

@@ -105,6 +105,35 @@ describe('tile glyphs', () => {
     expect(chance).toBe(1)
     expect(createTileGlyph(TILE_DEFINITIONS['vortex-1']).children.length).toBeGreaterThan(0)
     expect(createTileGlyph(TILE_DEFINITIONS['space-gate-1']).children.length).toBeGreaterThan(0)
-    expect(createTileGlyph(TILE_DEFINITIONS['strait-1']).children.length).toBeGreaterThan(0)
+  })
+
+  it('draws open channels and blocked walls for each strait layout', () => {
+    const threeWay = createTileGlyph(TILE_DEFINITIONS['strait-1'])
+    let open = 0
+    let blocked = 0
+    threeWay.traverse((obj) => {
+      if (obj.userData.straitOpen) open += 1
+      if (obj.userData.straitBlocked) blocked += 1
+      if (obj.userData.openChannels) {
+        expect(obj.userData.openChannels).toBe(3)
+        expect(obj.userData.blockedWalls).toBe(3)
+      }
+    })
+    expect(open).toBe(6)
+    expect(blocked).toBe(6)
+    const bent = createTileGlyph(TILE_DEFINITIONS['strait-2'])
+    bent.traverse((obj) => {
+      if (obj.userData.openChannels) {
+        expect(obj.userData.openChannels).toBe(2)
+        expect(obj.userData.blockedWalls).toBe(4)
+      }
+    })
+    const through = createTileGlyph(TILE_DEFINITIONS['strait-3'])
+    through.traverse((obj) => {
+      if (obj.userData.openChannels) {
+        expect(obj.userData.openChannels).toBe(2)
+        expect(obj.userData.blockedWalls).toBe(4)
+      }
+    })
   })
 })

@@ -42,6 +42,8 @@ import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { getNeighbor } from '@/game/board/hexMath'
 import { isTilePlaced } from '@/game/board/HexMap'
+import { getTileDefinition } from '@/game/definitions/tiles'
+import { straitRotationForEntry } from '@/game/rules/strait'
 
 const game = useGameStore()
 const ui = useUiStore()
@@ -59,7 +61,11 @@ function placeBeside(): void {
   for (let dir = 0; dir < 6; dir++) {
     const coord = getNeighbor(origin, dir)
     if (isTilePlaced(game.state.board, coord)) continue
-    game.dispatch({ type: 'DEV_PLACE_TILE', tileId: forced.value, coord, rotation: 0 })
+    const rotation =
+      getTileDefinition(forced.value).type === 'STRAIT'
+        ? straitRotationForEntry(game.state, forced.value, coord, dir)
+        : 0
+    game.dispatch({ type: 'DEV_PLACE_TILE', tileId: forced.value, coord, rotation })
     return
   }
 }

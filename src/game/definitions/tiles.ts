@@ -102,16 +102,16 @@ export const TILE_DEFINITIONS: Record<string, TileDefinition> = {
   'strait-1': def('strait-1', 'STRAIT', 'Strait', '═', [
     'OPEN',
     'BLOCKED',
-    'BLOCKED',
     'OPEN',
     'BLOCKED',
+    'OPEN',
     'BLOCKED',
   ]),
   'strait-2': def('strait-2', 'STRAIT', 'Strait', '═', [
     'OPEN',
     'BLOCKED',
-    'BLOCKED',
     'OPEN',
+    'BLOCKED',
     'BLOCKED',
     'BLOCKED',
   ]),

@@ -349,12 +349,70 @@ function spaceGateGlyph(color: number): THREE.Group {
   return g
 }
 
-function straitGlyph(color: number): THREE.Group {
+function straitGlyph(edges: TileDefinition['edges'], color: number): THREE.Group {
   const g = new THREE.Group()
-  g.add(poly([[-0.72, -0.12], [0.72, -0.12]], color))
-  g.add(poly([[-0.72, 0.12], [0.72, 0.12]], color))
-  g.add(poly([[-0.72, -0.12], [-0.72, 0.12]], color))
-  g.add(poly([[0.72, -0.12], [0.72, 0.12]], color))
+  g.userData.straitGlyph = true
+  let open = 0
+  let blocked = 0
+  const wallR = 0.78
+  const innerWallR = 0.64
+  const railW = 0.1
+  const railInner = 0.12
+  const railOuter = 0.72
+  for (let i = 0; i < 6; i++) {
+    const a0 = (Math.PI / 3) * i
+    const a1 = (Math.PI / 3) * (i + 1)
+    if (edges[i] === 'BLOCKED') {
+      blocked += 1
+      const wall = poly(
+        [
+          [Math.cos(a0) * wallR, Math.sin(a0) * wallR],
+          [Math.cos(a1) * wallR, Math.sin(a1) * wallR],
+        ],
+        color,
+      )
+      wall.userData.straitBlocked = true
+      g.add(wall)
+      const inner = poly(
+        [
+          [Math.cos(a0) * innerWallR, Math.sin(a0) * innerWallR],
+          [Math.cos(a1) * innerWallR, Math.sin(a1) * innerWallR],
+        ],
+        color,
+        false,
+        0.7,
+      )
+      inner.userData.straitBlocked = true
+      g.add(inner)
+      continue
+    }
+    open += 1
+    const mid = a0 + Math.PI / 6
+    const ux = Math.cos(mid)
+    const uz = Math.sin(mid)
+    const px = -uz
+    const pz = ux
+    const left = poly(
+      [
+        [ux * railInner + px * railW, uz * railInner + pz * railW],
+        [ux * railOuter + px * railW, uz * railOuter + pz * railW],
+      ],
+      color,
+    )
+    const right = poly(
+      [
+        [ux * railInner - px * railW, uz * railInner - pz * railW],
+        [ux * railOuter - px * railW, uz * railOuter - pz * railW],
+      ],
+      color,
+    )
+    left.userData.straitOpen = true
+    right.userData.straitOpen = true
+    g.add(left, right)
+  }
+  g.userData.openChannels = open
+  g.userData.blockedWalls = blocked
+  g.add(circle(0.12, color, 24))
   return g
 }
 
@@ -507,7 +565,7 @@ export function createTileGlyph(
       root.add(spaceGateGlyph(color))
       break
     case 'STRAIT':
-      root.add(straitGlyph(color))
+      root.add(straitGlyph(def.edges, color))
       break
     default:
       root.add(voidGlyph(color))

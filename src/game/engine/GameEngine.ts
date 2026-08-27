@@ -6,11 +6,11 @@ import { emptyCargo, STARTING_CREDITS } from '../definitions/resources'
 import { EXPLORATION_TILE_IDS, EVA_TILE_ID, getTileDefinition } from '../definitions/tiles'
 import { SHIP_DEFINITIONS } from '../definitions/ships'
 import { RNG } from '../random/RNG'
-import { emptyBoard, getPlacedTile, isTilePlaced, oppositeDirection, validateTilePlacement } from '../board/HexMap'
+import { emptyBoard, getPlacedTile, isTilePlaced, validateTilePlacement } from '../board/HexMap'
 import { coordKey } from '../board/HexCoord'
 import { rollEdgeNumbers } from '../board/edgeNumbers'
 import { getNeighbor } from '../board/hexMath'
-import { getRotatedEdge, wrapRotation, type Rotation } from '../board/tileRotation'
+import { wrapRotation, type Rotation } from '../board/tileRotation'
 import { drawFromDeck, forceNextTile } from '../board/TileDeck'
 import { activePlayer, activeShip, spendFuel, stayFuelCost } from '../rules/fuel'
 import { canMoveTo } from '../rules/movement'
@@ -22,6 +22,7 @@ import { canLaunchProbe, dismissProbesUnderShips } from '../rules/probes'
 import { spawnThornsForPlacedTile, runNpcPhase } from '../rules/npcs'
 import { resolveEntryHazards } from '../rules/sectorHazards'
 import { applyHullDamage } from '../rules/damage'
+import { straitRotationForEntry } from '../rules/strait'
 import { rollSectorName } from '../definitions/sectorNames'
 import type { ResourceId } from '../definitions/resources'
 import type { HexCoord } from '../board/HexCoord'
@@ -599,20 +600,6 @@ function repairHullCommand(state: GameState): EngineResult {
     { type: 'CREDITS_CHANGED', playerId: player.id, credits: player.credits },
   ]
   return { state: append(result.state, events), events }
-}
-
-function straitRotationForEntry(
-  state: GameState,
-  tileId: string,
-  coord: HexCoord,
-  exploreDir: number,
-) {
-  const enter = oppositeDirection(exploreDir)
-  const def = getTileDefinition(tileId)
-  const open = [0, 1, 2, 3, 4, 5].filter((rot) => getRotatedEdge(def, enter, rot) === 'OPEN')
-  const rng = new RNG(`${state.seed}:strait:${tileId}:${coordKey(coord)}`)
-  if (!open.length) return wrapRotation(rng.nextInt(6))
-  return wrapRotation(open[rng.nextInt(open.length)])
 }
 
 function makePlacedTile(

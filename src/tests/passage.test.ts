@@ -11,11 +11,11 @@ describe('passage', () => {
     }
   })
 
-  it('opens only opposite faces of a strait', () => {
+  it('opens only opposite faces of a through-strait', () => {
     let state = createInitialState('pass-strait')
     state = applyCommand(state, {
       type: 'DEV_PLACE_TILE',
-      tileId: 'strait-1',
+      tileId: 'strait-3',
       coord: { q: 1, r: 0 },
       rotation: 0,
     }).state
