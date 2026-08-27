@@ -434,7 +434,7 @@ function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
   const g = new THREE.Group()
   g.userData.edgeNumbers = true
   const r = HEX_SIZE * 0.96
-  const t = EDGE_DIGIT_ALONG
+  const tFromLeft = EDGE_DIGIT_ALONG
   const wallY = -TILE_THICKNESS * 0.5
   for (let i = 0; i < 6; i++) {
     const a0 = (Math.PI / 3) * i
@@ -447,9 +447,11 @@ function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
     const nz = -(x1 - x0)
     const len = Math.hypot(nx, nz) || 1
     const mark = edgeDigitPlane(numbers[i], color)
-    mark.position.set(x0 + (x1 - x0) * t + (nx / len) * 0.004, wallY, z0 + (z1 - z0) * t + (nz / len) * 0.004)
+    const x = x1 + (x0 - x1) * tFromLeft
+    const z = z1 + (z0 - z1) * tFromLeft
+    mark.position.set(x + (nx / len) * 0.004, wallY, z + (nz / len) * 0.004)
     mark.rotation.y = Math.atan2(nx, nz)
-    mark.userData.edgeAlong = t
+    mark.userData.edgeAlong = tFromLeft
     mark.userData.digitColor = color
     g.add(mark)
   }
