@@ -119,7 +119,7 @@ describe('tile glyphs', () => {
         expect(obj.userData.blockedWalls).toBe(3)
       }
     })
-    expect(open).toBe(6)
+    expect(open).toBe(12)
     expect(blocked).toBe(6)
     const bent = createTileGlyph(TILE_DEFINITIONS['strait-2'])
     bent.traverse((obj) => {

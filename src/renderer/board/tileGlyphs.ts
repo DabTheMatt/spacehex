@@ -354,36 +354,34 @@ function straitGlyph(edges: TileDefinition['edges'], color: number): THREE.Group
   g.userData.straitGlyph = true
   let open = 0
   let blocked = 0
-  const wallR = 0.78
-  const innerWallR = 0.64
-  const railW = 0.1
-  const railInner = 0.12
-  const railOuter = 0.72
+  const r = HEX_SIZE * 0.9
+  const railW = 0.11
+  const railInner = 0.1
   for (let i = 0; i < 6; i++) {
     const a0 = (Math.PI / 3) * i
     const a1 = (Math.PI / 3) * (i + 1)
+    const x0 = Math.cos(a0) * r
+    const z0 = Math.sin(a0) * r
+    const x1 = Math.cos(a1) * r
+    const z1 = Math.sin(a1) * r
     if (edges[i] === 'BLOCKED') {
       blocked += 1
-      const wall = poly(
-        [
-          [Math.cos(a0) * wallR, Math.sin(a0) * wallR],
-          [Math.cos(a1) * wallR, Math.sin(a1) * wallR],
-        ],
-        color,
-      )
+      const wall = poly([[x0, z0], [x1, z1]], color)
       wall.userData.straitBlocked = true
       g.add(wall)
-      const inner = poly(
+      const mx = (x0 + x1) / 2
+      const mz = (z0 + z1) / 2
+      const hatch = poly(
         [
-          [Math.cos(a0) * innerWallR, Math.sin(a0) * innerWallR],
-          [Math.cos(a1) * innerWallR, Math.sin(a1) * innerWallR],
+          [mx * 0.82, mz * 0.82],
+          [mx, mz],
         ],
         color,
         false,
-        0.7,
+        0.75,
       )
-      inner.userData.straitBlocked = true
-      g.add(inner)
+      hatch.userData.straitBlocked = true
+      g.add(hatch)
       continue
     }
     open += 1
@@ -392,27 +390,43 @@ function straitGlyph(edges: TileDefinition['edges'], color: number): THREE.Group
     const uz = Math.sin(mid)
     const px = -uz
     const pz = ux
+    const gate0 = poly(
+      [
+        [x0, z0],
+        [x0 + (x1 - x0) * 0.22, z0 + (z1 - z0) * 0.22],
+      ],
+      color,
+    )
+    const gate1 = poly(
+      [
+        [x1, z1],
+        [x1 + (x0 - x1) * 0.22, z1 + (z0 - z1) * 0.22],
+      ],
+      color,
+    )
     const left = poly(
       [
         [ux * railInner + px * railW, uz * railInner + pz * railW],
-        [ux * railOuter + px * railW, uz * railOuter + pz * railW],
+        [ux * r + px * railW, uz * r + pz * railW],
       ],
       color,
     )
     const right = poly(
       [
         [ux * railInner - px * railW, uz * railInner - pz * railW],
-        [ux * railOuter - px * railW, uz * railOuter - pz * railW],
+        [ux * r - px * railW, uz * r - pz * railW],
       ],
       color,
     )
     left.userData.straitOpen = true
     right.userData.straitOpen = true
-    g.add(left, right)
+    gate0.userData.straitOpen = true
+    gate1.userData.straitOpen = true
+    g.add(gate0, gate1, left, right)
   }
   g.userData.openChannels = open
   g.userData.blockedWalls = blocked
-  g.add(circle(0.12, color, 24))
+  g.add(circle(0.1, color, 24))
   return g
 }
 
