@@ -28,8 +28,10 @@ const FLAT_EDGE = TILE_RADIUS * (Math.sqrt(3) / 2)
 export const EDGE_MARGIN = 0.12
 const NAME_R = FLAT_EDGE - EDGE_MARGIN
 const LOT_Z = -(FLAT_EDGE - EDGE_MARGIN)
-const FOOT_GAP = 0.052
+/** Outward from the resource hex so the CR label sits below it, not on it. */
+export const PRICE_BELOW_Z = 0.13
 const HEX_SPACING = 0.18
+const SERVICE_GAP = 0.28
 const CLOSE_DIST = 4.2
 const FAR_DIST = 6.0
 /** Quarter of ship hover: 50% closer to the tile than the previous mid-height overlays. */
@@ -90,7 +92,7 @@ export function createPlanetOverlay(
     cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
     cluster.add(stockHex(id, amount))
     const tag = priceTag(`${buyPrice[id]}CR`, css.priceYellow)
-    tag.position.set(0, 0.01, FOOT_GAP)
+    tag.position.set(0, 0.01, -PRICE_BELOW_Z)
     cluster.add(tag)
     if (amount > 0) {
       const hit = new THREE.Mesh(
@@ -112,12 +114,12 @@ export function createPlanetOverlay(
     far.add(diceCluster(id, amount, x))
   })
 
-  const fuelX = 2.5 * HEX_SPACING
+  const fuelX = 3.5 * HEX_SPACING
   const fuelCluster = new THREE.Group()
   fuelCluster.position.set(fuelX, OVERLAY_HOVER, LOT_Z)
   fuelCluster.add(stockHexFuel())
   const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, css.ochre)
-  fuelTag.position.set(0, 0.01, FOOT_GAP)
+  fuelTag.position.set(0, 0.01, -PRICE_BELOW_Z)
   fuelCluster.add(fuelTag)
   const fuelHit = new THREE.Mesh(
     new THREE.CircleGeometry(0.12, 12),
@@ -180,15 +182,15 @@ export function createEvaOverlay(
     far.add(diceCluster(id, qty, x))
   })
   const exchange = caption('SELL CONTAINERS', css.priceYellow, 0.72, 0.055)
-  exchange.position.set(0, OVERLAY_HOVER + 0.01, LOT_Z + FOOT_GAP)
+  exchange.position.set(0, OVERLAY_HOVER + 0.01, LOT_Z - PRICE_BELOW_Z)
   close.add(exchange)
 
-  const fuelX = 2 * HEX_SPACING
+  const fuelX = 0.55
   const fuelCluster = new THREE.Group()
   fuelCluster.position.set(fuelX, OVERLAY_HOVER, LOT_Z)
   fuelCluster.add(stockHexFuel())
   const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, css.ochre)
-  fuelTag.position.set(0, 0.01, FOOT_GAP)
+  fuelTag.position.set(0, 0.01, -PRICE_BELOW_Z)
   fuelCluster.add(fuelTag)
   const fuelHit = new THREE.Mesh(
     new THREE.CircleGeometry(0.12, 12),
@@ -207,10 +209,10 @@ export function createEvaOverlay(
   close.add(fuelCluster)
 
   const repairCluster = new THREE.Group()
-  repairCluster.position.set(fuelX + HEX_SPACING, OVERLAY_HOVER, LOT_Z)
+  repairCluster.position.set(fuelX + SERVICE_GAP, OVERLAY_HOVER, LOT_Z)
   repairCluster.add(stockRepair())
   const repairTag = priceTag(`${REPAIR_PRICE}CR`, css.ivory)
-  repairTag.position.set(0, 0.01, FOOT_GAP)
+  repairTag.position.set(0, 0.01, -PRICE_BELOW_Z)
   repairCluster.add(repairTag)
   const repairHit = new THREE.Mesh(
     new THREE.CircleGeometry(0.12, 12),

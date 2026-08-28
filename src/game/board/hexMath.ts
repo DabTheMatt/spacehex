@@ -37,6 +37,21 @@ export function hexDistance(a: HexCoord, b: HexCoord): number {
 export const HEX_SIZE = 1
 
 /**
+ * Vertices sit 30° off world axes so each face points at an axial neighbor.
+ * Edge i (between corners i and i+1) faces world direction i.
+ */
+export const HEX_CORNER_PHASE = -Math.PI / 6
+
+export function hexCornerAngle(index: number): number {
+  return (Math.PI / 3) * index + HEX_CORNER_PHASE
+}
+
+export function hexCorner(index: number, radius = HEX_SIZE): { x: number; z: number } {
+  const a = hexCornerAngle(index)
+  return { x: Math.cos(a) * radius, z: Math.sin(a) * radius }
+}
+
+/**
  * World XZ for flat-top axial (Y up in Three.js).
  * x east, z south-of-east convention matching vertex at +X.
  */

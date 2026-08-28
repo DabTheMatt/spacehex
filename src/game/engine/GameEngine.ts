@@ -6,11 +6,11 @@ import { emptyCargo, STARTING_CREDITS } from '../definitions/resources'
 import { EXPLORATION_TILE_IDS, EVA_TILE_ID, getTileDefinition } from '../definitions/tiles'
 import { SHIP_DEFINITIONS } from '../definitions/ships'
 import { RNG } from '../random/RNG'
-import { emptyBoard, getPlacedTile, isTilePlaced, validateTilePlacement } from '../board/HexMap'
+import { getNeighbor, directionFromTo } from '../board/hexMath'
+import { emptyBoard, getPlacedTile, isTilePlaced, oppositeDirection, validateTilePlacement } from '../board/HexMap'
 import { coordKey } from '../board/HexCoord'
 import { rollEdgeNumbers } from '../board/edgeNumbers'
-import { getNeighbor } from '../board/hexMath'
-import { wrapRotation, type Rotation } from '../board/tileRotation'
+import { wrapRotation, getRotatedEdge, type Rotation } from '../board/tileRotation'
 import { drawFromDeck, forceNextTile } from '../board/TileDeck'
 import { activePlayer, activeShip, spendFuel, stayFuelCost } from '../rules/fuel'
 import { canMoveTo } from '../rules/movement'
@@ -22,7 +22,7 @@ import { canLaunchProbe, dismissProbesUnderShips } from '../rules/probes'
 import { spawnThornsForPlacedTile, runNpcPhase } from '../rules/npcs'
 import { resolveEntryHazards } from '../rules/sectorHazards'
 import { applyHullDamage } from '../rules/damage'
-import { straitRotationForEntry } from '../rules/strait'
+import { straitRotationForEntry, straitRotationStep } from '../rules/strait'
 import { rollSectorName } from '../definitions/sectorNames'
 import type { ResourceId } from '../definitions/resources'
 import type { HexCoord } from '../board/HexCoord'
@@ -314,7 +314,11 @@ function rotatePending(state: GameState, direction: 'LEFT' | 'RIGHT'): EngineRes
     return reject(state, 'ROTATE_PENDING_TILE', 'NOT_PLACING')
   }
   const delta = direction === 'RIGHT' ? 1 : -1
-  const rotation = wrapRotation((state.exploration.rotation ?? 0) + delta)
+  const exp = state.exploration
+  let rotation = wrapRotation((exp.rotation ?? 0) + delta)
+  if (exp.pendingTileId && exp.origin && exp.target) {
+    rotation = straitRotationStep(exp.pendingTileId, exp.origin, exp.target, exp.rotation ?? 0, delta)
+  }
   const events: GameEvent[] = [{ type: 'TILE_ROTATED', rotation }]
   const next = append(
     {
@@ -332,7 +336,13 @@ function confirmPlacement(state: GameState): EngineResult {
     return reject(state, 'CONFIRM_TILE_PLACEMENT', 'NOT_PLACING')
   }
   const definition = getTileDefinition(exp.pendingTileId)
-  const rotation = exp.rotation ?? 0
+  let rotation = exp.rotation ?? 0
+  if (definition.type === 'STRAIT') {
+    const dir = directionFromTo(exp.origin, exp.target)
+    if (dir !== null && getRotatedEdge(definition, oppositeDirection(dir), rotation) !== 'OPEN') {
+      rotation = straitRotationForEntry(state, exp.pendingTileId, exp.target, dir)
+    }
+  }
   const validation = validateTilePlacement(
     state.board,
     exp.target,

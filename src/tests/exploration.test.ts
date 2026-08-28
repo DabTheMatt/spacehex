@@ -52,6 +52,7 @@ describe('exploration engine', () => {
 
   it('draws, rotates six times, places, and moves the ship', () => {
     let state = createInitialState('explore')
+    state = applyCommand(state, { type: 'DEV_FORCE_NEXT_TILE', tileId: 'void-1' }).state
     const top = state.explorationDeck.drawPile[0]
     const started = applyCommand(state, { type: 'START_EXPLORATION', direction: 0 })
     state = started.state

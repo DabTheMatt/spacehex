@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { HEX_SIZE } from '../../game/board/hexMath'
+import { HEX_SIZE, hexCorner } from '../../game/board/hexMath'
 import { palette } from '../theme'
 
 export const TILE_THICKNESS = 0.1
@@ -10,11 +10,9 @@ export const TILE_SETTLED_Y = 0
 function hexShape(radius: number): THREE.Shape {
   const shape = new THREE.Shape()
   for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i
-    const x = radius * Math.cos(angle)
-    const y = -radius * Math.sin(angle)
-    if (i === 0) shape.moveTo(x, y)
-    else shape.lineTo(x, y)
+    const { x, z } = hexCorner(i, radius)
+    if (i === 0) shape.moveTo(x, -z)
+    else shape.lineTo(x, -z)
   }
   shape.closePath()
   return shape
@@ -80,9 +78,7 @@ export function createHexMesh(options: {
   group.add(hexRing(radius, topY, options.stroke, strokeOpacity, options.dashed))
   group.add(hexRing(radius, botY, options.stroke, strokeOpacity, options.dashed))
   for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i
-    const x = radius * Math.cos(angle)
-    const z = radius * Math.sin(angle)
+    const { x, z } = hexCorner(i, radius)
     group.add(
       hexLine(
         [new THREE.Vector3(x, botY, z), new THREE.Vector3(x, topY, z)],
@@ -104,8 +100,8 @@ function hexRing(
 ): THREE.Line {
   const pts: THREE.Vector3[] = []
   for (let i = 0; i <= 6; i++) {
-    const angle = (Math.PI / 3) * (i % 6)
-    pts.push(new THREE.Vector3(radius * Math.cos(angle), y, radius * Math.sin(angle)))
+    const { x, z } = hexCorner(i % 6, radius)
+    pts.push(new THREE.Vector3(x, y, z))
   }
   return hexLine(pts, color, opacity, dashed)
 }
@@ -221,13 +217,11 @@ export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
   const tick = 0.11
   const mat = new THREE.LineBasicMaterial({ color: palette.ochre })
   for (let i = 0; i < 6; i++) {
-    const a0 = (Math.PI / 3) * i
-    const a1 = (Math.PI / 3) * ((i + 1) % 6)
-    const a2 = (Math.PI / 3) * ((i + 5) % 6)
-    const vx = radius * Math.cos(a0)
-    const vz = radius * Math.sin(a0)
-    const along1 = new THREE.Vector3(Math.cos(a1) * radius - vx, 0, Math.sin(a1) * radius - vz).normalize()
-    const along2 = new THREE.Vector3(Math.cos(a2) * radius - vx, 0, Math.sin(a2) * radius - vz).normalize()
+    const { x: vx, z: vz } = hexCorner(i, radius)
+    const n1 = hexCorner((i + 1) % 6, radius)
+    const n2 = hexCorner((i + 5) % 6, radius)
+    const along1 = new THREE.Vector3(n1.x - vx, 0, n1.z - vz).normalize()
+    const along2 = new THREE.Vector3(n2.x - vx, 0, n2.z - vz).normalize()
     const origin = new THREE.Vector3(vx, y, vz)
     g.add(
       new THREE.Line(

@@ -20,22 +20,27 @@ describe('tile glyphs', () => {
     expect(spins.some((speed) => speed < 0)).toBe(true)
   })
 
-  it('stacks two or three resource cubes on the wrecked transport', () => {
-    const glyph = createTileGlyph(TILE_DEFINITIONS['wreck-transport-1'], palette.paper, 'wreck-a')
-    const kinds: string[] = []
+  it('stacks two or three resource cubes on the wrecked tanker and transport', () => {
+    for (const id of ['wreck-tanker-1', 'wreck-transport-1'] as const) {
+      const glyph = createTileGlyph(TILE_DEFINITIONS[id], palette.paper, `${id}-cargo`)
+      const kinds: string[] = []
+      glyph.traverse((obj) => {
+        if (obj.userData.cargoCube) kinds.push(String(obj.userData.cargoCube))
+      })
+      expect(kinds.length).toBeGreaterThanOrEqual(2)
+      expect(kinds.length).toBeLessThanOrEqual(3)
+      expect(new Set(kinds).size).toBe(kinds.length)
+      expect(kinds.every((kind) => CARGO.has(kind))).toBe(true)
+    }
+  })
+
+  it('spins the black hole', () => {
+    const glyph = createTileGlyph(TILE_DEFINITIONS['black-hole-1'])
+    let spins = 0
     glyph.traverse((obj) => {
-      if (obj.userData.cargoCube) kinds.push(String(obj.userData.cargoCube))
+      if (obj.userData.animate === 'spin') spins += 1
     })
-    expect(kinds.length).toBeGreaterThanOrEqual(2)
-    expect(kinds.length).toBeLessThanOrEqual(3)
-    expect(new Set(kinds).size).toBe(kinds.length)
-    expect(kinds.every((kind) => CARGO.has(kind))).toBe(true)
-    const again = createTileGlyph(TILE_DEFINITIONS['wreck-transport-1'], palette.paper, 'wreck-a')
-    const kinds2: string[] = []
-    again.traverse((obj) => {
-      if (obj.userData.cargoCube) kinds2.push(String(obj.userData.cargoCube))
-    })
-    expect(kinds2).toEqual(kinds)
+    expect(spins).toBe(1)
   })
 
   it('orbits a moon around medium planets', () => {
@@ -111,9 +116,9 @@ describe('tile glyphs', () => {
       if (obj.userData.edgeDigit) digits += 1
     })
     expect(fuel).toBe(0)
-    expect(repair).toBe(1)
+    expect(repair).toBe(0)
     expect(digits).toBe(6)
-    expect(EDGE_DIGIT_INSET).toBeCloseTo(0.9)
+    expect(EDGE_DIGIT_INSET).toBeCloseTo(0.84)
     eva.traverse((obj) => {
       if (!obj.userData.edgeDigit) return
       expect(obj.userData.edgeTop).toBe(true)

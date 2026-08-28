@@ -4,12 +4,12 @@ import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
 import { asteroidCollisionPercent } from '../../game/definitions/tiles'
 import type { EdgeNumbers } from '../../game/board/edgeNumbers'
-import { HEX_SIZE } from '../../game/board/hexMath'
+import { HEX_SIZE, hexCorner } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
 /** Midpoint of each top-face edge, scaled toward the hex center. Stays outside the strait rock belt. */
-export const EDGE_DIGIT_INSET = 0.9
+export const EDGE_DIGIT_INSET = 0.84
 
 const CARGO_KINDS = ['ORE', 'BIOMASS', 'ICE', 'FUEL'] as const
 export type WreckCargoKind = (typeof CARGO_KINDS)[number]
@@ -254,11 +254,12 @@ function shadowBaseGlyph(color: number): THREE.Group {
   return g
 }
 
-function tankerGlyph(color: number): THREE.Group {
+function tankerGlyph(color: number, salt: string): THREE.Group {
   const g = new THREE.Group()
   g.add(poly([[-0.5, -0.12], [0.32, -0.12], [0.55, 0], [0.32, 0.12], [-0.5, 0.12]], color, true))
   g.add(poly([[-0.28, -0.12], [-0.28, 0.12]], color))
   g.add(poly([[0.02, -0.12], [0.02, 0.12]], color))
+  addWreckContainers(g, salt)
   return g
 }
 
@@ -281,6 +282,26 @@ function cargoCube(kind: WreckCargoKind, size: number): THREE.Group {
   return g
 }
 
+function addWreckContainers(g: THREE.Group, salt: string): void {
+  const rng = new RNG(`wreck-cargo:${salt}`)
+  const count = 2 + rng.nextInt(2)
+  const kinds = rng.shuffle(CARGO_KINDS).slice(0, count)
+  const slots: Array<[number, number]> = [
+    [-0.28, -0.28],
+    [0.22, -0.26],
+    [0.02, 0.3],
+  ]
+  kinds.forEach((kind, index) => {
+    const size = 0.08
+    const box = cargoCube(kind, size)
+    const [x, z] = slots[index] ?? slots[0]
+    box.position.set(x, Y + size * 0.5, z)
+    box.userData.animate = 'crate'
+    box.userData.spinY = 0
+    g.add(box)
+  })
+}
+
 function transportGlyph(hullColor: number, salt: string): THREE.Group {
   const g = new THREE.Group()
   g.add(poly([[-0.18, -0.28], [0.18, -0.28], [0.18, 0.08], [-0.18, 0.08]], hullColor, true))
@@ -291,31 +312,18 @@ function transportGlyph(hullColor: number, salt: string): THREE.Group {
   g.add(poly([[0.06, 0.08], [0.14, 0.2]], hullColor))
   g.add(poly([[-0.12, -0.28], [-0.2, -0.42]], hullColor))
   g.add(poly([[0.12, -0.28], [0.22, -0.4]], hullColor))
-
-  const rng = new RNG(`wreck-cargo:${salt}`)
-  const count = 2 + rng.nextInt(2)
-  const kinds = rng.shuffle(CARGO_KINDS).slice(0, count)
-  const slots: Array<[number, number]> = [
-    [-0.34, -0.14],
-    [0.3, -0.2],
-    [0.02, 0.34],
-  ]
-  kinds.forEach((kind, index) => {
-    const size = 0.07 + rng.next() * 0.025
-    const box = cargoCube(kind, size)
-    const [x, z] = slots[index] ?? slots[0]
-    box.position.set(x, Y + size * 0.5, z)
-    box.userData.animate = 'crate'
-    box.userData.spinY = (rng.next() * 1.1 + 0.25) * (rng.next() < 0.5 ? -1 : 1)
-    g.add(box)
-  })
+  addWreckContainers(g, salt)
   return g
 }
 
 function blackHoleGlyph(color: number): THREE.Group {
-  const g = new THREE.Group()
-  g.add(circle(0.18, color))
-  g.add(circle(0.34, color, 40, 0.7))
+  const root = new THREE.Group()
+  const spin = new THREE.Group()
+  spin.userData.animate = 'spin'
+  spin.userData.spinRate = 0.42
+  spin.userData.spinPhase = 0
+  spin.add(circle(0.18, color))
+  spin.add(circle(0.34, color, 40, 0.7))
   const spiral: Array<[number, number]> = []
   for (let i = 0; i <= 28; i++) {
     const t = i / 28
@@ -323,8 +331,9 @@ function blackHoleGlyph(color: number): THREE.Group {
     const r = 0.12 + t * 0.42
     spiral.push([Math.cos(a) * r, Math.sin(a) * r])
   }
-  g.add(poly(spiral, color))
-  return g
+  spin.add(poly(spiral, color))
+  root.add(spin)
+  return root
 }
 
 function fuelHexGlyph(color: number): THREE.Group {
@@ -334,35 +343,12 @@ function fuelHexGlyph(color: number): THREE.Group {
   const hex: Array<[number, number]> = []
   const r = 0.072
   for (let i = 0; i < 6; i++) {
-    const a = (Math.PI / 3) * i
-    hex.push([Math.cos(a) * r, Math.sin(a) * r])
+    const { x, z } = hexCorner(i, r)
+    hex.push([x, z])
   }
   g.add(poly(hex, color, true))
   g.add(circle(0.028, color, 16))
   g.position.set(0.52, 0, 0.48)
-  return g
-}
-
-function repairGlyph(color: number): THREE.Group {
-  const g = new THREE.Group()
-  g.userData.repairMark = true
-  g.add(poly([[-0.055, -0.01], [0.018, -0.01], [0.018, 0.01], [-0.055, 0.01]], color, true))
-  g.add(
-    poly(
-      [
-        [0.018, -0.01],
-        [0.05, -0.028],
-        [0.062, -0.016],
-        [0.034, 0],
-        [0.062, 0.016],
-        [0.05, 0.028],
-        [0.018, 0.01],
-      ],
-      color,
-      true,
-    ),
-  )
-  g.position.set(0.68, 0, 0.48)
   return g
 }
 
@@ -385,8 +371,8 @@ function spaceGateGlyph(color: number): THREE.Group {
   const hex = (r: number): Array<[number, number]> => {
     const pts: Array<[number, number]> = []
     for (let i = 0; i < 6; i++) {
-      const a = (Math.PI / 3) * i
-      pts.push([Math.cos(a) * r, Math.sin(a) * r])
+      const { x, z } = hexCorner(i, r)
+      pts.push([x, z])
     }
     return pts
   }
@@ -404,12 +390,12 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
   let blocked = 0
   const r = HEX_SIZE * 0.82
   for (let i = 0; i < 6; i++) {
-    const a0 = (Math.PI / 3) * i
-    const a1 = (Math.PI / 3) * (i + 1)
-    const x0 = Math.cos(a0) * r
-    const z0 = Math.sin(a0) * r
-    const x1 = Math.cos(a1) * r
-    const z1 = Math.sin(a1) * r
+    const p0 = hexCorner(i, r)
+    const p1 = hexCorner(i + 1, r)
+    const x0 = p0.x
+    const z0 = p0.z
+    const x1 = p1.x
+    const z1 = p1.z
     if (edges[i] !== 'BLOCKED') {
       open += 1
       continue
@@ -519,13 +505,13 @@ function edgeDigitPlane(n: number, color: number): THREE.Object3D {
   if (ctx) {
     ctx.clearRect(0, 0, 64, 64)
     ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`
-    ctx.font = '600 44px "IBM Plex Mono", monospace'
+    ctx.font = '600 36px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(String(n), 32, 34)
   }
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.11, 0.11),
+    new THREE.PlaneGeometry(0.055, 0.055),
     new THREE.MeshBasicMaterial({
       map: new THREE.CanvasTexture(canvas),
       transparent: true,
@@ -544,10 +530,10 @@ function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
   g.userData.edgeNumbers = true
   const r = HEX_SIZE * 0.96
   for (let i = 0; i < 6; i++) {
-    const a0 = (Math.PI / 3) * i
-    const a1 = (Math.PI / 3) * (i + 1)
-    const mx = ((r * Math.cos(a0) + r * Math.cos(a1)) / 2) * EDGE_DIGIT_INSET
-    const mz = ((r * Math.sin(a0) + r * Math.sin(a1)) / 2) * EDGE_DIGIT_INSET
+    const p0 = hexCorner(i, r)
+    const p1 = hexCorner(i + 1, r)
+    const mx = ((p0.x + p1.x) / 2) * EDGE_DIGIT_INSET
+    const mz = ((p0.z + p1.z) / 2) * EDGE_DIGIT_INSET
     const mark = edgeDigitPlane(numbers[i], color)
     mark.position.set(mx, Y + 0.018, mz)
     const normal = new THREE.Vector3(0, 1, 0)
@@ -596,7 +582,7 @@ export function createTileGlyph(
       root.add(shadowBaseGlyph(color))
       break
     case 'WRECK_TANKER':
-      root.add(tankerGlyph(color))
+      root.add(tankerGlyph(color, salt))
       break
     case 'WRECK_TRANSPORT':
       root.add(transportGlyph(color, salt))
@@ -617,7 +603,6 @@ export function createTileGlyph(
       root.add(voidGlyph(color))
   }
   if (type === 'WRECK_TANKER') root.add(fuelHexGlyph(scan ? color : palette.ochre))
-  if (type === 'EVA_1') root.add(repairGlyph(scan ? color : palette.ivory))
   if (edgeNumbers) root.add(edgeNumberMarks(edgeNumbers, color))
   return root
 }
@@ -630,9 +615,9 @@ export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
       obj.rotation.y = time * Number(obj.userData.spinY || 0)
     }
     if (obj.userData.animate === 'crate') {
-      obj.rotation.x = 0.18
+      obj.rotation.x = 0
       obj.rotation.z = 0
-      obj.rotation.y = time * Number(obj.userData.spinY || 0.5)
+      obj.rotation.y = time * Number(obj.userData.spinY || 0)
     }
     if (obj.userData.animate === 'spin') {
       const rate = Number(obj.userData.spinRate ?? 0.12)
