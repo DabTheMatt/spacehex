@@ -8,8 +8,8 @@ import { HEX_SIZE, hexCorner } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
-/** Midpoint of each top-face edge, scaled toward the hex center. Stays outside the strait rock belt. */
-export const EDGE_DIGIT_INSET = 0.84
+/** Inward from the edge midpoint, on the top face (not the side wall). */
+export const EDGE_DIGIT_INSET = 0.18
 
 const CARGO_KINDS = ['ORE', 'BIOMASS', 'ICE', 'FUEL'] as const
 export type WreckCargoKind = (typeof CARGO_KINDS)[number]
@@ -496,6 +496,7 @@ function edgeDigitPlane(n: number, color: number): THREE.Object3D {
   if (typeof document === 'undefined') {
     const stub = new THREE.Group()
     Object.assign(stub.userData, userData)
+    stub.rotation.x = -Math.PI / 2
     return stub
   }
   const canvas = document.createElement('canvas')
@@ -511,7 +512,7 @@ function edgeDigitPlane(n: number, color: number): THREE.Object3D {
     ctx.fillText(String(n), 32, 34)
   }
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.055, 0.055),
+    new THREE.PlaneGeometry(0.07, 0.07),
     new THREE.MeshBasicMaterial({
       map: new THREE.CanvasTexture(canvas),
       transparent: true,
@@ -520,6 +521,7 @@ function edgeDigitPlane(n: number, color: number): THREE.Object3D {
       side: THREE.DoubleSide,
     }),
   )
+  mesh.rotation.x = -Math.PI / 2
   mesh.renderOrder = 8
   Object.assign(mesh.userData, userData)
   return mesh
@@ -532,18 +534,19 @@ function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
   for (let i = 0; i < 6; i++) {
     const p0 = hexCorner(i, r)
     const p1 = hexCorner(i + 1, r)
-    const mx = ((p0.x + p1.x) / 2) * EDGE_DIGIT_INSET
-    const mz = ((p0.z + p1.z) / 2) * EDGE_DIGIT_INSET
+    const mx = (p0.x + p1.x) / 2
+    const mz = (p0.z + p1.z) / 2
+    const len = Math.hypot(mx, mz) || 1
+    const x = mx - (mx / len) * EDGE_DIGIT_INSET
+    const z = mz - (mz / len) * EDGE_DIGIT_INSET
+    const holder = new THREE.Group()
+    holder.position.set(x, 0.035, z)
+    holder.rotation.y = Math.atan2(mx, mz)
+    holder.userData.edgeDigitHolder = true
     const mark = edgeDigitPlane(numbers[i], color)
-    mark.position.set(mx, Y + 0.018, mz)
-    const normal = new THREE.Vector3(0, 1, 0)
-    const textUp = new THREE.Vector3(-mx, 0, -mz)
-    if (textUp.lengthSq() < 1e-8) textUp.set(0, 0, -1)
-    textUp.normalize()
-    const textRight = new THREE.Vector3().crossVectors(textUp, normal).normalize()
-    mark.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(textRight, textUp, normal))
     mark.userData.digitColor = color
-    g.add(mark)
+    holder.add(mark)
+    g.add(holder)
   }
   return g
 }

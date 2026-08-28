@@ -118,17 +118,17 @@ describe('tile glyphs', () => {
     expect(fuel).toBe(0)
     expect(repair).toBe(0)
     expect(digits).toBe(6)
-    expect(EDGE_DIGIT_INSET).toBeCloseTo(0.84)
+    expect(EDGE_DIGIT_INSET).toBeCloseTo(0.18)
+    eva.updateMatrixWorld(true)
     eva.traverse((obj) => {
       if (!obj.userData.edgeDigit) return
       expect(obj.userData.edgeTop).toBe(true)
       expect(obj.userData.edgeWall).toBeUndefined()
-      expect(obj.position.y).toBeGreaterThan(0)
-      const len = Math.hypot(obj.position.x, obj.position.z) || 1
-      const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(obj.quaternion)
-      expect(localY.x).toBeCloseTo(-obj.position.x / len, 5)
-      expect(localY.z).toBeCloseTo(-obj.position.z / len, 5)
-      expect(localY.y).toBeCloseTo(0, 5)
+      expect(obj.rotation.x).toBeCloseTo(-Math.PI / 2)
+      const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(obj.getWorldQuaternion(new THREE.Quaternion()))
+      expect(Math.abs(normal.y)).toBeGreaterThan(0.98)
+      expect(Math.abs(normal.x)).toBeLessThan(0.15)
+      expect(Math.abs(normal.z)).toBeLessThan(0.15)
       expect(obj.userData.digitColor).toBe(palette.paper)
       expect(obj).not.toBeInstanceOf(THREE.Sprite)
     })
@@ -153,9 +153,14 @@ describe('tile glyphs', () => {
     let blockedFaces = 0
     const digitR: number[] = []
     const rockR: number[] = []
+    threeWay.updateMatrixWorld(true)
     threeWay.traverse((obj) => {
       if (obj.userData.straitBlocked) blockedFaces += 1
-      if (obj.userData.edgeDigit) digitR.push(Math.hypot(obj.position.x, obj.position.z))
+      if (obj.userData.edgeDigit) {
+        const w = new THREE.Vector3()
+        obj.getWorldPosition(w)
+        digitR.push(Math.hypot(w.x, w.z))
+      }
       if (obj.userData.animate === 'asteroid') rockR.push(Math.hypot(obj.position.x, obj.position.z))
       if (obj.userData.openChannels) {
         expect(obj.userData.openChannels).toBe(3)
