@@ -6,7 +6,7 @@ import { createCargoFigure, attachCrateMotion, CARGO_COLOR } from './cargoMesh'
 import { CARGO_KINDS, type CargoKind } from '../../game/definitions/cargoFigures'
 import { asteroidCollisionPercent } from '../../game/definitions/tiles'
 import type { EdgeNumbers } from '../../game/board/edgeNumbers'
-import { HEX_SIZE, hexCorner, hexEdgeCorners, hexEdgeFrame, pointInFlatTopHex, clampToFlatTopHex } from '../../game/board/hexMath'
+import { HEX_SIZE, hexCorner, hexEdgeCorners, hexEdgeFrame, clampToFlatTopHex } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
@@ -257,7 +257,7 @@ function addWreckContainers(g: THREE.Group, salt: string, colorFor?: (kind: Carg
     const size = 0.1
     const box = cargoCube(kind, size, colorFor ? colorFor(kind) : CARGO_COLOR[kind])
     const [x, z] = slots[index] ?? slots[0]
-    const speed = 0.1 + rng.next() * 0.08
+    const speed = 0.045 + rng.next() * 0.03
     const a = rng.next() * Math.PI * 2
     attachCrateMotion(
       box,
@@ -805,20 +805,36 @@ function bounceInHex(
   let nz = z
   let ovx = vx
   let ovz = vz
-  if (!pointInFlatTopHex(nx, nz, radius)) {
-    const len = Math.hypot(nx, nz) || 1
-    const hx = nx / len
-    const hz = nz / len
-    const dot = ovx * hx + ovz * hz
-    if (dot > 0) {
-      ovx -= 2 * dot * hx
-      ovz -= 2 * dot * hz
+  const rest = 0.38
+  const grip = 0.18
+  for (let i = 0; i < 6; i++) {
+    const e = hexEdgeFrame(i, radius)
+    const ox = -e.ix
+    const oz = -e.iz
+    const d = (nx - e.mx) * ox + (nz - e.mz) * oz
+    const vn = ovx * ox + ovz * oz
+    if (d > -0.004 && vn > 0) {
+      ovx -= (1 + rest) * vn * ox
+      ovz -= (1 + rest) * vn * oz
+      const tx = -oz
+      const tz = ox
+      const vt = ovx * tx + ovz * tz
+      ovx -= vt * grip * tx
+      ovz -= vt * grip * tz
     }
-    const clamped = clampToFlatTopHex(nx, nz, radius)
-    nx = clamped.x
-    nz = clamped.z
+    if (d > 0) {
+      nx -= ox * d
+      nz -= oz * d
+    }
   }
-  return { x: nx, z: nz, vx: ovx, vz: ovz }
+  const held = clampToFlatTopHex(nx, nz, radius)
+  const speed = Math.hypot(ovx, ovz)
+  const cap = 0.085
+  if (speed > cap) {
+    ovx *= cap / speed
+    ovz *= cap / speed
+  }
+  return { x: held.x, z: held.z, vx: ovx, vz: ovz }
 }
 
 function hasInkAncestor(obj: THREE.Object3D): boolean {
@@ -832,21 +848,25 @@ function hasInkAncestor(obj: THREE.Object3D): boolean {
 
 function tickCrateGroup(crates: THREE.Object3D[], time: number, dt: number): void {
   const rim = HEX_SIZE * 0.9
-  for (const crate of crates) {
-    const pad = Number(crate.userData.crateRadius || 0.05)
-    const limit = Math.max(0.2, rim - pad)
-    if (crate.userData.spinX || crate.userData.spinY || crate.userData.spinZ) {
-      crate.rotation.x = time * Number(crate.userData.spinX || 0)
-      crate.rotation.y = time * Number(crate.userData.spinY || 0)
-      crate.rotation.z = time * Number(crate.userData.spinZ || 0)
+  const steps = Math.max(1, Math.min(4, Math.ceil(dt / 0.016)))
+  const stepDt = dt / steps
+  for (let step = 0; step < steps; step++) {
+    for (const crate of crates) {
+      const pad = Number(crate.userData.crateRadius || 0.05)
+      const limit = Math.max(0.2, rim - pad)
+      if (crate.userData.spinX || crate.userData.spinY || crate.userData.spinZ) {
+        crate.rotation.x = time * Number(crate.userData.spinX || 0)
+        crate.rotation.y = time * Number(crate.userData.spinY || 0)
+        crate.rotation.z = time * Number(crate.userData.spinZ || 0)
+      }
+      const x = crate.position.x + Number(crate.userData.vx || 0) * stepDt
+      const z = crate.position.z + Number(crate.userData.vz || 0) * stepDt
+      const bounced = bounceInHex(x, z, Number(crate.userData.vx || 0), Number(crate.userData.vz || 0), limit)
+      crate.userData.vx = bounced.vx
+      crate.userData.vz = bounced.vz
+      crate.position.x = bounced.x
+      crate.position.z = bounced.z
     }
-    const x = crate.position.x + Number(crate.userData.vx || 0) * dt
-    const z = crate.position.z + Number(crate.userData.vz || 0) * dt
-    const bounced = bounceInHex(x, z, Number(crate.userData.vx || 0), Number(crate.userData.vz || 0), limit)
-    crate.userData.vx = bounced.vx
-    crate.userData.vz = bounced.vz
-    crate.position.x = bounced.x
-    crate.position.z = bounced.z
   }
   for (let i = 0; i < crates.length; i++) {
     for (let j = i + 1; j < crates.length; j++) {

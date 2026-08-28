@@ -208,7 +208,7 @@ export class BoardRenderer {
         glyph.add(createPlanetOverlay(market, tile.coord, prices, ink))
       }
       if (def.type === 'EVA_1' && options.showMarketIcons !== false && !probed) {
-        glyph.add(createEvaOverlay(tile.coord, ship?.cargo ?? emptyCargo(), atEva, ink))
+        glyph.add(createEvaOverlay(tile.coord, ship?.cargo ?? emptyCargo(), atEva, ink, colors.paper))
       }
       mesh.userData.glyph = glyph
       mesh.add(glyph)

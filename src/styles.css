@@ -457,6 +457,10 @@ body,
   gap: 0.35rem;
 }
 
+.cargo.clickable {
+  cursor: pointer;
+}
+
 .cargo-icon {
   width: 0.95rem;
   height: 0.95rem;

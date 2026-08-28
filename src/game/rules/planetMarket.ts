@@ -140,10 +140,11 @@ export function sellResource(
   if (qty <= 0) return { ok: false, reason: 'NO_CARGO' }
   const player = activePlayer(state)
   const parts = evaSellParts(state, resource)
-  const payout = parts.total * qty
+  const sold = 1
+  const payout = parts.total * sold
   return {
     ok: true,
-    qty,
+    qty: sold,
     ...parts,
     state: {
       ...state,
@@ -155,7 +156,7 @@ export function sellResource(
         ...state.ships,
         [ship.id]: {
           ...ship,
-          cargo: { ...ship.cargo, [resource]: 0 },
+          cargo: { ...ship.cargo, [resource]: qty - sold },
         },
       },
     },

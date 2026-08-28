@@ -6,6 +6,8 @@ import { palette, css } from '../theme'
 import { HEX_SIZE, hexEdgeCorners } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { clamp01 } from '../motion'
+import { createCargoFigure } from './cargoMesh'
+import { CARGO_FIGURE } from '../../game/definitions/cargoFigures'
 
 const RESOURCE_COLOR: Record<ResourceId, number> = {
   ORE: palette.resourceRed,
@@ -178,6 +180,7 @@ export function createEvaOverlay(
   cargo: Record<ResourceId, number>,
   canSell: boolean,
   ink = false,
+  mark = 0xffffff,
 ): THREE.Group {
   const g = new THREE.Group()
   g.userData.evaOverlay = true
@@ -191,7 +194,7 @@ export function createEvaOverlay(
     const cluster = new THREE.Group()
     cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
     const qty = cargo[id] ?? 0
-    cluster.add(stockSquare(id, qty, ink))
+    cluster.add(stockSellIcon(id, qty, ink, mark))
     if (canSell && qty > 0) {
       const hit = new THREE.Mesh(
         new THREE.PlaneGeometry(0.16, 0.16),
@@ -209,7 +212,7 @@ export function createEvaOverlay(
       cluster.add(hit)
     }
     close.add(cluster)
-    far.add(diceCluster(id, qty, x, ink))
+    far.add(sellFarMark(id, qty, x, ink, mark))
   })
   const exchange = caption('SELL CONTAINERS', ink ? '#FFFFFF' : css.priceYellow, 0.72, 0.055)
   const sellIn = priceInwardOffset(0, LOT_Z)
@@ -438,6 +441,57 @@ function stockHex(id: ResourceId, amount: number): THREE.Group {
   digit.position.y = 0.012
   digit.renderOrder = 7
   g.add(digit)
+  return g
+}
+
+function stockSellIcon(id: ResourceId, amount: number, ink = false, mark = 0xffffff): THREE.Group {
+  const g = new THREE.Group()
+  const color = ink ? mark : RESOURCE_COLOR[id]
+  const fig = createCargoFigure(id, 0.1, color)
+  fig.position.y = 0.045
+  fig.rotation.set(0.42, 0.62, 0.18)
+  g.add(fig)
+  g.userData.sellIcon = id
+  g.userData.cargoFigure = CARGO_FIGURE[id]
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')
+  if (ctx) {
+    ctx.clearRect(0, 0, 128, 128)
+    ctx.fillStyle = ink ? (mark === 0 ? '#000000' : '#FFFFFF') : RESOURCE_CSS[id]
+    ctx.font = '500 56px "IBM Plex Mono", monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(amount), 64, 70)
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.needsUpdate = true
+  const digit = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.08, 0.08),
+    new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      side: THREE.DoubleSide,
+    }),
+  )
+  digit.rotation.x = -Math.PI / 2
+  digit.position.set(0.07, 0.014, 0.06)
+  digit.renderOrder = 7
+  g.add(digit)
+  return g
+}
+
+function sellFarMark(id: ResourceId, amount: number, x: number, ink = false, mark = 0xffffff): THREE.Group {
+  const g = new THREE.Group()
+  g.position.set(x, OVERLAY_HOVER, LOT_Z)
+  if (amount <= 0) return g
+  const fig = createCargoFigure(id, 0.055, ink ? mark : RESOURCE_COLOR[id])
+  fig.position.y = 0.03
+  fig.rotation.set(0.4, 0.5, 0.12)
+  g.add(fig)
   return g
 }
 

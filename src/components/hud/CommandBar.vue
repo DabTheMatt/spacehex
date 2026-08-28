@@ -9,7 +9,8 @@
         <span
           v-for="lot in planetLots"
           :key="lot.id"
-          :class="['cargo', `cargo--${lot.id.toLowerCase()}`]"
+          :class="['cargo', `cargo--${lot.id.toLowerCase()}`, { clickable: canSellLot(lot.id) }]"
+          @click="sellIfPossible(lot.id)"
         >
           <CargoIcon v-if="isCargoKind(lot.id)" :kind="lot.id" />
           {{ lot.text }}
@@ -42,7 +43,8 @@
         <span
           v-for="row in cargoRows"
           :key="row.id"
-          :class="['cargo', `cargo--${row.id.toLowerCase()}`]"
+          :class="['cargo', `cargo--${row.id.toLowerCase()}`, { clickable: canSellLot(row.id) }]"
+          @click="sellIfPossible(row.id)"
         >
           <CargoIcon :kind="row.id" />
           {{ row.text }}
@@ -220,5 +222,16 @@ function pad(value: number): string {
 
 function isCargoKind(id: string): boolean {
   return (CARGO_KINDS as readonly string[]).includes(id)
+}
+
+function canSellLot(id: string): boolean {
+  if (!isEvaHex(planetCoord.value) || !isEvaHex(game.ship.coord)) return false
+  if (!(RESOURCE_IDS as readonly string[]).includes(id)) return false
+  return (game.ship.cargo[id as (typeof RESOURCE_IDS)[number]] ?? 0) > 0
+}
+
+function sellIfPossible(id: string): void {
+  if (!canSellLot(id)) return
+  game.dispatch({ type: 'SELL_RESOURCE', resource: id as (typeof RESOURCE_IDS)[number] })
 }
 </script>

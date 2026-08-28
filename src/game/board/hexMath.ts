@@ -100,14 +100,32 @@ export function clampToFlatTopHex(
   radius: number,
 ): { x: number; z: number } {
   if (pointInFlatTopHex(x, z, radius)) return { x, z }
+  return projectInsideFlatTopHex(x, z, radius)
+}
+
+/** Push a point onto the inside of each hex face (no snap toward the origin). */
+export function projectInsideFlatTopHex(
+  x: number,
+  z: number,
+  radius: number,
+): { x: number; z: number } {
   let nx = x
   let nz = z
-  for (let i = 0; i < 12; i++) {
-    nx *= 0.86
-    nz *= 0.86
-    if (pointInFlatTopHex(nx, nz, radius)) return { x: nx, z: nz }
+  for (let pass = 0; pass < 3; pass++) {
+    let moved = false
+    for (let i = 0; i < 6; i++) {
+      const e = hexEdgeFrame(i, radius)
+      const ox = -e.ix
+      const oz = -e.iz
+      const d = (nx - e.mx) * ox + (nz - e.mz) * oz
+      if (d <= 0) continue
+      nx -= ox * d
+      nz -= oz * d
+      moved = true
+    }
+    if (!moved) break
   }
-  return { x: 0, z: 0 }
+  return { x: nx, z: nz }
 }
 
 /** Midpoint, unit tangent, inward normal, and Yaw that maps local +X onto the edge. */

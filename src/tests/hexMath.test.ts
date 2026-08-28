@@ -10,6 +10,7 @@ import {
   hexEdgeCorners,
   hexEdgeFrame,
   pointInFlatTopHex,
+  projectInsideFlatTopHex,
 } from '../game/board/hexMath'
 import { coordKey } from '../game/board/HexCoord'
 
@@ -71,6 +72,12 @@ describe('hexMath (flat-top axial)', () => {
     const held = clampToFlatTopHex(1.4, 0, 1)
     expect(pointInFlatTopHex(held.x, held.z, 1)).toBe(true)
     expect(Math.hypot(held.x, held.z)).toBeLessThan(1)
+  })
+
+  it('projects outside points onto the hex face instead of shrinking to the origin', () => {
+    const held = projectInsideFlatTopHex(1.4, 0, 1)
+    expect(pointInFlatTopHex(held.x, held.z, 1)).toBe(true)
+    expect(held.x).toBeGreaterThan(0.4)
   })
 
   it('neighbor of neighbor opposite returns origin', () => {

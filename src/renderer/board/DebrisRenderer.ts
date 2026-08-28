@@ -42,7 +42,7 @@ export class DebrisRenderer {
         const color = ink ? line : CARGO_COLOR[crate.kind]
         const mesh = createCargoFigure(crate.kind, size, color)
         const rng = new RNG(`debris-motion:${crate.id}`)
-        const speed = 0.08 + rng.next() * 0.07
+        const speed = 0.04 + rng.next() * 0.028
         const a = rng.next() * Math.PI * 2
         const ox = (rng.next() - 0.5) * 0.2
         const oz = (rng.next() - 0.5) * 0.2

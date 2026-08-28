@@ -175,8 +175,11 @@ describe('planet markets', () => {
     const credits = state.players['player-1'].credits
     const sold = applyCommand(state, { type: 'SELL_RESOURCE', resource: 'ORE' })
     expect(sold.events.some((event) => event.type === 'RESOURCE_SOLD')).toBe(true)
-    expect(sold.state.ships['mewa-1'].cargo.ORE).toBe(0)
-    expect(sold.state.players['player-1'].credits).toBe(credits + parts.total * 2)
+    expect(sold.state.ships['mewa-1'].cargo.ORE).toBe(1)
+    expect(sold.state.players['player-1'].credits).toBe(credits + parts.total)
+    const again = applyCommand(sold.state, { type: 'SELL_RESOURCE', resource: 'ORE' })
+    expect(again.state.ships['mewa-1'].cargo.ORE).toBe(0)
+    expect(again.state.players['player-1'].credits).toBe(credits + parts.total * 2)
     expect(boardSupply(sold.state, 'ORE')).toBe(supply)
     expect(buyPrice(sold.state, 'ORE')).toBe(buyPrice(state, 'ORE'))
   })

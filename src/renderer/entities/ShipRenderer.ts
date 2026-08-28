@@ -795,7 +795,26 @@ function createInkNavMarker(
     g.add(led)
     g.userData.beacon = led
   }
-  g.userData.engines = undefined
+  const y = 0.022
+  const main = makeInkThruster(new THREE.Vector3(0, y, -length * 0.5), new THREE.Vector3(0, 0, -1), 'main', color)
+  const port = makeInkThruster(new THREE.Vector3(-half, y, 0.02), new THREE.Vector3(-1, 0, 0), 'rcs', color)
+  const starboard = makeInkThruster(new THREE.Vector3(half, y, 0.02), new THREE.Vector3(1, 0, 0), 'rcs', color)
+  const s = Math.SQRT1_2
+  const brakePort = makeInkThruster(
+    new THREE.Vector3(-half * 0.42, y, length * 0.48),
+    new THREE.Vector3(-s, 0, s),
+    'rcs',
+    color,
+  )
+  const brakeStarboard = makeInkThruster(
+    new THREE.Vector3(half * 0.42, y, length * 0.48),
+    new THREE.Vector3(s, 0, s),
+    'rcs',
+    color,
+  )
+  g.add(main, port, starboard, brakePort, brakeStarboard)
+  g.userData.engines = { main, port, starboard, brakePort, brakeStarboard }
+  applyEngineBurn(g, ENGINES_OFF)
   return g
 }
 
@@ -911,6 +930,45 @@ function hullColor(playerNo: number, active: boolean): number {
   return active ? palette.player2 : 0x4f6070
 }
 
+function makeInkThruster(
+  hullPoint: THREE.Vector3,
+  exhaust: THREE.Vector3,
+  kind: 'main' | 'rcs',
+  color: number,
+): THREE.Group {
+  const dir = exhaust.clone().normalize()
+  const standoff = kind === 'main' ? 0.018 : 0.014
+  const len = kind === 'main' ? 0.1 : 0.055
+  const half = kind === 'main' ? 0.024 : 0.012
+  const group = new THREE.Group()
+  group.position.copy(hullPoint).addScaledVector(dir, standoff)
+  group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir)
+  group.userData.inkPlume = true
+  const y = 0.028
+  const geo = new THREE.BufferGeometry()
+  geo.setFromPoints([
+    new THREE.Vector3(-half, y, 0),
+    new THREE.Vector3(half, y, 0),
+    new THREE.Vector3(0, y, len),
+  ])
+  geo.setIndex([0, 1, 2])
+  geo.computeVertexNormals()
+  const mesh = new THREE.Mesh(
+    geo,
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  )
+  mesh.renderOrder = 8
+  group.add(mesh)
+  group.userData.plumeMesh = mesh
+  return group
+}
+
 function makeThruster(
   hullPoint: THREE.Vector3,
   exhaust: THREE.Vector3,
@@ -1011,7 +1069,11 @@ function setPlume(group: THREE.Group, intensity: number, lengthScale: number): v
   }
   const sx = 0.75 + lit * 0.55
   const sy = 0.6 + lit * lengthScale
-  mesh.scale.set(sx, sy, sx)
+  if (group.userData.inkPlume) {
+    mesh.scale.set(sx, 1, 0.4 + lit * lengthScale)
+  } else {
+    mesh.scale.set(sx, sy, sx)
+  }
   mesh.visible = lit > 0.03
 }
 
