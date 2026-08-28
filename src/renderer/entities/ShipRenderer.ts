@@ -937,9 +937,9 @@ function makeInkThruster(
   color: number,
 ): THREE.Group {
   const dir = exhaust.clone().normalize()
-  const standoff = kind === 'main' ? 0.018 : 0.014
-  const len = kind === 'main' ? 0.1 : 0.055
-  const half = kind === 'main' ? 0.024 : 0.012
+  const standoff = kind === 'main' ? 0.02 : 0.016
+  const len = kind === 'main' ? 0.16 : 0.08
+  const half = kind === 'main' ? 0.032 : 0.016
   const group = new THREE.Group()
   group.position.copy(hullPoint).addScaledVector(dir, standoff)
   group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir)

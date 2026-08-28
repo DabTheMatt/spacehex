@@ -225,7 +225,7 @@ function isCargoKind(id: string): boolean {
 }
 
 function canSellLot(id: string): boolean {
-  if (!isEvaHex(planetCoord.value) || !isEvaHex(game.ship.coord)) return false
+  if (!isEvaHex(game.ship.coord)) return false
   if (!(RESOURCE_IDS as readonly string[]).includes(id)) return false
   return (game.ship.cargo[id as (typeof RESOURCE_IDS)[number]] ?? 0) > 0
 }

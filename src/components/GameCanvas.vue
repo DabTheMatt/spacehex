@@ -413,10 +413,12 @@ watch(
   (events) => {
     if (!scene) return
     scene.handleEvents(events, game.state)
-    if (events.some((event) => event.type === 'TURN_ENDED')) {
+    if (events.some((event) => event.type === 'TURN_ENDED' || event.type === 'SHIP_MOVED')) {
       ui.inspectPlanet = null
       scene.camera.clearInspectLimits()
-      scene.camera.panTo(game.ship.coord)
+      if (events.some((event) => event.type === 'TURN_ENDED')) {
+        scene.camera.panTo(game.ship.coord)
+      }
     }
     sync()
   },
