@@ -228,13 +228,13 @@ function isResourceLot(id: string): id is (typeof RESOURCE_IDS)[number] {
   return (RESOURCE_IDS as readonly string[]).includes(id)
 }
 
-function canSellLot(id: string): boolean {
+function canSellLot(id: string): id is (typeof RESOURCE_IDS)[number] {
   if (!isEvaHex(game.ship.coord)) return false
   if (!isResourceLot(id)) return false
   return (game.ship.cargo[id] ?? 0) > 0
 }
 
-function canBuyLot(id: string): boolean {
+function canBuyLot(id: string): id is (typeof RESOURCE_IDS)[number] {
   if (!isResourceLot(id)) return false
   const ship = game.ship
   const market = game.state.planetMarkets[coordKey(ship.coord)]
