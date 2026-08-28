@@ -10,6 +10,7 @@ import {
   priceInwardOffset,
   servicePadPosition,
 } from '../renderer/board/planetLots'
+import { palette } from '../renderer/theme'
 import { BASE_HOVER } from '../renderer/entities/ShipRenderer'
 import { EVA_HUB_SPIN } from '../renderer/board/evaDocks'
 import { missileSidePoint, missileWorldPos, probeWorldPos } from '../renderer/fx/missilePath'
@@ -56,6 +57,7 @@ describe('dice pips', () => {
     expect(repair.x).toBeGreaterThan(0.4)
     expect(repair.z).toBeGreaterThan(0.2)
     expect(fuel.z).toBeGreaterThan(LOT_Z + 0.5)
+    expect(palette.repairPink).toBe(0xc48a96)
   })
 })
 

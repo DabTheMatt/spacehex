@@ -498,16 +498,13 @@ function stockSquare(id: ResourceId, amount: number): THREE.Group {
   return g
 }
 
-function stockHexFuel(): THREE.Group {
+function overlayHexPad(ring: number, radius = 0.072): THREE.Group {
   const g = new THREE.Group()
-  g.userData.fuelHex = true
-  const color = palette.ochre
-  const r = 0.072
   const shape = new THREE.Shape()
   for (let i = 0; i < 6; i++) {
     const a = (Math.PI / 3) * i
-    const x = r * Math.cos(a)
-    const y = r * Math.sin(a)
+    const x = radius * Math.cos(a)
+    const y = radius * Math.sin(a)
     if (i === 0) shape.moveTo(x, y)
     else shape.lineTo(x, y)
   }
@@ -524,44 +521,87 @@ function stockHexFuel(): THREE.Group {
   )
   hex.rotation.x = -Math.PI / 2
   g.add(hex)
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(r * 0.94, r, 6),
+  const rim = new THREE.Mesh(
+    new THREE.RingGeometry(radius * 0.94, radius, 6),
     new THREE.MeshBasicMaterial({
-      color,
+      color: ring,
       side: THREE.DoubleSide,
       depthWrite: false,
       transparent: true,
     }),
   )
-  ring.rotation.x = -Math.PI / 2
-  ring.position.y = 0.002
-  g.add(ring)
+  rim.rotation.x = -Math.PI / 2
+  rim.position.y = 0.002
+  g.add(rim)
+  return g
+}
+
+function overlayLine(points: Array<[number, number]>, color: number, y = 0.008): THREE.Line {
+  const pts = points.map(([x, z]) => new THREE.Vector3(x, y, z))
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color, depthWrite: false, transparent: true }),
+  )
+}
+
+function stockHexFuel(): THREE.Group {
+  const g = overlayHexPad(palette.ochre)
+  g.userData.fuelHex = true
+  const c = palette.ochre
+  g.add(
+    overlayLine(
+      [
+        [-0.018, -0.022],
+        [0.012, -0.022],
+        [0.012, 0.022],
+        [-0.018, 0.022],
+        [-0.018, -0.022],
+      ],
+      c,
+    ),
+  )
+  g.add(
+    overlayLine(
+      [
+        [0.012, -0.009],
+        [0.022, -0.009],
+        [0.022, 0.009],
+        [0.012, 0.009],
+        [0.012, -0.009],
+      ],
+      c,
+    ),
+  )
+  g.add(overlayLine([[-0.01, -0.008], [0.004, -0.008]], c))
+  g.add(overlayLine([[-0.01, 0.004], [0.004, 0.004]], c))
+  g.userData.fuelBattery = true
   return g
 }
 
 function stockRepair(): THREE.Group {
-  const g = new THREE.Group()
+  const g = overlayHexPad(palette.repairPink)
   g.userData.repairMark = true
+  g.userData.repairHex = true
   const mat = new THREE.MeshBasicMaterial({
-    color: palette.ivory,
+    color: palette.repairPink,
     side: THREE.DoubleSide,
     depthWrite: false,
   })
-  const handle = new THREE.Mesh(new THREE.PlaneGeometry(0.088, 0.016), mat)
+  const handle = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.012), mat)
   handle.rotation.x = -Math.PI / 2
-  handle.position.set(-0.012, 0.002, 0)
+  handle.position.set(-0.01, 0.006, 0)
   g.add(handle)
-  const collar = new THREE.Mesh(new THREE.PlaneGeometry(0.016, 0.042), mat)
+  const collar = new THREE.Mesh(new THREE.PlaneGeometry(0.012, 0.032), mat)
   collar.rotation.x = -Math.PI / 2
-  collar.position.set(0.03, 0.002, 0)
+  collar.position.set(0.022, 0.006, 0)
   g.add(collar)
-  const jawT = new THREE.Mesh(new THREE.PlaneGeometry(0.038, 0.012), mat)
+  const jawT = new THREE.Mesh(new THREE.PlaneGeometry(0.028, 0.01), mat)
   jawT.rotation.x = -Math.PI / 2
-  jawT.position.set(0.048, 0.002, 0.018)
+  jawT.position.set(0.036, 0.006, 0.014)
   g.add(jawT)
-  const jawB = new THREE.Mesh(new THREE.PlaneGeometry(0.038, 0.012), mat)
+  const jawB = new THREE.Mesh(new THREE.PlaneGeometry(0.028, 0.01), mat)
   jawB.rotation.x = -Math.PI / 2
-  jawB.position.set(0.048, 0.002, -0.018)
+  jawB.position.set(0.036, 0.006, -0.014)
   g.add(jawB)
   return g
 }

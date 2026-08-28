@@ -19,6 +19,7 @@ export const palette = {
   resourceRed: 0xc45c4a,
   resourceGreen: 0x6a9a62,
   resourceBlue: 0x5a7ea8,
+  repairPink: 0xc48a96,
 }
 
 export const css = {
@@ -36,6 +37,7 @@ export const css = {
   resourceRed: '#C45C4A',
   resourceGreen: '#6A9A62',
   resourceBlue: '#5A7EA8',
+  repairPink: '#C48A96',
   hullMark: '#141412',
   priceYellow: '#E2D06A',
 }

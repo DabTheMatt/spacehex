@@ -348,6 +348,30 @@ function fuelHexGlyph(color: number): THREE.Group {
   }
   g.add(poly(hex, color, true))
   g.add(circle(0.028, color, 16))
+  g.add(
+    poly(
+      [
+        [-0.018, -0.02],
+        [0.01, -0.02],
+        [0.01, 0.02],
+        [-0.018, 0.02],
+      ],
+      color,
+      true,
+    ),
+  )
+  g.add(
+    poly(
+      [
+        [0.01, -0.008],
+        [0.02, -0.008],
+        [0.02, 0.008],
+        [0.01, 0.008],
+      ],
+      color,
+      true,
+    ),
+  )
   g.position.set(0.52, 0, 0.48)
   return g
 }
@@ -388,8 +412,8 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
   const rng = new RNG(`strait-rocks:${salt}`)
   let open = 0
   let blocked = 0
-  const r = HEX_SIZE * 0.82
-  for (let i = 0; i < 6; i++) {
+    const r = HEX_SIZE * 0.94
+    for (let i = 0; i < 6; i++) {
     const [p0, p1] = hexEdgeCorners(i, r)
     const x0 = p0.x
     const z0 = p0.z
@@ -411,34 +435,20 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
     const inward = Math.hypot(mx, mz) || 1
     const ix = -mx / inward
     const iz = -mz / inward
-    const pebbles = 5 + rng.nextInt(2)
+    const pebbles = 11 + rng.nextInt(4)
     for (let p = 0; p < pebbles; p++) {
       const slot = pebbles === 1 ? 0 : p / (pebbles - 1)
-      const along = (slot - 0.5) * edgeLen * 0.78
-      if (Math.abs(along) < edgeLen * 0.12) continue
-      const inset = 0.16 + rng.next() * 0.08
-      const jitter = (rng.next() - 0.5) * 0.04
+      const along = (slot - 0.5) * edgeLen * 0.88
+      const inset = 0.035 + rng.next() * 0.055
+      const jitter = (rng.next() - 0.5) * 0.028
       const cx = mx + tx * (along + jitter) + ix * inset
       const cz = mz + tz * (along + jitter) + iz * inset
-      const rad = 0.048 + rng.next() * 0.03
-      const fill = new THREE.Mesh(
-        new THREE.CircleGeometry(rad * 0.92, 10),
-        new THREE.MeshBasicMaterial({
-          color,
-          transparent: true,
-          opacity: 0.22,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        }),
-      )
-      fill.rotation.x = -Math.PI / 2
-      fill.position.set(cx, Y, cz)
-      cluster.add(fill)
+      const rad = 0.016 + rng.next() * 0.014
       const pts: Array<[number, number]> = []
-      const sides = 5 + rng.nextInt(2)
+      const sides = 5 + rng.nextInt(3)
       for (let s = 0; s < sides; s++) {
-        const a = (Math.PI * 2 * s) / sides + rng.next() * 0.4
-        const rr = rad * (0.7 + rng.next() * 0.45)
+        const a = (Math.PI * 2 * s) / sides + rng.next() * 0.45
+        const rr = rad * (0.65 + rng.next() * 0.5)
         pts.push([cx + Math.cos(a) * rr, cz + Math.sin(a) * rr])
       }
       cluster.add(spinningRock(pts, color, (0.2 + rng.next() * 0.5) * (rng.next() < 0.5 ? -1 : 1)))

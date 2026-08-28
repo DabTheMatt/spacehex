@@ -169,8 +169,9 @@ describe('tile glyphs', () => {
     })
     expect(blockedFaces).toBe(3)
     expect(digitR).toHaveLength(6)
-    expect(rockR.length).toBeGreaterThan(0)
-    expect(Math.min(...digitR)).toBeGreaterThan(Math.max(...rockR))
+    expect(rockR.length).toBeGreaterThan(30)
+    expect(Math.min(...rockR)).toBeGreaterThan(0.62)
+    expect(Math.max(...rockR)).toBeLessThan(0.98)
     const bent = createTileGlyph(TILE_DEFINITIONS['strait-2'])
     bent.traverse((obj) => {
       if (obj.userData.openChannels) {

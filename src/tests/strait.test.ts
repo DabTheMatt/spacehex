@@ -7,6 +7,14 @@ import { oppositeDirection } from '../game/board/HexMap'
 describe('strait layouts', () => {
   it('has a three-way, a bent, and a through passage', () => {
     expect(TILE_DEFINITIONS['strait-1'].edges.filter((e) => e === 'OPEN')).toHaveLength(3)
+    expect(TILE_DEFINITIONS['strait-1'].edges).toEqual([
+      'BLOCKED',
+      'OPEN',
+      'BLOCKED',
+      'OPEN',
+      'BLOCKED',
+      'OPEN',
+    ])
     expect(TILE_DEFINITIONS['strait-2'].edges.filter((e) => e === 'OPEN')).toHaveLength(2)
     expect(TILE_DEFINITIONS['strait-3'].edges.filter((e) => e === 'OPEN')).toHaveLength(2)
     expect(TILE_DEFINITIONS['strait-3'].edges[0]).toBe('OPEN')
