@@ -2,16 +2,24 @@ import * as THREE from 'three'
 import type { TileType } from '../../game/board/tileRotation'
 import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
-import { isRefuelTileType } from '../../game/definitions/refuel'
 import { asteroidCollisionPercent } from '../../game/definitions/tiles'
 import type { EdgeNumbers } from '../../game/board/edgeNumbers'
 import { HEX_SIZE } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
-import { TILE_THICKNESS } from './TileRenderer'
 import { RNG } from '../../game/random/RNG'
 
-/** Along each side wall, from the left when looking at the face from outside. */
-export const EDGE_DIGIT_ALONG = 1 / 3
+/** Midpoint of each top-face edge, scaled toward the hex center. */
+export const EDGE_DIGIT_INSET = 0.78
+
+const CARGO_KINDS = ['ORE', 'BIOMASS', 'ICE', 'FUEL'] as const
+export type WreckCargoKind = (typeof CARGO_KINDS)[number]
+
+const CARGO_COLOR: Record<WreckCargoKind, number> = {
+  ORE: palette.resourceRed,
+  BIOMASS: palette.resourceGreen,
+  ICE: palette.resourceBlue,
+  FUEL: palette.ochre,
+}
 
 const Y = 0.012
 const PLANET_TINTS = [palette.planetViolet, palette.planetRose, palette.planetSage] as const
@@ -121,10 +129,13 @@ function voidGlyph(color: number): THREE.Group {
   return g
 }
 
-function planetGlyph(color: number, size: 'L' | 'M' | 'S'): THREE.Group {
+function planetGlyph(color: number, size: 'L' | 'M' | 'S', salt: string): THREE.Group {
   const root = new THREE.Group()
   const spin = new THREE.Group()
+  const rng = new RNG(`planet-spin:${salt}`)
   spin.userData.animate = 'spin'
+  spin.userData.spinRate = 0.055 + rng.next() * 0.14
+  spin.userData.spinPhase = rng.next() * Math.PI * 2
   if (size === 'L') {
     spin.add(circle(0.42, color, 48))
     spin.add(ellipse(0.63, 0.195, color))
@@ -143,6 +154,8 @@ function planetGlyph(color: number, size: 'L' | 'M' | 'S'): THREE.Group {
     root.add(spin)
     const moonArm = new THREE.Group()
     moonArm.userData.animate = 'moon'
+    moonArm.userData.spinRate = 0.28 + rng.next() * 0.7
+    moonArm.userData.spinPhase = rng.next() * Math.PI * 2
     const moon = circle(0.055, color, 16)
     moon.position.set(0.4, 0, 0)
     moonArm.add(moon)
@@ -249,37 +262,53 @@ function tankerGlyph(color: number): THREE.Group {
   return g
 }
 
-function crateGlyph(color: number, sx: number, sy: number, sz: number): THREE.Group {
+function cargoCube(kind: WreckCargoKind, size: number): THREE.Group {
   const g = new THREE.Group()
-  const geom = new THREE.BoxGeometry(sx, sy, sz)
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geom), lineMat(color))
-  g.add(edges)
+  const color = CARGO_COLOR[kind]
+  const geom = new THREE.BoxGeometry(size, size, size)
+  const fill = new THREE.Mesh(
+    geom,
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+    }),
+  )
+  g.add(fill)
+  g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom), lineMat(color)))
+  g.userData.cargoCube = kind
   return g
 }
 
-function transportGlyph(color: number): THREE.Group {
+function transportGlyph(hullColor: number, salt: string): THREE.Group {
   const g = new THREE.Group()
-  g.add(poly([[-0.18, -0.28], [0.18, -0.28], [0.18, 0.08], [-0.18, 0.08]], color, true))
-  g.add(poly([[-0.1, -0.18], [0.1, -0.18], [0.1, -0.02], [-0.1, -0.02]], color, true))
-  g.add(poly([[-0.48, 0.08], [-0.18, 0.08], [-0.18, 0.28], [-0.48, 0.22]], color, true))
-  g.add(poly([[0.18, 0.08], [0.5, 0.14], [0.48, 0.3], [0.18, 0.28]], color, true))
-  g.add(poly([[-0.08, 0.08], [-0.02, 0.22]], color))
-  g.add(poly([[0.06, 0.08], [0.14, 0.2]], color))
-  g.add(poly([[-0.12, -0.28], [-0.2, -0.42]], color))
-  g.add(poly([[0.12, -0.28], [0.22, -0.4]], color))
+  g.add(poly([[-0.18, -0.28], [0.18, -0.28], [0.18, 0.08], [-0.18, 0.08]], hullColor, true))
+  g.add(poly([[-0.1, -0.18], [0.1, -0.18], [0.1, -0.02], [-0.1, -0.02]], hullColor, true))
+  g.add(poly([[-0.48, 0.08], [-0.18, 0.08], [-0.18, 0.28], [-0.48, 0.22]], hullColor, true))
+  g.add(poly([[0.18, 0.08], [0.5, 0.14], [0.48, 0.3], [0.18, 0.28]], hullColor, true))
+  g.add(poly([[-0.08, 0.08], [-0.02, 0.22]], hullColor))
+  g.add(poly([[0.06, 0.08], [0.14, 0.2]], hullColor))
+  g.add(poly([[-0.12, -0.28], [-0.2, -0.42]], hullColor))
+  g.add(poly([[0.12, -0.28], [0.22, -0.4]], hullColor))
 
-  const crates: Array<{ x: number; z: number; spinY: number; sx: number; sy: number; sz: number }> = [
-    { x: -0.34, z: -0.14, spinY: 0.62, sx: 0.09, sy: 0.07, sz: 0.11 },
-    { x: 0.3, z: -0.2, spinY: -0.48, sx: 0.08, sy: 0.06, sz: 0.09 },
-    { x: 0.02, z: 0.34, spinY: 0.84, sx: 0.07, sy: 0.07, sz: 0.08 },
+  const rng = new RNG(`wreck-cargo:${salt}`)
+  const count = 2 + rng.nextInt(2)
+  const kinds = rng.shuffle(CARGO_KINDS).slice(0, count)
+  const slots: Array<[number, number]> = [
+    [-0.34, -0.14],
+    [0.3, -0.2],
+    [0.02, 0.34],
   ]
-  for (const crate of crates) {
-    const box = crateGlyph(color, crate.sx, crate.sy, crate.sz)
-    box.position.set(crate.x, Y + 0.04, crate.z)
+  kinds.forEach((kind, index) => {
+    const size = 0.07 + rng.next() * 0.025
+    const box = cargoCube(kind, size)
+    const [x, z] = slots[index] ?? slots[0]
+    box.position.set(x, Y + size * 0.5, z)
     box.userData.animate = 'crate'
-    box.userData.spinY = crate.spinY
+    box.userData.spinY = (rng.next() * 1.1 + 0.25) * (rng.next() < 0.5 ? -1 : 1)
     g.add(box)
-  }
+  })
   return g
 }
 
@@ -298,13 +327,18 @@ function blackHoleGlyph(color: number): THREE.Group {
   return g
 }
 
-function fuelCellGlyph(color: number): THREE.Group {
+function fuelHexGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
   g.userData.fuelCell = true
-  g.add(poly([[-0.05, -0.032], [0.038, -0.032], [0.038, 0.032], [-0.05, 0.032]], color, true))
-  g.add(poly([[-0.028, -0.016], [0.016, -0.016]], color))
-  g.add(poly([[-0.028, 0.016], [0.016, 0.016]], color))
-  g.add(poly([[0.038, -0.014], [0.058, -0.014], [0.058, 0.014], [0.038, 0.014]], color, true))
+  g.userData.fuelHex = true
+  const hex: Array<[number, number]> = []
+  const r = 0.072
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i
+    hex.push([Math.cos(a) * r, Math.sin(a) * r])
+  }
+  g.add(poly(hex, color, true))
+  g.add(circle(0.028, color, 16))
   g.position.set(0.52, 0, 0.48)
   return g
 }
@@ -312,10 +346,23 @@ function fuelCellGlyph(color: number): THREE.Group {
 function repairGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
   g.userData.repairMark = true
-  g.add(circle(0.07, color, 24))
-  g.add(poly([[-0.04, 0], [0.04, 0]], color))
-  g.add(poly([[0, -0.04], [0, 0.04]], color))
-  g.position.set(0.68, 0, 0.28)
+  g.add(poly([[-0.055, -0.01], [0.018, -0.01], [0.018, 0.01], [-0.055, 0.01]], color, true))
+  g.add(
+    poly(
+      [
+        [0.018, -0.01],
+        [0.05, -0.028],
+        [0.062, -0.016],
+        [0.034, 0],
+        [0.062, 0.016],
+        [0.05, 0.028],
+        [0.018, 0.01],
+      ],
+      color,
+      true,
+    ),
+  )
+  g.position.set(0.68, 0, 0.48)
   return g
 }
 
@@ -349,14 +396,13 @@ function spaceGateGlyph(color: number): THREE.Group {
   return g
 }
 
-function straitGlyph(edges: TileDefinition['edges'], color: number): THREE.Group {
+function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string): THREE.Group {
   const g = new THREE.Group()
   g.userData.straitGlyph = true
+  const rng = new RNG(`strait-rocks:${salt}`)
   let open = 0
   let blocked = 0
-  const r = HEX_SIZE * 0.9
-  const railW = 0.11
-  const railInner = 0.1
+  const r = HEX_SIZE * 0.88
   for (let i = 0; i < 6; i++) {
     const a0 = (Math.PI / 3) * i
     const a1 = (Math.PI / 3) * (i + 1)
@@ -364,69 +410,43 @@ function straitGlyph(edges: TileDefinition['edges'], color: number): THREE.Group
     const z0 = Math.sin(a0) * r
     const x1 = Math.cos(a1) * r
     const z1 = Math.sin(a1) * r
-    if (edges[i] === 'BLOCKED') {
-      blocked += 1
-      const wall = poly([[x0, z0], [x1, z1]], color)
-      wall.userData.straitBlocked = true
-      g.add(wall)
-      const mx = (x0 + x1) / 2
-      const mz = (z0 + z1) / 2
-      const hatch = poly(
-        [
-          [mx * 0.82, mz * 0.82],
-          [mx, mz],
-        ],
-        color,
-        false,
-        0.75,
-      )
-      hatch.userData.straitBlocked = true
-      g.add(hatch)
+    if (edges[i] !== 'BLOCKED') {
+      open += 1
       continue
     }
-    open += 1
-    const mid = a0 + Math.PI / 6
-    const ux = Math.cos(mid)
-    const uz = Math.sin(mid)
-    const px = -uz
-    const pz = ux
-    const gate0 = poly(
-      [
-        [x0, z0],
-        [x0 + (x1 - x0) * 0.22, z0 + (z1 - z0) * 0.22],
-      ],
-      color,
-    )
-    const gate1 = poly(
-      [
-        [x1, z1],
-        [x1 + (x0 - x1) * 0.22, z1 + (z0 - z1) * 0.22],
-      ],
-      color,
-    )
-    const left = poly(
-      [
-        [ux * railInner + px * railW, uz * railInner + pz * railW],
-        [ux * r + px * railW, uz * r + pz * railW],
-      ],
-      color,
-    )
-    const right = poly(
-      [
-        [ux * railInner - px * railW, uz * railInner - pz * railW],
-        [ux * r - px * railW, uz * r - pz * railW],
-      ],
-      color,
-    )
-    left.userData.straitOpen = true
-    right.userData.straitOpen = true
-    gate0.userData.straitOpen = true
-    gate1.userData.straitOpen = true
-    g.add(gate0, gate1, left, right)
+    blocked += 1
+    const cluster = new THREE.Group()
+    cluster.userData.straitBlocked = true
+    cluster.userData.blockedFace = i
+    const mx = (x0 + x1) / 2
+    const mz = (z0 + z1) / 2
+    const edgeLen = Math.hypot(x1 - x0, z1 - z0) || 1
+    const tx = (x1 - x0) / edgeLen
+    const tz = (z1 - z0) / edgeLen
+    const inward = Math.hypot(mx, mz) || 1
+    const ix = -mx / inward
+    const iz = -mz / inward
+    const pebbles = 4 + rng.nextInt(3)
+    for (let p = 0; p < pebbles; p++) {
+      const along = (p / Math.max(1, pebbles - 1) - 0.5) * edgeLen * 0.62
+      const inset = 0.1 + rng.next() * 0.08
+      const jitter = (rng.next() - 0.5) * 0.04
+      const cx = mx + tx * (along + jitter) + ix * inset
+      const cz = mz + tz * (along + jitter) + iz * inset
+      const rad = 0.028 + rng.next() * 0.03
+      const pts: Array<[number, number]> = []
+      const sides = 5 + rng.nextInt(2)
+      for (let s = 0; s < sides; s++) {
+        const a = (Math.PI * 2 * s) / sides + rng.next() * 0.4
+        const rr = rad * (0.7 + rng.next() * 0.45)
+        pts.push([cx + Math.cos(a) * rr, cz + Math.sin(a) * rr])
+      }
+      cluster.add(spinningRock(pts, color, (0.2 + rng.next() * 0.5) * (rng.next() < 0.5 ? -1 : 1)))
+    }
+    g.add(cluster)
   }
   g.userData.openChannels = open
   g.userData.blockedWalls = blocked
-  g.add(circle(0.1, color, 24))
   return g
 }
 
@@ -471,7 +491,7 @@ function chanceLabel(text: string, color: number): THREE.Object3D {
 }
 
 function edgeDigitPlane(n: number, color: number): THREE.Object3D {
-  const userData = { edgeDigit: n, edgeWall: true }
+  const userData = { edgeDigit: n, edgeTop: true }
   if (typeof document === 'undefined') {
     const stub = new THREE.Group()
     Object.assign(stub.userData, userData)
@@ -490,7 +510,7 @@ function edgeDigitPlane(n: number, color: number): THREE.Object3D {
     ctx.fillText(String(n), 32, 34)
   }
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.055, 0.055),
+    new THREE.PlaneGeometry(0.09, 0.09),
     new THREE.MeshBasicMaterial({
       map: new THREE.CanvasTexture(canvas),
       transparent: true,
@@ -506,24 +526,14 @@ function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
   const g = new THREE.Group()
   g.userData.edgeNumbers = true
   const r = HEX_SIZE * 0.96
-  const tFromLeft = EDGE_DIGIT_ALONG
-  const wallY = -TILE_THICKNESS * 0.5
   for (let i = 0; i < 6; i++) {
     const a0 = (Math.PI / 3) * i
     const a1 = (Math.PI / 3) * (i + 1)
-    const x0 = r * Math.cos(a0)
-    const z0 = r * Math.sin(a0)
-    const x1 = r * Math.cos(a1)
-    const z1 = r * Math.sin(a1)
-    const nx = z1 - z0
-    const nz = -(x1 - x0)
-    const len = Math.hypot(nx, nz) || 1
+    const mx = ((r * Math.cos(a0) + r * Math.cos(a1)) / 2) * EDGE_DIGIT_INSET
+    const mz = ((r * Math.sin(a0) + r * Math.sin(a1)) / 2) * EDGE_DIGIT_INSET
     const mark = edgeDigitPlane(numbers[i], color)
-    const x = x1 + (x0 - x1) * tFromLeft
-    const z = z1 + (z0 - z1) * tFromLeft
-    mark.position.set(x + (nx / len) * 0.004, wallY, z + (nz / len) * 0.004)
-    mark.rotation.y = Math.atan2(nx, nz)
-    mark.userData.edgeAlong = tFromLeft
+    mark.position.set(mx, Y + 0.002, mz)
+    mark.rotation.set(-Math.PI / 2, Math.atan2(-mx, -mz), 0)
     mark.userData.digitColor = color
     g.add(mark)
   }
@@ -548,13 +558,13 @@ export function createTileGlyph(
       root.add(voidGlyph(color))
       break
     case 'PLANET_LARGE':
-      root.add(planetGlyph(planetColor, 'L'))
+      root.add(planetGlyph(planetColor, 'L', salt))
       break
     case 'PLANET_MEDIUM':
-      root.add(planetGlyph(planetColor, 'M'))
+      root.add(planetGlyph(planetColor, 'M', salt))
       break
     case 'PLANET_SMALL':
-      root.add(planetGlyph(planetColor, 'S'))
+      root.add(planetGlyph(planetColor, 'S', salt))
       break
     case 'ASTEROID':
       root.add(asteroidGlyph(color))
@@ -567,7 +577,7 @@ export function createTileGlyph(
       root.add(tankerGlyph(color))
       break
     case 'WRECK_TRANSPORT':
-      root.add(transportGlyph(color))
+      root.add(transportGlyph(color, salt))
       break
     case 'BLACK_HOLE':
       root.add(blackHoleGlyph(color))
@@ -579,12 +589,12 @@ export function createTileGlyph(
       root.add(spaceGateGlyph(color))
       break
     case 'STRAIT':
-      root.add(straitGlyph(def.edges, color))
+      root.add(straitGlyph(def.edges, color, salt))
       break
     default:
       root.add(voidGlyph(color))
   }
-  if (isRefuelTileType(type)) root.add(fuelCellGlyph(scan ? color : palette.ochre))
+  if (type === 'WRECK_TANKER') root.add(fuelHexGlyph(scan ? color : palette.ochre))
   if (type === 'EVA_1') root.add(repairGlyph(scan ? color : palette.ivory))
   if (edgeNumbers) root.add(edgeNumberMarks(edgeNumbers, color))
   return root
@@ -603,10 +613,14 @@ export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
       obj.rotation.y = time * Number(obj.userData.spinY || 0.5)
     }
     if (obj.userData.animate === 'spin') {
-      obj.rotation.y = time * 0.12
+      const rate = Number(obj.userData.spinRate ?? 0.12)
+      const phase = Number(obj.userData.spinPhase ?? 0)
+      obj.rotation.y = phase + time * rate
     }
     if (obj.userData.animate === 'moon') {
-      obj.rotation.y = (time / 12) * Math.PI * 2
+      const rate = Number(obj.userData.spinRate ?? Math.PI * 2 / 12)
+      const phase = Number(obj.userData.spinPhase ?? 0)
+      obj.rotation.y = phase + time * rate
     }
     if (obj.userData.animate === 'evaHub') {
       obj.rotation.y = time * EVA_HUB_SPIN

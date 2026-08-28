@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { TILE_DEFINITIONS } from '../game/definitions/tiles'
-import { createTileGlyph, planetTintForId, EDGE_DIGIT_ALONG } from '../renderer/board/tileGlyphs'
-import { TILE_THICKNESS } from '../renderer/board/TileRenderer'
+import { createTileGlyph, planetTintForId, EDGE_DIGIT_INSET } from '../renderer/board/tileGlyphs'
 import { palette } from '../renderer/theme'
+
+const CARGO = new Set(['ORE', 'BIOMASS', 'ICE', 'FUEL'])
 
 describe('tile glyphs', () => {
   it('spins each asteroid in the tile plane at its own rate', () => {
@@ -19,15 +20,22 @@ describe('tile glyphs', () => {
     expect(spins.some((speed) => speed < 0)).toBe(true)
   })
 
-  it('tumbles three crates on the wrecked transport', () => {
-    const glyph = createTileGlyph(TILE_DEFINITIONS['wreck-transport-1'])
-    const spins: number[] = []
+  it('stacks two or three resource cubes on the wrecked transport', () => {
+    const glyph = createTileGlyph(TILE_DEFINITIONS['wreck-transport-1'], palette.paper, 'wreck-a')
+    const kinds: string[] = []
     glyph.traverse((obj) => {
-      if (obj.userData.animate !== 'crate') return
-      spins.push(Number(obj.userData.spinY))
+      if (obj.userData.cargoCube) kinds.push(String(obj.userData.cargoCube))
     })
-    expect(spins).toHaveLength(3)
-    expect(new Set(spins).size).toBe(3)
+    expect(kinds.length).toBeGreaterThanOrEqual(2)
+    expect(kinds.length).toBeLessThanOrEqual(3)
+    expect(new Set(kinds).size).toBe(kinds.length)
+    expect(kinds.every((kind) => CARGO.has(kind))).toBe(true)
+    const again = createTileGlyph(TILE_DEFINITIONS['wreck-transport-1'], palette.paper, 'wreck-a')
+    const kinds2: string[] = []
+    again.traverse((obj) => {
+      if (obj.userData.cargoCube) kinds2.push(String(obj.userData.cargoCube))
+    })
+    expect(kinds2).toEqual(kinds)
   })
 
   it('orbits a moon around medium planets', () => {
@@ -37,6 +45,23 @@ describe('tile glyphs', () => {
       if (obj.userData.animate === 'moon') moons += 1
     })
     expect(moons).toBe(1)
+  })
+
+  it('gives each planet its own spin rate and phase', () => {
+    const a = createTileGlyph(TILE_DEFINITIONS['planet-medium-1'], palette.paper, 'spin-a')
+    const b = createTileGlyph(TILE_DEFINITIONS['planet-medium-2'], palette.paper, 'spin-b')
+    const rates: number[] = []
+    const phases: number[] = []
+    for (const glyph of [a, b]) {
+      glyph.traverse((obj) => {
+        if (obj.userData.animate !== 'spin') return
+        rates.push(Number(obj.userData.spinRate))
+        phases.push(Number(obj.userData.spinPhase))
+      })
+    }
+    expect(rates).toHaveLength(2)
+    expect(rates[0]).not.toBeCloseTo(rates[1])
+    expect(phases[0]).not.toBeCloseTo(phases[1])
   })
 
   it('paints a probe-scan planet glyph engine blue instead of a muted tint', () => {
@@ -75,7 +100,7 @@ describe('tile glyphs', () => {
     expect(pulses.sort()).toEqual([0, 1, 2])
   })
 
-  it('marks a fuel cell, EVA repair, asteroid chance, and edge numbers', () => {
+  it('marks EVA repair and tanker fuel, with edge numbers on the top face', () => {
     const eva = createTileGlyph(TILE_DEFINITIONS['eva-1'], palette.paper, 'eva-1', false, [1, 2, 3, 4, 5, 6])
     let fuel = 0
     let repair = 0
@@ -85,15 +110,16 @@ describe('tile glyphs', () => {
       if (obj.userData.repairMark) repair += 1
       if (obj.userData.edgeDigit) digits += 1
     })
-    expect(fuel).toBe(1)
+    expect(fuel).toBe(0)
     expect(repair).toBe(1)
     expect(digits).toBe(6)
-    expect(EDGE_DIGIT_ALONG).toBeCloseTo(1 / 3)
+    expect(EDGE_DIGIT_INSET).toBeCloseTo(0.78)
     eva.traverse((obj) => {
       if (!obj.userData.edgeDigit) return
-      expect(obj.userData.edgeWall).toBe(true)
-      expect(obj.userData.edgeAlong).toBeCloseTo(1 / 3)
-      expect(obj.position.y).toBeCloseTo(-TILE_THICKNESS * 0.5)
+      expect(obj.userData.edgeTop).toBe(true)
+      expect(obj.userData.edgeWall).toBeUndefined()
+      expect(obj.position.y).toBeGreaterThan(0)
+      expect(obj.rotation.x).toBeCloseTo(-Math.PI / 2)
       expect(obj.userData.digitColor).toBe(palette.paper)
       expect(obj).not.toBeInstanceOf(THREE.Sprite)
     })
@@ -107,20 +133,17 @@ describe('tile glyphs', () => {
     expect(createTileGlyph(TILE_DEFINITIONS['space-gate-1']).children.length).toBeGreaterThan(0)
   })
 
-  it('draws open channels and blocked walls for each strait layout', () => {
+  it('piles asteroid clusters on blocked strait edges', () => {
     const threeWay = createTileGlyph(TILE_DEFINITIONS['strait-1'])
-    let open = 0
-    let blocked = 0
+    let blockedFaces = 0
     threeWay.traverse((obj) => {
-      if (obj.userData.straitOpen) open += 1
-      if (obj.userData.straitBlocked) blocked += 1
+      if (obj.userData.straitBlocked) blockedFaces += 1
       if (obj.userData.openChannels) {
         expect(obj.userData.openChannels).toBe(3)
         expect(obj.userData.blockedWalls).toBe(3)
       }
     })
-    expect(open).toBe(12)
-    expect(blocked).toBe(6)
+    expect(blockedFaces).toBe(3)
     const bent = createTileGlyph(TILE_DEFINITIONS['strait-2'])
     bent.traverse((obj) => {
       if (obj.userData.openChannels) {

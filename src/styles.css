@@ -115,6 +115,21 @@ body,
   color: color-mix(in srgb, var(--color-primary) 72%, transparent);
 }
 
+.phase-banner {
+  position: absolute;
+  top: calc(2.05rem + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 21;
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: var(--font-xs);
+  font-weight: 500;
+  color: color-mix(in srgb, var(--color-primary) 88%, transparent);
+  white-space: nowrap;
+}
+
 .event-log__line {
   margin-top: 0.22rem;
   line-height: 1.35;

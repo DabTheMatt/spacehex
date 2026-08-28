@@ -273,6 +273,7 @@ export class ShipRenderer {
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
       wrapper.userData.beacon = marker.userData.beacon
+      wrapper.userData.beacon2 = marker.userData.beacon2
       const shownYaw = this.facing.get(ship.id) ?? yaw
       wrapper.quaternion.setFromAxisAngle(Y_AXIS, shownYaw)
       wrapper.position.set(last.x, BASE_HOVER, last.z)
@@ -310,12 +311,8 @@ export class ShipRenderer {
         this.facing.set(shipId, dock.yaw)
         this.lastXZ.set(shipId, { x: child.position.x, z: child.position.z })
       }
-      const beacon = child.userData.beacon as THREE.Mesh | undefined
-      if (!beacon) continue
-      const mat = beacon.material
-      if (Array.isArray(mat) || !('opacity' in mat)) continue
-      const on = (time * 2) % 1 < 0.5
-      mat.opacity = on ? 1 : 0.12
+      blinkBeacon(child.userData.beacon as THREE.Mesh | undefined, time, 2)
+      blinkBeacon(child.userData.beacon2 as THREE.Mesh | undefined, time, 2.65)
     }
     return settled
   }
@@ -765,6 +762,21 @@ function createNavMarker(
     beacon.renderOrder = 10
     g.add(beacon)
     g.userData.beacon = beacon
+    const beacon2 = new THREE.Mesh(
+      new THREE.SphereGeometry(0.007, 8, 6),
+      new THREE.MeshBasicMaterial({
+        color: 0xf4f1e8,
+        transparent: true,
+        opacity: 1,
+        depthTest: false,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    )
+    beacon2.position.set(half * 0.36, HULL_HEIGHT + 0.016, -length * 0.12)
+    beacon2.renderOrder = 10
+    g.add(beacon2)
+    g.userData.beacon2 = beacon2
   }
   applyEngineBurn(g, ENGINES_OFF)
   return g
@@ -834,6 +846,14 @@ function makeThruster(
   group.userData.plumeMesh = mesh
   group.userData.plumeCore = core
   return group
+}
+
+function blinkBeacon(beacon: THREE.Mesh | undefined, time: number, hz: number): void {
+  if (!beacon) return
+  const mat = beacon.material
+  if (Array.isArray(mat) || !('opacity' in mat)) return
+  const on = (time * hz) % 1 < 0.5
+  mat.opacity = on ? 1 : 0.12
 }
 
 function applyEngineBurn(

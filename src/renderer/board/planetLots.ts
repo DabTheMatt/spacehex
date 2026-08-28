@@ -112,7 +112,7 @@ export function createPlanetOverlay(
     far.add(diceCluster(id, amount, x))
   })
 
-  const fuelX = 1.5 * HEX_SPACING
+  const fuelX = 2.5 * HEX_SPACING
   const fuelCluster = new THREE.Group()
   fuelCluster.position.set(fuelX, OVERLAY_HOVER, LOT_Z)
   fuelCluster.add(stockHexFuel())
@@ -183,7 +183,7 @@ export function createEvaOverlay(
   exchange.position.set(0, OVERLAY_HOVER + 0.01, LOT_Z + FOOT_GAP)
   close.add(exchange)
 
-  const fuelX = HEX_SPACING
+  const fuelX = 2 * HEX_SPACING
   const fuelCluster = new THREE.Group()
   fuelCluster.position.set(fuelX, OVERLAY_HOVER, LOT_Z)
   fuelCluster.add(stockHexFuel())
@@ -466,9 +466,20 @@ function stockSquare(id: ResourceId, amount: number): THREE.Group {
 
 function stockHexFuel(): THREE.Group {
   const g = new THREE.Group()
+  g.userData.fuelHex = true
   const color = palette.ochre
-  const body = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.09, 0.056),
+  const r = 0.072
+  const shape = new THREE.Shape()
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i
+    const x = r * Math.cos(a)
+    const y = r * Math.sin(a)
+    if (i === 0) shape.moveTo(x, y)
+    else shape.lineTo(x, y)
+  }
+  shape.closePath()
+  const hex = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape),
     new THREE.MeshBasicMaterial({
       color: palette.graphite,
       side: THREE.DoubleSide,
@@ -477,10 +488,10 @@ function stockHexFuel(): THREE.Group {
       opacity: 0.92,
     }),
   )
-  body.rotation.x = -Math.PI / 2
-  g.add(body)
+  hex.rotation.x = -Math.PI / 2
+  g.add(hex)
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.048, 0.056, 4),
+    new THREE.RingGeometry(r * 0.94, r, 6),
     new THREE.MeshBasicMaterial({
       color,
       side: THREE.DoubleSide,
@@ -491,46 +502,33 @@ function stockHexFuel(): THREE.Group {
   ring.rotation.x = -Math.PI / 2
   ring.position.y = 0.002
   g.add(ring)
-  const nub = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.018, 0.028),
-    new THREE.MeshBasicMaterial({
-      color,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  )
-  nub.rotation.x = -Math.PI / 2
-  nub.position.set(0.058, 0.002, 0)
-  g.add(nub)
   return g
 }
 
 function stockRepair(): THREE.Group {
   const g = new THREE.Group()
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.048, 0.06, 24),
-    new THREE.MeshBasicMaterial({
-      color: palette.ivory,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  )
-  ring.rotation.x = -Math.PI / 2
-  g.add(ring)
-  const barH = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.07, 0.012),
-    new THREE.MeshBasicMaterial({ color: palette.ivory, side: THREE.DoubleSide, depthWrite: false }),
-  )
-  barH.rotation.x = -Math.PI / 2
-  barH.position.y = 0.002
-  g.add(barH)
-  const barV = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.012, 0.07),
-    new THREE.MeshBasicMaterial({ color: palette.ivory, side: THREE.DoubleSide, depthWrite: false }),
-  )
-  barV.rotation.x = -Math.PI / 2
-  barV.position.y = 0.002
-  g.add(barV)
+  g.userData.repairMark = true
+  const mat = new THREE.MeshBasicMaterial({
+    color: palette.ivory,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
+  const handle = new THREE.Mesh(new THREE.PlaneGeometry(0.088, 0.016), mat)
+  handle.rotation.x = -Math.PI / 2
+  handle.position.set(-0.012, 0.002, 0)
+  g.add(handle)
+  const collar = new THREE.Mesh(new THREE.PlaneGeometry(0.016, 0.042), mat)
+  collar.rotation.x = -Math.PI / 2
+  collar.position.set(0.03, 0.002, 0)
+  g.add(collar)
+  const jawT = new THREE.Mesh(new THREE.PlaneGeometry(0.038, 0.012), mat)
+  jawT.rotation.x = -Math.PI / 2
+  jawT.position.set(0.048, 0.002, 0.018)
+  g.add(jawT)
+  const jawB = new THREE.Mesh(new THREE.PlaneGeometry(0.038, 0.012), mat)
+  jawB.rotation.x = -Math.PI / 2
+  jawB.position.set(0.048, 0.002, -0.018)
+  g.add(jawB)
   return g
 }
 

@@ -82,21 +82,20 @@ describe('NPC face movement', () => {
 })
 
 describe('fuel cell marks', () => {
-  it('marks EVA, planets, and the tanker, but not void', () => {
-    const marked = ['eva-1', 'planet-small-1', 'wreck-tanker-1']
-    for (const id of marked) {
-      const glyph = createTileGlyph(TILE_DEFINITIONS[id])
-      let cells = 0
-      glyph.traverse((obj) => {
-        if (obj.userData.fuelCell) cells += 1
-      })
-      expect(cells).toBe(1)
-    }
-    const voidGlyph = createTileGlyph(TILE_DEFINITIONS['void-1'])
+  it('marks the tanker with a fuel hex, not EVA or planets', () => {
+    const tanker = createTileGlyph(TILE_DEFINITIONS['wreck-tanker-1'])
     let cells = 0
-    voidGlyph.traverse((obj) => {
-      if (obj.userData.fuelCell) cells += 1
+    tanker.traverse((obj) => {
+      if (obj.userData.fuelHex) cells += 1
     })
-    expect(cells).toBe(0)
+    expect(cells).toBe(1)
+    for (const id of ['eva-1', 'planet-small-1', 'void-1']) {
+      const glyph = createTileGlyph(TILE_DEFINITIONS[id])
+      let found = 0
+      glyph.traverse((obj) => {
+        if (obj.userData.fuelCell || obj.userData.fuelHex) found += 1
+      })
+      expect(found).toBe(0)
+    }
   })
 })
