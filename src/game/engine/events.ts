@@ -52,6 +52,6 @@ export type GameEvent =
   | { type: 'ASTEROID_STRIKE'; shipId: string; coord: HexCoord; damage: number }
   | { type: 'FUEL_BOUGHT'; playerId: string; price: number; fuel: number; coord: HexCoord }
   | { type: 'NPC_FACE_ROLLED'; shipId: string; face: number }
-  | { type: 'VORTEX_ROLL'; shipId: string; face: number; coord: HexCoord }
+  | { type: 'VORTEX_ROLL'; shipId: string; face: number; coord: HexCoord; dest: HexCoord }
   | { type: 'HULL_REPAIRED'; shipId: string; hullAfter: number; price: number }
   | { type: 'COMMAND_REJECTED'; command: string; reason: string }

@@ -19,6 +19,7 @@ import {
   shipsTooClose,
   yieldOffSegment,
   SHIP_CLEARANCE,
+  ENEMY_YIELD_CLEARANCE,
   shortestAngleDelta,
   SHIP_BRAKE_MS,
   SHIP_FLIGHT_MS,
@@ -544,6 +545,7 @@ export class ShipRenderer {
       if (otherMotion?.kind === 'hold') continue
       if (otherMotion?.kind !== 'fly') {
         this.yieldAside(otherId, flyer, other.position)
+        if (!other.userData.playerId) return true
         continue
       }
       return true
@@ -567,7 +569,16 @@ export class ShipRenderer {
     flyer: FlyMotion,
     pos: { x: number; z: number },
   ): void {
-    const to = yieldOffSegment(pos.x, pos.z, flyer.fromX, flyer.fromZ, flyer.toX, flyer.toZ)
+    const enemy = !this.group.children.find((child) => child.userData.shipId === shipId)?.userData.playerId
+    const to = yieldOffSegment(
+      pos.x,
+      pos.z,
+      flyer.fromX,
+      flyer.fromZ,
+      flyer.toX,
+      flyer.toZ,
+      enemy ? ENEMY_YIELD_CLEARANCE : SHIP_CLEARANCE,
+    )
     this.maybeSlide(shipId, pos, to)
   }
 

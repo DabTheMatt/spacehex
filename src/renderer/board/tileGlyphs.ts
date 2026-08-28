@@ -378,15 +378,46 @@ function fuelHexGlyph(color: number): THREE.Group {
 
 function vortexGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
-  g.add(circle(0.42, color, 40, 0.85))
-  const spiral: Array<[number, number]> = []
-  for (let i = 0; i <= 32; i++) {
-    const t = i / 32
-    const a = t * Math.PI * 2.4
-    const r = 0.06 + t * 0.38
-    spiral.push([Math.cos(a) * r, Math.sin(a) * r])
+  g.userData.vortexGlyph = true
+  const ink = palette.engine
+  g.add(poly(
+    Array.from({ length: 6 }, (_, i) => {
+      const { x, z } = hexCorner(i, 0.62)
+      return [x, z] as [number, number]
+    }),
+    ink,
+    true,
+  ))
+  const outer = new THREE.Group()
+  outer.userData.animate = 'spin'
+  outer.userData.spinRate = 0.85
+  outer.userData.spinPhase = 0
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i
+    const x = Math.cos(a) * 0.38
+    const z = Math.sin(a) * 0.38
+    const px = -Math.sin(a)
+    const pz = Math.cos(a)
+    outer.add(
+      poly(
+        [
+          [x - px * 0.1, z - pz * 0.1],
+          [x + Math.cos(a) * 0.16, z + Math.sin(a) * 0.16],
+          [x + px * 0.1, z + pz * 0.1],
+        ],
+        ink,
+      ),
+    )
   }
-  g.add(poly(spiral, color))
+  g.add(outer)
+  const inner = new THREE.Group()
+  inner.userData.animate = 'spin'
+  inner.userData.spinRate = -1.35
+  inner.userData.spinPhase = 0.4
+  inner.add(circle(0.16, ink, 6))
+  inner.add(circle(0.28, ink, 6, 0.75))
+  g.add(inner)
+  void color
   return g
 }
 
@@ -616,7 +647,11 @@ export function createTileGlyph(
   return root
 }
 
-export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
+export function tickTileGlyphs(
+  root: THREE.Object3D,
+  time: number,
+  vortexFlash?: { face: number | null; hold: boolean } | null,
+): void {
   root.traverse((obj) => {
     if (obj.userData.animate === 'asteroid') {
       obj.rotation.x = 0
@@ -667,6 +702,18 @@ export function tickTileGlyphs(root: THREE.Object3D, time: number): void {
         const prev = (chase + count - 1) % count
         mat.transparent = true
         mat.opacity = index === chase ? 1 : index === prev ? 0.4 : 0.12
+      }
+    }
+    if (typeof obj.userData.edgeDigit === 'number' && obj instanceof THREE.Mesh) {
+      const mat = obj.material
+      if (!Array.isArray(mat) && 'opacity' in mat) {
+        mat.transparent = true
+        if (!vortexFlash || vortexFlash.face === null) {
+          mat.opacity = 1
+        } else {
+          const on = obj.userData.edgeDigit === vortexFlash.face
+          mat.opacity = on ? 1 : vortexFlash.hold ? 0.18 : 0.28
+        }
       }
     }
   })

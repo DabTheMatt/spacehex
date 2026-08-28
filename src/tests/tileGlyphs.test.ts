@@ -138,7 +138,12 @@ describe('tile glyphs', () => {
       if (obj.userData.collisionChance) chance += 1
     })
     expect(chance).toBe(1)
-    expect(createTileGlyph(TILE_DEFINITIONS['vortex-1']).children.length).toBeGreaterThan(0)
+    const vortex = createTileGlyph(TILE_DEFINITIONS['vortex-1'])
+    let swirl = 0
+    vortex.traverse((obj) => {
+      if (obj.userData.vortexGlyph) swirl += 1
+    })
+    expect(swirl).toBe(1)
     expect(createTileGlyph(TILE_DEFINITIONS['space-gate-1']).children.length).toBeGreaterThan(0)
   })
 

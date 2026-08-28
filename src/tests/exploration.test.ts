@@ -206,6 +206,32 @@ describe('straits and vortex', () => {
       rotation: 0,
     }).state
     const moved = applyCommand(state, { type: 'DECLARE_MOVE', target: { q: 1, r: 0 } })
-    expect(moved.events.some((e) => e.type === 'VORTEX_ROLL')).toBe(true)
+    const roll = moved.events.find((e) => e.type === 'VORTEX_ROLL')
+    expect(roll).toBeTruthy()
+    if (roll && roll.type === 'VORTEX_ROLL') {
+      expect(roll.face).toBeGreaterThanOrEqual(1)
+      expect(roll.face).toBeLessThanOrEqual(6)
+      expect(roll.dest).toBeDefined()
+    }
+    const ship = moved.state.ships['mewa-1']
+    expect(ship.coord).not.toEqual({ q: 1, r: 0 })
+  })
+
+  it('discovers an empty neighbor when the vortex dumps there', () => {
+    let state = createInitialState('vortex-empty')
+    const glory = state.players['player-1'].glory
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'vortex-1',
+      coord: { q: 1, r: 0 },
+      rotation: 0,
+    }).state
+    const moved = applyCommand(state, { type: 'DECLARE_MOVE', target: { q: 1, r: 0 } })
+    expect(moved.events.some((e) => e.type === 'HEX_DISCOVERED')).toBe(true)
+    expect(moved.events.some((e) => e.type === 'GLORY_CHANGED')).toBe(true)
+    expect(moved.state.players['player-1'].glory).toBeGreaterThan(glory)
+    const dest = moved.state.ships['mewa-1'].coord
+    expect(dest).not.toEqual({ q: 1, r: 0 })
+    expect(moved.state.board.tiles[`${dest.q},${dest.r}`]).toBeTruthy()
   })
 })

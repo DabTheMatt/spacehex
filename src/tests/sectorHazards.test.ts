@@ -5,7 +5,8 @@ import { FUEL_BUY_PRICE, FUEL_TANK, REPAIR_PRICE, STARTING_FUEL } from '../game/
 import { formatLogLine } from '../ui/eventLog'
 import { discoveryNoun } from '../ui/discoveryCopy'
 import { hullPipCount, hullPipFilled } from '../ui/hullPips'
-import { rollAsteroidCollision } from '../game/rules/sectorHazards'
+import { faceOnWorldEdge } from '../game/board/edgeNumbers'
+import { rollAsteroidCollision, pickVortexDestination, hostileAt } from '../game/rules/sectorHazards'
 
 describe('exploration deck', () => {
   it('shuffles the exploration pile at game start', () => {
@@ -176,5 +177,49 @@ describe('hull pips', () => {
     expect(hullPipFilled(0, 2)).toBe(true)
     expect(hullPipFilled(1, 2)).toBe(true)
     expect(hullPipFilled(2, 2)).toBe(false)
+  })
+})
+
+describe('vortex dump', () => {
+  it('skips a neighbor occupied by an enemy hull', () => {
+    let state = createInitialState('vortex-skip-npc')
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'vortex-1',
+      coord: { q: 1, r: 0 },
+      rotation: 0,
+    }).state
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'void-1',
+      coord: { q: 2, r: 0 },
+      rotation: 0,
+    }).state
+    state = applyCommand(state, {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'void-2',
+      coord: { q: 1, r: -1 },
+      rotation: 0,
+    }).state
+    const blocked = { q: 2, r: 0 }
+    state = {
+      ...state,
+      npcShips: {
+        ...state.npcShips,
+        'ciern-block': {
+          id: 'ciern-block',
+          class: 'CIERN',
+          coord: blocked,
+          hull: 3,
+          maxHull: 3,
+        },
+      },
+    }
+    expect(hostileAt(state, blocked, 'mewa-1')).toBe(true)
+    const tile = state.board.tiles['1,0']
+    const faceEast = faceOnWorldEdge(tile.edgeNumbers, tile.rotation, 0)
+    const pick = pickVortexDestination(state, 'mewa-1', { q: 1, r: 0 }, faceEast)
+    expect(pick).toBeTruthy()
+    expect(pick?.dest).not.toEqual(blocked)
   })
 })

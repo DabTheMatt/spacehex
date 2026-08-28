@@ -33,6 +33,7 @@ export class BoardRenderer {
   private markers = new THREE.Group()
   private tileCache = new Map<string, { mesh: THREE.Group; sig: string }>()
   private glyphFade = new Map<string, { start: number; duration: number }>()
+  private vortexFlash: { key: string; face: number | null; hold: boolean } | null = null
 
   constructor() {
     this.group.add(this.tiles)
@@ -65,8 +66,16 @@ export class BoardRenderer {
   tick(time: number, camera: THREE.Camera): void {
     this.advanceGlyphFades(performance.now())
     tickTileGlyphs(this.tiles, time)
+    if (this.vortexFlash) {
+      const glyph = this.tileCache.get(this.vortexFlash.key)?.mesh.userData.glyph as THREE.Object3D | undefined
+      if (glyph) tickTileGlyphs(glyph, time, this.vortexFlash)
+    }
     tickPlanetLod(this.tiles, camera)
     pulseHexGhosts(this.markers, time)
+  }
+
+  setVortexFlash(flash: { key: string; face: number | null; hold: boolean } | null): void {
+    this.vortexFlash = flash
   }
 
   setTileY(key: string, y: number): void {

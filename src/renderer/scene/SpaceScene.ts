@@ -24,6 +24,8 @@ import {
   prefersReducedMotion,
   TILE_RISE_MS,
   CAMERA_FOCUS_MS,
+  VORTEX_CHASE_STEP_MS,
+  VORTEX_CHASE_LAPS,
 } from '../motion'
 
 export interface SceneOptions {
@@ -74,6 +76,14 @@ export class SpaceScene {
   private revealWhenSettled = new Set<string>()
   private startedProbeFlights = new Set<string>()
   private inflightProbeKeys = new Set<string>()
+  private vortexFx: {
+    shipId: string
+    coord: HexCoord
+    dest: HexCoord
+    face: number
+    startedAt: number
+    stage: 'inbound' | 'chase' | 'hold'
+  } | null = null
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -161,6 +171,18 @@ export class SpaceScene {
     for (const event of events) {
       if (event.type !== 'PROBE_LAUNCHED') continue
       this.launchProbeFlight(event.shipId, event.coord)
+    }
+    for (const event of events) {
+      if (event.type === 'VORTEX_ROLL') {
+        this.vortexFx = {
+          shipId: event.shipId,
+          coord: { ...event.coord },
+          dest: { ...event.dest },
+          face: event.face,
+          startedAt: performance.now(),
+          stage: 'inbound',
+        }
+      }
     }
     for (const event of events) {
       if (event.type === 'ASTEROID_STRIKE' && event.damage > 0) {
@@ -291,6 +313,14 @@ export class SpaceScene {
       }
       if (prev.q === ship.coord.q && prev.r === ship.coord.r) continue
       const dest = { ...ship.coord }
+      const vortex = this.vortexFx
+      if (vortex && vortex.shipId === ship.id && coordKey(dest) === coordKey(vortex.dest)) {
+        if (!this.ships.isFlyingTo(ship.id, vortex.coord) && !this.ships.isParkedAt(ship.id, vortex.coord)) {
+          this.ships.fly(ship.id, prev, vortex.coord)
+        }
+        this.prevShipCoords.set(ship.id, dest)
+        continue
+      }
       if (this.ships.isFlyingTo(ship.id, dest) || this.ships.isParkedAt(ship.id, dest)) {
         this.prevShipCoords.set(ship.id, dest)
         continue
@@ -373,9 +403,50 @@ export class SpaceScene {
     this.revealWhenSettled.clear()
     this.inflightProbeKeys.clear()
     this.startedProbeFlights.clear()
+    this.vortexFx = null
+    this.board.setVortexFlash(null)
     this.ships.reset()
     this.combat.dispose()
     this.duel = null
+  }
+
+  private advanceVortex(now: number): void {
+    const fx = this.vortexFx
+    if (!fx) {
+      this.board.setVortexFlash(null)
+      return
+    }
+    const key = coordKey(fx.coord)
+    const step = prefersReducedMotion() ? 0 : VORTEX_CHASE_STEP_MS
+    const chaseMs = step * 6 * VORTEX_CHASE_LAPS
+    if (fx.stage === 'inbound') {
+      if (this.ships.isBusy(fx.shipId) && this.ships.isFlyingTo(fx.shipId, fx.coord)) return
+      fx.stage = 'chase'
+      fx.startedAt = now
+    }
+    if (fx.stage === 'chase') {
+      const elapsed = now - fx.startedAt
+      if (step <= 0 || elapsed >= chaseMs) {
+        this.board.setVortexFlash({ key, face: fx.face, hold: true })
+        fx.stage = 'hold'
+        fx.startedAt = now
+      } else {
+        const idx = Math.floor(elapsed / step) % 6
+        this.board.setVortexFlash({ key, face: idx + 1, hold: false })
+        return
+      }
+    }
+    if (fx.stage === 'hold') {
+      this.board.setVortexFlash({ key, face: fx.face, hold: true })
+      const same = coordKey(fx.coord) === coordKey(fx.dest)
+      if (!same && !this.ships.isFlyingTo(fx.shipId, fx.dest) && !this.ships.isParkedAt(fx.shipId, fx.dest)) {
+        if (!this.ships.isBusy(fx.shipId)) this.ships.fly(fx.shipId, fx.coord, fx.dest)
+        return
+      }
+      if (this.ships.isBusy(fx.shipId)) return
+      this.vortexFx = null
+      this.board.setVortexFlash(null)
+    }
   }
 
   private advanceDuel(now: number): void {
@@ -426,6 +497,7 @@ export class SpaceScene {
     this.hoverTargets.tick(time)
     this.probes.tick(time)
     this.advanceDuel(now)
+    this.advanceVortex(now)
     this.combat.tick(now)
     let glyphsChanged = false
     for (const coord of this.ships.consumeLanded()) {
