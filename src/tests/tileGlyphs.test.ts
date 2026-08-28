@@ -118,7 +118,7 @@ describe('tile glyphs', () => {
     expect(fuel).toBe(0)
     expect(repair).toBe(0)
     expect(digits).toBe(6)
-    expect(EDGE_DIGIT_INSET).toBeCloseTo(0.18)
+    expect(EDGE_DIGIT_INSET).toBeCloseTo(0.05)
     eva.updateMatrixWorld(true)
     eva.traverse((obj) => {
       if (!obj.userData.edgeDigit) return

@@ -8,8 +8,8 @@ import { HEX_SIZE, hexCorner } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
-/** Inward from the edge midpoint, on the top face (not the side wall). */
-export const EDGE_DIGIT_INSET = 0.18
+/** Inward from the edge midpoint, on the top face (not the side wall). Small so the digit sits on the rim. */
+export const EDGE_DIGIT_INSET = 0.05
 
 const CARGO_KINDS = ['ORE', 'BIOMASS', 'ICE', 'FUEL'] as const
 export type WreckCargoKind = (typeof CARGO_KINDS)[number]
