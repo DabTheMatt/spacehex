@@ -426,14 +426,27 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
     const inward = Math.hypot(mx, mz) || 1
     const ix = -mx / inward
     const iz = -mz / inward
-    const pebbles = 4 + rng.nextInt(3)
+    const pebbles = 5 + rng.nextInt(2)
     for (let p = 0; p < pebbles; p++) {
-      const along = (p / Math.max(1, pebbles - 1) - 0.5) * edgeLen * 0.62
-      const inset = 0.1 + rng.next() * 0.08
-      const jitter = (rng.next() - 0.5) * 0.04
+      const along = (p / Math.max(1, pebbles - 1) - 0.5) * edgeLen * 0.7
+      const inset = 0.08 + rng.next() * 0.07
+      const jitter = (rng.next() - 0.5) * 0.05
       const cx = mx + tx * (along + jitter) + ix * inset
       const cz = mz + tz * (along + jitter) + iz * inset
-      const rad = 0.028 + rng.next() * 0.03
+      const rad = 0.05 + rng.next() * 0.035
+      const fill = new THREE.Mesh(
+        new THREE.CircleGeometry(rad * 0.92, 10),
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.22,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      )
+      fill.rotation.x = -Math.PI / 2
+      fill.position.set(cx, Y, cz)
+      cluster.add(fill)
       const pts: Array<[number, number]> = []
       const sides = 5 + rng.nextInt(2)
       for (let s = 0; s < sides; s++) {
