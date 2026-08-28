@@ -7,6 +7,7 @@ import { TilePreviewRenderer } from '../board/TilePreviewRenderer'
 import { ShipRenderer } from '../entities/ShipRenderer'
 import { HoverTargetRenderer } from '../entities/HoverTargetRenderer'
 import { ProbeRenderer } from '../entities/ProbeRenderer'
+import { DebrisRenderer } from '../board/DebrisRenderer'
 import { CombatFx } from '../fx/CombatFx'
 import { palette, scenePalette } from '../theme'
 import type { GraphicMode } from '../graphicMode'
@@ -53,6 +54,7 @@ export class SpaceScene {
   readonly ships: ShipRenderer
   readonly hoverTargets: HoverTargetRenderer
   readonly probes: ProbeRenderer
+  readonly debris: DebrisRenderer
   readonly combat: CombatFx
   readonly raycaster = new THREE.Raycaster()
   private disposed = false
@@ -107,6 +109,7 @@ export class SpaceScene {
     this.ships = new ShipRenderer()
     this.hoverTargets = new HoverTargetRenderer()
     this.probes = new ProbeRenderer()
+    this.debris = new DebrisRenderer()
     this.combat = new CombatFx()
     this.scene.add(
       this.board.group,
@@ -114,6 +117,7 @@ export class SpaceScene {
       this.ships.group,
       this.hoverTargets.group,
       this.probes.group,
+      this.debris.group,
       this.combat.group,
     )
     this.loop()
@@ -138,6 +142,7 @@ export class SpaceScene {
       this.preview.setGraphicMode(mode)
       this.ships.setGraphicMode(mode)
       this.probes.setGraphicMode(mode)
+      this.debris.setGraphicMode(mode)
       this.combat.setGraphicMode(mode)
     }
     this.camera.mapRotateEnabled = this.lastState.phase !== 'TILE_PLACEMENT'
@@ -364,6 +369,7 @@ export class SpaceScene {
       this.launchProbeFlight(probe.ownerShipId, probe.coord)
     }
     this.probes.sync(this.lastState, this.inflightProbeKeys)
+    this.debris.sync(this.lastState)
   }
 
   private advanceRise(now: number): boolean {
@@ -512,6 +518,7 @@ export class SpaceScene {
     const shipsSettled = this.ships.tick(this.camera.camera, time)
     this.hoverTargets.tick(time)
     this.probes.tick(time)
+    this.debris.tick(time)
     this.advanceDuel(now)
     this.advanceVortex(now)
     this.combat.tick(now)

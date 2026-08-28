@@ -114,6 +114,7 @@ export function createInitialState(seed: string): GameState {
     npcShips: {},
     planetMarkets: {},
     probes: {},
+    debris: [],
     log: [
       { type: 'GAME_STARTED', seed },
       { type: 'DECK_SHUFFLED', count: drawPile.length },

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { TILE_DEFINITIONS } from '../game/definitions/tiles'
-import { createTileGlyph, planetTintForId, EDGE_DIGIT_INSET } from '../renderer/board/tileGlyphs'
+import { createTileGlyph, planetTintForId, EDGE_DIGIT_INSET, tickTileGlyphs } from '../renderer/board/tileGlyphs'
+import { attachCrateMotion, createCargoFigure } from '../renderer/board/cargoMesh'
+import { HEX_SIZE, pointInFlatTopHex } from '../game/board/hexMath'
+import { CARGO_FIGURE } from '../game/definitions/cargoFigures'
 import { palette } from '../renderer/theme'
 
 const CARGO = new Set(['ORE', 'BIOMASS', 'ICE', 'FUEL'])
@@ -28,6 +31,7 @@ describe('tile glyphs', () => {
       glyph.traverse((obj) => {
         if (obj.userData.cargoCube) {
           kinds.push(String(obj.userData.cargoCube))
+          expect(obj.userData.cargoFigure).toBe(CARGO_FIGURE[obj.userData.cargoCube as keyof typeof CARGO_FIGURE])
           expect(obj.userData.vx).not.toBeUndefined()
           expect(obj.userData.vz).not.toBeUndefined()
         }
@@ -204,5 +208,26 @@ describe('tile glyphs', () => {
         expect(obj.userData.blockedWalls).toBe(4)
       }
     })
+  })
+
+  it('gives wreck cargo distinct figures in ink', () => {
+    const glyph = createTileGlyph(TILE_DEFINITIONS['wreck-tanker-1'], palette.paper, 'ink-wreck', false, undefined, true)
+    const figures = new Set<string>()
+    glyph.traverse((obj) => {
+      if (obj.userData.cargoFigure) figures.add(String(obj.userData.cargoFigure))
+    })
+    expect(figures.size).toBeGreaterThan(1)
+    expect([...figures].every((f) => ['cube', 'cone', 'sphere', 'cylinder'].includes(f))).toBe(true)
+  })
+
+  it('keeps drifting crates inside the flat-top hex outline', () => {
+    const root = new THREE.Group()
+    const crate = createCargoFigure('ORE', 0.11, 0xffffff)
+    attachCrateMotion(crate, 1.2, 0, 0, 2.4, 0.4, { x: 0, y: 0, z: 0 })
+    root.add(crate)
+    for (let t = 0; t < 4; t += 1 / 60) tickTileGlyphs(root, t)
+    const pad = Number(crate.userData.crateRadius)
+    expect(pointInFlatTopHex(crate.position.x, crate.position.z, HEX_SIZE * 0.9 - pad)).toBe(true)
+    expect(pointInFlatTopHex(crate.position.x, crate.position.z, HEX_SIZE)).toBe(true)
   })
 })

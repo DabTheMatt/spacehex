@@ -16,6 +16,13 @@
         >
           INK
         </button>
+        <button
+          type="button"
+          :class="{ on: ui.graphicMode === 'ink-reversed' }"
+          @click="ui.setGraphicMode('ink-reversed')"
+        >
+          INK REV
+        </button>
       </div>
       <span>{{ left }}</span>
     </div>

@@ -6,6 +6,7 @@ import type { EdgeNumbers } from '../board/edgeNumbers'
 import type { GameEvent } from '../engine/events'
 import type { ShipClass } from '../definitions/ships'
 import type { PlanetMarket, ResourceId } from '../definitions/resources'
+import type { CargoKind } from '../definitions/cargoFigures'
 
 export type GamePhase = 'PLAYER_TURN' | 'TILE_PLACEMENT'
 
@@ -50,6 +51,12 @@ export interface ProbeState {
   ownerShipId: string
 }
 
+export interface DebrisCrate {
+  id: string
+  kind: CargoKind
+  coord: HexCoord
+}
+
 export interface NpcShipState {
   id: string
   class: ShipClass
@@ -72,6 +79,7 @@ export interface GameState {
   npcShips: Record<string, NpcShipState>
   planetMarkets: Record<string, PlanetMarket>
   probes: Record<string, ProbeState>
+  debris: DebrisCrate[]
   log: GameEvent[]
   movementSpent: boolean
 }

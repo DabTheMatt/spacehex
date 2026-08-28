@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type { GameState } from '../../game/state/GameState'
 import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import { palette } from '../theme'
-import type { GraphicMode } from '../graphicMode'
+import { isInk, type GraphicMode } from '../graphicMode'
 import { TILE_THICKNESS } from '../board/TileRenderer'
 import { prefersReducedMotion } from '../motion'
 
@@ -34,7 +34,7 @@ export class ProbeRenderer {
     for (const probe of Object.values(state.probes)) {
       const key = `${probe.coord.q},${probe.coord.r}`
       if (inflightKeys?.has(key)) continue
-      this.group.add(makeProbeSite(probe.coord.q, probe.coord.r, probe.ownerPlayerId, this.graphicMode === 'ink'))
+      this.group.add(makeProbeSite(probe.coord.q, probe.coord.r, probe.ownerPlayerId, isInk(this.graphicMode)))
     }
   }
 
@@ -56,7 +56,7 @@ export class ProbeRenderer {
       }
       if (obj.userData.probeBody) {
         obj.position.y = TILE_THICKNESS + 0.08 + wave * 0.01
-        if (!this.graphicMode || this.graphicMode !== 'ink') obj.rotation.y = time * 0.55
+        if (!isInk(this.graphicMode)) obj.rotation.y = time * 0.55
       }
       if (obj.userData.probeLed) {
         const mat = (obj as THREE.Mesh).material as THREE.MeshBasicMaterial

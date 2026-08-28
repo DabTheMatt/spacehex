@@ -88,10 +88,57 @@ export const inkCss = {
   priceYellow: '#FFFFFF',
 }
 
+export const inkReversedPalette = {
+  void: 0xffffff,
+  graphite: 0xffffff,
+  tileFill: 0xffffff,
+  ivory: 0x000000,
+  paper: 0x000000,
+  blood: 0x000000,
+  dusk: 0x000000,
+  ochre: 0x000000,
+  preview: 0x000000,
+  ink: 0xffffff,
+  engine: 0x000000,
+  player1: 0x000000,
+  player2: 0x000000,
+  planetViolet: 0x000000,
+  planetRose: 0x000000,
+  planetSage: 0x000000,
+  resourceRed: 0x000000,
+  resourceGreen: 0x000000,
+  resourceBlue: 0x000000,
+  repairPink: 0x000000,
+}
+
+export const inkReversedCss = {
+  void: '#FFFFFF',
+  ivory: '#000000',
+  paper: '#000000',
+  blood: '#000000',
+  dusk: '#000000',
+  ochre: '#000000',
+  graphite: '#FFFFFF',
+  ink: '#FFFFFF',
+  engine: '#000000',
+  player1: '#000000',
+  player2: '#000000',
+  resourceRed: '#000000',
+  resourceGreen: '#000000',
+  resourceBlue: '#000000',
+  repairPink: '#000000',
+  hullMark: '#FFFFFF',
+  priceYellow: '#000000',
+}
+
 export function scenePalette(mode: GraphicMode) {
-  return mode === 'ink' ? inkPalette : palette
+  if (mode === 'ink-reversed') return inkReversedPalette
+  if (mode === 'ink') return inkPalette
+  return palette
 }
 
 export function sceneCss(mode: GraphicMode) {
-  return mode === 'ink' ? inkCss : css
+  if (mode === 'ink-reversed') return inkReversedCss
+  if (mode === 'ink') return inkCss
+  return css
 }

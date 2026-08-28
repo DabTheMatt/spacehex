@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { scenePalette } from '../theme'
-import type { GraphicMode } from '../graphicMode'
+import { isInk, type GraphicMode } from '../graphicMode'
 import { isTypingTarget } from '../../ui/actionHotkeys'
 import { pinchDollyRadius, pinchPairAngle } from '../../ui/pointerInput'
 import { clamp01, easeInOutSmooth, lerp, prefersReducedMotion, CAMERA_FOCUS_MS, shortestAngleDelta } from '../motion'
@@ -74,7 +74,7 @@ export class CameraController {
   private lastTick = performance.now()
 
   get camera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
-    return this.mode === 'ink' ? this.ortho : this.persp
+    return isInk(this.mode) ? this.ortho : this.persp
   }
 
   get graphicMode(): GraphicMode {
@@ -120,13 +120,15 @@ export class CameraController {
 
   setGraphicMode(mode: GraphicMode): void {
     if (this.mode === mode) return
+    const stayInk = isInk(this.mode) && isInk(mode)
     this.mode = mode
+    if (stayInk) return
     this.orbitAnim = null
     this.panAnim = null
     this.pinch = null
     this.followReleased = true
     const target = this.controls.target
-    if (mode === 'ink') {
+    if (isInk(mode)) {
       this.controls.object = this.ortho
       this.controls.enableRotate = false
       this.controls.mouseButtons.RIGHT = null
@@ -161,7 +163,7 @@ export class CameraController {
 
   private worldPerPixel(): number {
     const height = Math.max(1, this.canvas.clientHeight)
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       return (this.ortho.top - this.ortho.bottom) / Math.max(0.05, this.ortho.zoom) / height
     }
     const dist = this.persp.position.distanceTo(this.controls.target)
@@ -194,7 +196,7 @@ export class CameraController {
 
   /** Frame the active ship at a 30° polar angle and the current distance. */
   focusShip(coord: HexCoord): void {
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       this.panTo(coord)
       return
     }
@@ -236,7 +238,7 @@ export class CameraController {
   }
 
   private beginInspect(coord: HexCoord, theta: number, toPhi: number): void {
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       this.panTo(coord)
       this.ortho.zoom = Math.min(4.2, Math.max(1.6, this.ortho.zoom * 1.35))
       this.ortho.updateProjectionMatrix()
@@ -316,7 +318,7 @@ export class CameraController {
     const depth = Math.max(2.4, maxZ - minZ)
     const cx = (minX + maxX) / 2
     const cz = (minZ + maxZ) / 2
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       const aspect = this.viewW / Math.max(1, this.viewH)
       const halfH = 8
       const needH = Math.max(depth / 2, width / 2 / aspect) * 1.22
@@ -426,7 +428,7 @@ export class CameraController {
     this.panY = clientY
     const worldPerPx = this.worldPerPixel()
     const forward = new THREE.Vector3()
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       forward.copy(this.inkUp).setY(0)
       if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1)
       else forward.normalize()
@@ -467,7 +469,7 @@ export class CameraController {
 
   updatePinch(a: { x: number; y: number }, b: { x: number; y: number }): void {
     if (!this.pinch) return
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       const span = Math.hypot(a.x - b.x, a.y - b.y)
       this.ortho.zoom = Math.min(8, Math.max(0.12, this.pinch.zoom * (span / Math.max(1, this.pinch.span))))
       this.ortho.updateProjectionMatrix()
@@ -504,7 +506,7 @@ export class CameraController {
   }
 
   setOrbitEnabled(enabled: boolean): void {
-    this.controls.enableRotate = this.mode === 'ink' ? false : enabled
+    this.controls.enableRotate = isInk(this.mode) ? false : enabled
   }
 
   tick(): void {
@@ -532,7 +534,7 @@ export class CameraController {
   }
 
   private sanitizeOrbit(): void {
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       this.snapInk(this.controls.target.x, this.controls.target.z)
       return
     }
@@ -580,7 +582,7 @@ export class CameraController {
     target.x += dx * k
     target.z += dz * k
     target.y = 0
-    if (this.mode === 'ink') this.snapInk(target.x, target.z)
+    if (isInk(this.mode)) this.snapInk(target.x, target.z)
     else this.camera.position.copy(target).add(offset)
   }
 
@@ -594,7 +596,7 @@ export class CameraController {
       lerp(anim.fromTarget.y, anim.toTarget.y, e),
       lerp(anim.fromTarget.z, anim.toTarget.z, e),
     )
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       this.snapInk(this.controls.target.x, this.controls.target.z)
     } else {
       this.camera.position.set(
@@ -609,7 +611,7 @@ export class CameraController {
   private applyOrbit(now: number): void {
     const anim = this.orbitAnim
     if (!anim || this.grabbing) return
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       const t = anim.duration <= 0 ? 1 : clamp01((now - anim.start) / anim.duration)
       const e = easeInOutSmooth(t)
       const x = lerp(anim.fromTarget.x, anim.toTarget.x, e)
@@ -642,7 +644,7 @@ export class CameraController {
     const z = (this.keys.w ? 1 : 0) - (this.keys.s ? 1 : 0)
     if (!x && !z) return
     const forward = new THREE.Vector3()
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       forward.copy(this.inkUp).setY(0)
       if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1)
       else forward.normalize()
@@ -670,7 +672,7 @@ export class CameraController {
     const dir = (this.keys.q ? 1 : 0) - (this.keys.e ? 1 : 0)
     if (!dir) return
     const angle = dir * MAP_ROTATE_SPEED * dt
-    if (this.mode === 'ink') {
+    if (isInk(this.mode)) {
       this.inkUp.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
       this.snapInk(this.controls.target.x, this.controls.target.z)
       return
@@ -714,7 +716,7 @@ export function makeLights(scene: THREE.Scene, mode: GraphicMode = 'space'): voi
     if (child.userData.sceneLight) scene.remove(child)
   }
   const colors = scenePalette(mode)
-  if (mode === 'ink') {
+  if (isInk(mode)) {
     const ambient = new THREE.AmbientLight(0xffffff, 1)
     ambient.userData.sceneLight = true
     scene.add(ambient)

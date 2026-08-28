@@ -6,6 +6,7 @@ import { SHIP_DEFINITIONS, type ShipClass } from '../definitions/ships'
 import { addGlory, GLORY_DAMAGE, GLORY_DESTROY } from './glory'
 import { activeShip } from './fuel'
 import { RNG } from '../random/RNG'
+import { spillDestroyedHold } from './damage'
 
 export type Combatant = {
   id: string
@@ -227,6 +228,11 @@ export function resolveCombatExchange(
     const glory = awardDamageGlory(nextState, shooter, loserClass, hullAfter, before)
     nextState = glory.state
     events.push(...glory.events)
+    if (hullAfter === 0 && before > 0) {
+      const spill = spillDestroyedHold(nextState, shot.defenderId)
+      nextState = spill.state
+      events.push(...spill.events)
+    }
   }
   events.push({
     type: 'COMBAT_ENDED',

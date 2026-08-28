@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import { missileSidePoint, missileWorldPos, probeWorldPos, type Vec3 } from './missilePath'
 import { clamp01, prefersReducedMotion } from '../motion'
-import { palette } from '../theme'
-import type { GraphicMode } from '../graphicMode'
+import { palette, sceneCss, scenePalette } from '../theme'
+import { isInk, type GraphicMode } from '../graphicMode'
 
 export const MISSILE_SIDE_MS = 280
 export const MISSILE_FLY_MS = 520
@@ -89,7 +89,7 @@ export class CombatFx {
   }
 
   spawnDamage(target: Vec3, amount: number, now: number): void {
-    const sprite = damageSprite(amount, this.graphicMode === 'ink')
+    const sprite = damageSprite(amount, this.graphicMode)
     sprite.position.set(target.x, target.y + 0.08, target.z)
     this.group.add(sprite)
     this.floaters.push({ sprite, start: now, origin: { ...target, y: target.y + 0.08 } })
@@ -217,11 +217,13 @@ export class CombatFx {
       positions[i * 3 + 1] = origin.y
       positions[i * 3 + 2] = origin.z
     }
-    const rocket = kind === 'probe' ? makeProbeDart(this.graphicMode === 'ink') : makeRocket(this.graphicMode === 'ink')
+    const ink = isInk(this.graphicMode)
+    const mark = scenePalette(this.graphicMode).paper
+    const rocket = kind === 'probe' ? makeProbeDart(ink, mark) : makeRocket(ink, mark)
     rocket.position.set(origin.x, origin.y, origin.z)
     rocket.visible = false
-    const trail = makeTrail(positions, colors)
-    const boom = makeBoom(this.graphicMode === 'ink')
+    const boom = makeBoom(ink, mark)
+    const trail = makeTrail(positions, colors, ink)
     this.group.add(rocket, trail, boom)
     return {
       kind,
@@ -260,7 +262,7 @@ export class CombatFx {
     shot.positions[2] = p.z
     for (let i = 0; i < TRAIL; i++) {
       const a = 1 - i / (TRAIL - 1)
-      const tint = shot.kind === 'probe' ? [0.49, 0.78, 1] : [0.85, 0.18, 0.16]
+      const tint = trailTint(shot.kind, this.graphicMode)
       shot.colors[i * 3] = tint[0] * a
       shot.colors[i * 3 + 1] = tint[1] * a
       shot.colors[i * 3 + 2] = tint[2] * a
@@ -273,7 +275,7 @@ export class CombatFx {
   private fadeTrail(shot: Shot, opacity: number): void {
     for (let i = 0; i < TRAIL; i++) {
       const a = (1 - i / (TRAIL - 1)) * opacity
-      const tint = shot.kind === 'probe' ? [0.49, 0.78, 1] : [0.85, 0.18, 0.16]
+      const tint = trailTint(shot.kind, this.graphicMode)
       shot.colors[i * 3] = tint[0] * a
       shot.colors[i * 3 + 1] = tint[1] * a
       shot.colors[i * 3 + 2] = tint[2] * a
@@ -283,14 +285,22 @@ export class CombatFx {
   }
 }
 
-function damageSprite(amount: number, ink = false): THREE.Sprite {
+function trailTint(kind: ShotKind, mode: GraphicMode): [number, number, number] {
+  if (isInk(mode)) {
+    const v = mode === 'ink-reversed' ? 0 : 1
+    return [v, v, v]
+  }
+  return kind === 'probe' ? [0.49, 0.78, 1] : [0.85, 0.18, 0.16]
+}
+
+function damageSprite(amount: number, mode: GraphicMode): THREE.Sprite {
   const canvas = document.createElement('canvas')
   canvas.width = 128
   canvas.height = 128
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, 128, 128)
-    ctx.fillStyle = ink ? '#FFFFFF' : '#C45C4A'
+    ctx.fillStyle = isInk(mode) ? sceneCss(mode).paper : '#C45C4A'
     ctx.font = '700 72px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -310,11 +320,11 @@ function damageSprite(amount: number, ink = false): THREE.Sprite {
   return sprite
 }
 
-function makeRocket(ink = false): THREE.Mesh {
+function makeRocket(ink = false, mark = 0xffffff): THREE.Mesh {
   if (ink) {
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(0.04, 0.08),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: mark, side: THREE.DoubleSide, depthWrite: false }),
     )
     mesh.rotation.x = -Math.PI / 2
     mesh.renderOrder = 12
@@ -333,11 +343,11 @@ function makeRocket(ink = false): THREE.Mesh {
   return mesh
 }
 
-function makeProbeDart(ink = false): THREE.Mesh {
+function makeProbeDart(ink = false, mark = 0xffffff): THREE.Mesh {
   if (ink) {
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(0.03, 0.06),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: mark, side: THREE.DoubleSide, depthWrite: false }),
     )
     mesh.rotation.x = -Math.PI / 2
     mesh.renderOrder = 12
@@ -356,7 +366,7 @@ function makeProbeDart(ink = false): THREE.Mesh {
   return mesh
 }
 
-function makeTrail(positions: Float32Array, colors: Float32Array): THREE.Line {
+function makeTrail(positions: Float32Array, colors: Float32Array, ink = false): THREE.Line {
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
@@ -366,7 +376,7 @@ function makeTrail(positions: Float32Array, colors: Float32Array): THREE.Line {
       vertexColors: true,
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: ink ? THREE.NormalBlending : THREE.AdditiveBlending,
     }),
   )
   line.renderOrder = 11
@@ -374,12 +384,12 @@ function makeTrail(positions: Float32Array, colors: Float32Array): THREE.Line {
   return line
 }
 
-function makeBoom(ink = false): THREE.Mesh {
+function makeBoom(ink = false, mark = 0xffffff): THREE.Mesh {
   if (ink) {
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
       new THREE.MeshBasicMaterial({
-        color: 0xffffff,
+        color: mark,
         transparent: true,
         opacity: 0.9,
         depthWrite: false,

@@ -10,7 +10,7 @@ export const FUEL_TANK = STARTING_FUEL
 export const FUEL_BUY_PRICE = 1
 /** TODO RULE CLARIFICATION T7 — EVA hull repair; 2 CR per pip. */
 export const REPAIR_PRICE = 2
-export const GAME_STATE_VERSION = 3
+export const GAME_STATE_VERSION = 4
 
 /** Loser of a combat contest takes this many hull points. */
 export const COMBAT_DAMAGE = 1

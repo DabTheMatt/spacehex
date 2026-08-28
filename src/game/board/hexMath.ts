@@ -80,6 +80,36 @@ export function getWorldPosition(coord: HexCoord, size = HEX_SIZE): { x: number;
   return { x, z }
 }
 
+/**
+ * Point-in-hex for a flat-top hex of center-to-vertex radius `radius`
+ * (vertices on ±X). Cube-max tests overshoot the horizontal flats.
+ */
+export function pointInFlatTopHex(x: number, z: number, radius: number): boolean {
+  const R = Math.max(1e-6, radius)
+  const ax = Math.abs(x)
+  const az = Math.abs(z)
+  if (ax > R + 1e-6) return false
+  if (az > (R * Math.sqrt(3)) / 2 + 1e-6) return false
+  if (az > Math.sqrt(3) * (R - ax) + 1e-6) return false
+  return true
+}
+
+export function clampToFlatTopHex(
+  x: number,
+  z: number,
+  radius: number,
+): { x: number; z: number } {
+  if (pointInFlatTopHex(x, z, radius)) return { x, z }
+  let nx = x
+  let nz = z
+  for (let i = 0; i < 12; i++) {
+    nx *= 0.86
+    nz *= 0.86
+    if (pointInFlatTopHex(nx, nz, radius)) return { x: nx, z: nz }
+  }
+  return { x: 0, z: 0 }
+}
+
 export function directionFromTo(origin: HexCoord, target: HexCoord): number | null {
   const dq = target.q - origin.q
   const dr = target.r - origin.r
