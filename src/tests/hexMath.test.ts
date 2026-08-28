@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   HEX_CORNER_PHASE,
+  clampToFlatTopHex,
   getNeighbor,
   getNeighbors,
   getWorldPosition,
   hexCorner,
   hexDistance,
   hexEdgeCorners,
+  pointInFlatTopHex,
 } from '../game/board/hexMath'
 import { coordKey } from '../game/board/HexCoord'
 
@@ -46,6 +48,18 @@ describe('hexMath (flat-top axial)', () => {
     const b = getWorldPosition({ q: 1, r: 0 })
     expect(a).toEqual(b)
     expect(a.x).toBeGreaterThan(0)
+  })
+
+  it('keeps flat-top vertices on the hex boundary and rejects points outside the outline', () => {
+    for (let i = 0; i < 6; i++) {
+      const c = hexCorner(i, 1)
+      expect(pointInFlatTopHex(c.x, c.z, 1)).toBe(true)
+    }
+    expect(pointInFlatTopHex(1.08, 0, 1)).toBe(false)
+    expect(pointInFlatTopHex(0, 0.95, 1)).toBe(false)
+    const held = clampToFlatTopHex(1.4, 0, 1)
+    expect(pointInFlatTopHex(held.x, held.z, 1)).toBe(true)
+    expect(Math.hypot(held.x, held.z)).toBeLessThan(1)
   })
 
   it('neighbor of neighbor opposite returns origin', () => {

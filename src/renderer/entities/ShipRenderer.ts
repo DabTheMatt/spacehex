@@ -5,7 +5,7 @@ import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
 import { SHIP_DEFINITIONS } from '../../game/definitions/ships'
-import { palette, css } from '../theme'
+import { palette, css, scenePalette } from '../theme'
 import type { GraphicMode } from '../graphicMode'
 import { isInk } from '../graphicMode'
 import { TILE_THICKNESS } from '../board/TileRenderer'
@@ -291,7 +291,14 @@ export class ShipRenderer {
       const wreck = ship.hull <= 0
       const wrapper = new THREE.Group()
       const marker = isInk(this.graphicMode)
-        ? createInkNavMarker(ship.class, playerNo, active && !wreck, hullLabel(ship), wreck)
+        ? createInkNavMarker(
+            ship.class,
+            playerNo,
+            active && !wreck,
+            hullLabel(ship),
+            wreck,
+            scenePalette(this.graphicMode).paper,
+          )
         : createNavMarker(ship.class, playerNo, active && !wreck, hullLabel(ship), wreck)
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
@@ -726,12 +733,12 @@ function createInkNavMarker(
   active: boolean,
   _label: string,
   wreck = false,
+  color = 0xffffff,
 ): THREE.Group {
   const { length, half } = hullExtents(shipClass)
   const g = new THREE.Group()
   const w = half * 2
   const fill = playerNo > 0 && !wreck
-  const color = 0xffffff
   if (fill) {
     const plate = new THREE.Mesh(
       new THREE.PlaneGeometry(w, length),
@@ -770,7 +777,7 @@ function createInkNavMarker(
   if (active) {
     const led = new THREE.Mesh(
       new THREE.PlaneGeometry(0.04, 0.04),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, depthWrite: false }),
     )
     led.rotation.x = -Math.PI / 2
     led.position.set(0, HULL_HEIGHT + 0.02, length * 0.22)

@@ -136,13 +136,20 @@ body,
   --font-display: var(--font-ui);
 }
 
+.app-shell.ink-reversed {
+  --color-background: #ffffff;
+  --color-primary: #000000;
+  --color-muted: #000000;
+  --color-accent: #000000;
+}
+
 .app-shell.ink .cargo--ore,
 .app-shell.ink .cargo--biomass,
 .app-shell.ink .cargo--ice,
 .app-shell.ink .cargo--fuel,
 .app-shell.ink .action-strip__item.probe.on,
 .app-shell.ink .action-strip__item.probe.aiming {
-  color: #ffffff;
+  color: var(--color-primary);
 }
 
 .app-shell.ink .action-strip__item.probe.aiming {
@@ -442,6 +449,18 @@ body,
   font-size: var(--font-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.cargo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cargo-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
 }
 
 .cargo--ore {

@@ -4,7 +4,7 @@ import { getWorldPosition } from '../../game/board/hexMath'
 import { createHexMesh, TILE_SLOT_Y, TILE_THICKNESS } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
 import { scenePalette } from '../theme'
-import type { GraphicMode } from '../graphicMode'
+import { isInk, type GraphicMode } from '../graphicMode'
 import { clamp01, easeOutCubic, prefersReducedMotion, TILE_REVEAL_MS } from '../motion'
 import { coordKey } from '../../game/board/HexCoord'
 import { getTileDefinition } from '../../game/definitions/tiles'
@@ -49,7 +49,7 @@ export class TilePreviewRenderer {
     this.fadeDuration = prefersReducedMotion() ? 0 : TILE_REVEAL_MS
     const pos = getWorldPosition(exp.target)
     const colors = scenePalette(this.graphicMode)
-    const ink = this.graphicMode === 'ink'
+    const ink = isInk(this.graphicMode)
     const mesh = createHexMesh({
       fill: colors.tileFill,
       stroke: colors.ochre,

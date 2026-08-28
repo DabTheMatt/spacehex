@@ -5,8 +5,9 @@ import { TILE_DEFINITIONS } from '../game/definitions/tiles'
 import { palette } from '../renderer/theme'
 
 describe('graphic mode', () => {
-  it('treats only ink as the 2D skin', () => {
+  it('accepts ink and ink-reversed as 2D skins', () => {
     expect(parseGraphicMode('ink')).toBe('ink')
+    expect(parseGraphicMode('ink-reversed')).toBe('ink-reversed')
     expect(parseGraphicMode('space')).toBe('space')
     expect(parseGraphicMode(null)).toBe('space')
     expect(parseGraphicMode('nope')).toBe('space')

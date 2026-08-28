@@ -97,7 +97,12 @@ describe('destruction', () => {
     const hit = applyCommand(state, { type: 'DEV_DAMAGE_SHIP', shipId: 'mewa-1', amount: 3 })
     expect(hit.state.ships['mewa-1'].hull).toBe(0)
     expect(hit.events.some((e) => e.type === 'SHIP_DESTROYED')).toBe(true)
-    expect(formatLogLine(hit.state, { type: 'SHIP_DESTROYED', shipId: 'mewa-1' })).toBe(
+    expect(formatLogLine(hit.state, {
+      type: 'SHIP_DESTROYED',
+      shipId: 'mewa-1',
+      coord: { q: 0, r: 0 },
+      cargo: [],
+    })).toBe(
       'SG-1 was destroyed.',
     )
     const move = applyCommand(hit.state, {
@@ -108,6 +113,45 @@ describe('destruction', () => {
     }).state
     const fly = applyCommand(move, { type: 'DECLARE_MOVE', target: { q: 1, r: 0 } })
     expect(fly.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(true)
+  })
+
+  it('spills hold containers as debris when a ship is destroyed', () => {
+    let state = createInitialState('spill-hold')
+    const ship = state.ships['mewa-1']
+    state = {
+      ...state,
+      ships: {
+        ...state.ships,
+        'mewa-1': { ...ship, cargo: { ORE: 2, BIOMASS: 1, ICE: 0 } },
+      },
+    }
+    const hit = applyCommand(state, { type: 'DEV_DAMAGE_SHIP', shipId: 'mewa-1', amount: 3 })
+    expect(hit.state.ships['mewa-1'].cargo).toEqual({ ORE: 0, BIOMASS: 0, ICE: 0 })
+    expect(hit.state.debris.map((c) => c.kind).sort()).toEqual(['BIOMASS', 'ORE', 'ORE'])
+    expect(hit.state.debris.every((c) => c.coord.q === 0 && c.coord.r === 0)).toBe(true)
+    const destroyed = hit.events.find((e) => e.type === 'SHIP_DESTROYED')
+    expect(destroyed).toMatchObject({ type: 'SHIP_DESTROYED', shipId: 'mewa-1', cargo: ['ORE', 'ORE', 'BIOMASS'] })
+  })
+
+  it('drops one or two random crates from a destroyed NPC', () => {
+    let state = createInitialState('spill-npc')
+    state = {
+      ...state,
+      npcShips: {
+        'ciern-x': {
+          id: 'ciern-x',
+          class: 'CIERN',
+          coord: { q: 0, r: 0 },
+          hull: 1,
+          maxHull: 3,
+        },
+      },
+    }
+    const hit = applyCommand(state, { type: 'DEV_DAMAGE_SHIP', shipId: 'ciern-x', amount: 1 })
+    expect(hit.state.debris.length).toBeGreaterThanOrEqual(1)
+    expect(hit.state.debris.length).toBeLessThanOrEqual(2)
+    const again = applyCommand(state, { type: 'DEV_DAMAGE_SHIP', shipId: 'ciern-x', amount: 1 })
+    expect(again.state.debris.map((c) => c.kind)).toEqual(hit.state.debris.map((c) => c.kind))
   })
 })
 

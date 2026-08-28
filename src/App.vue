@@ -1,5 +1,11 @@
 <template>
-  <div class="app-shell" :class="{ ink: ui.graphicMode === 'ink' }">
+  <div
+    class="app-shell"
+    :class="{
+      ink: isInk(ui.graphicMode),
+      'ink-reversed': ui.graphicMode === 'ink-reversed',
+    }"
+  >
     <GameCanvas />
     <GameHUD />
     <DeveloperPanel v-if="ui.showDev" />
@@ -12,6 +18,7 @@ import GameCanvas from './components/GameCanvas.vue'
 import GameHUD from './components/hud/GameHUD.vue'
 import DeveloperPanel from './components/panels/DeveloperPanel.vue'
 import { useUiStore } from './stores/uiStore'
+import { isInk } from './renderer/graphicMode'
 import { useGameHotkeys } from './ui/useGameHotkeys'
 import { isTypingTarget } from './ui/actionHotkeys'
 

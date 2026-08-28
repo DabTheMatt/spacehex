@@ -11,6 +11,7 @@
           :key="lot.id"
           :class="['cargo', `cargo--${lot.id.toLowerCase()}`]"
         >
+          <CargoIcon v-if="isCargoKind(lot.id)" :kind="lot.id" />
           {{ lot.text }}
         </span>
       </div>
@@ -43,6 +44,7 @@
           :key="row.id"
           :class="['cargo', `cargo--${row.id.toLowerCase()}`]"
         >
+          <CargoIcon :kind="row.id" />
           {{ row.text }}
         </span>
       </div>
@@ -73,6 +75,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import ActionStrip from './ActionStrip.vue'
+import CargoIcon from './CargoIcon.vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useUiStore } from '@/stores/uiStore'
 import { commandMode } from '@/ui/commandMode'
@@ -92,6 +95,7 @@ import { prefersCoarsePointer } from '@/ui/pointerInput'
 import { hudPaneLabel } from '@/ui/sectorPane'
 import { getTileDefinition } from '@/game/definitions/tiles'
 import { hullPipCount, hullPipFilled } from '@/ui/hullPips'
+import { CARGO_KINDS } from '@/game/definitions/cargoFigures'
 import { FUEL_BUY_PRICE, FUEL_TANK, REPAIR_PRICE } from '@/game/definitions/constants'
 
 const game = useGameStore()
@@ -212,5 +216,9 @@ watch(showProbe, (ok) => {
 
 function pad(value: number): string {
   return String(value).padStart(2, '0')
+}
+
+function isCargoKind(id: string): boolean {
+  return (CARGO_KINDS as readonly string[]).includes(id)
 }
 </script>

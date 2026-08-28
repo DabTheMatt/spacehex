@@ -2,24 +2,18 @@ import * as THREE from 'three'
 import type { TileType } from '../../game/board/tileRotation'
 import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
+import { createCargoFigure, attachCrateMotion, CARGO_COLOR } from './cargoMesh'
+import { CARGO_KINDS, type CargoKind } from '../../game/definitions/cargoFigures'
 import { asteroidCollisionPercent } from '../../game/definitions/tiles'
 import type { EdgeNumbers } from '../../game/board/edgeNumbers'
-import { HEX_SIZE, hexCorner, hexEdgeCorners } from '../../game/board/hexMath'
+import { HEX_SIZE, hexCorner, hexEdgeCorners, pointInFlatTopHex, clampToFlatTopHex } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
 /** Inward from the edge midpoint, on the top face (not the side wall). Small so the digit sits on the rim. */
 export const EDGE_DIGIT_INSET = 0.05
 
-const CARGO_KINDS = ['ORE', 'BIOMASS', 'ICE', 'FUEL'] as const
-export type WreckCargoKind = (typeof CARGO_KINDS)[number]
-
-const CARGO_COLOR: Record<WreckCargoKind, number> = {
-  ORE: palette.resourceRed,
-  BIOMASS: palette.resourceGreen,
-  ICE: palette.resourceBlue,
-  FUEL: palette.ochre,
-}
+export type WreckCargoKind = CargoKind
 
 const Y = 0.012
 const PLANET_TINTS = [palette.planetViolet, palette.planetRose, palette.planetSage] as const
@@ -263,40 +257,46 @@ function tankerGlyph(color: number, salt: string): THREE.Group {
   return g
 }
 
-function cargoCube(kind: WreckCargoKind, size: number): THREE.Group {
-  const g = new THREE.Group()
-  const color = CARGO_COLOR[kind]
-  const geom = new THREE.BoxGeometry(size, size, size)
-  g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom), lineMat(color)))
-  g.userData.cargoCube = kind
-  g.userData.crateRadius = size * 0.62
-  return g
+function cargoCube(kind: WreckCargoKind, size: number, color = CARGO_COLOR[kind]): THREE.Group {
+  return createCargoFigure(kind, size, color)
 }
 
-function addWreckContainers(g: THREE.Group, salt: string): void {
+function addWreckContainers(g: THREE.Group, salt: string, colorFor?: (kind: CargoKind) => number): void {
   const rng = new RNG(`wreck-cargo:${salt}`)
   const count = 2 + rng.nextInt(2)
-  const kinds = rng.shuffle(CARGO_KINDS).slice(0, count)
+  const kinds = rng.shuffle([...CARGO_KINDS]).slice(0, count)
   const slots: Array<[number, number]> = [
     [-0.28, -0.28],
     [0.22, -0.26],
     [0.02, 0.3],
   ]
   kinds.forEach((kind, index) => {
-    const size = 0.08
-    const box = cargoCube(kind, size)
+    const size = 0.1
+    const box = cargoCube(kind, size, colorFor ? colorFor(kind) : CARGO_COLOR[kind])
     const [x, z] = slots[index] ?? slots[0]
-    box.position.set(x, Y + size * 0.5, z)
-    box.userData.animate = 'crate'
-    const speed = 0.12 + rng.next() * 0.1
+    const speed = 0.1 + rng.next() * 0.08
     const a = rng.next() * Math.PI * 2
-    box.userData.vx = Math.cos(a) * speed
-    box.userData.vz = Math.sin(a) * speed
-    box.userData.spinX = (0.4 + rng.next() * 0.8) * (rng.next() < 0.5 ? -1 : 1)
-    box.userData.spinY = (0.5 + rng.next() * 0.9) * (rng.next() < 0.5 ? -1 : 1)
-    box.userData.spinZ = (0.3 + rng.next() * 0.7) * (rng.next() < 0.5 ? -1 : 1)
+    attachCrateMotion(
+      box,
+      x,
+      z,
+      Y + size * 0.5,
+      Math.cos(a) * speed,
+      Math.sin(a) * speed,
+      {
+        x: (0.4 + rng.next() * 0.8) * (rng.next() < 0.5 ? -1 : 1),
+        y: (0.5 + rng.next() * 0.9) * (rng.next() < 0.5 ? -1 : 1),
+        z: (0.3 + rng.next() * 0.7) * (rng.next() < 0.5 ? -1 : 1),
+      },
+    )
     g.add(box)
   })
+}
+
+function wreckCrateCluster(salt: string, colorFor: (kind: CargoKind) => number): THREE.Group {
+  const g = new THREE.Group()
+  addWreckContainers(g, salt, colorFor)
+  return g
 }
 
 function transportGlyph(hullColor: number, salt: string): THREE.Group {
@@ -730,13 +730,13 @@ function createInkTileGlyph(
       break
     case 'WRECK_TANKER':
       root.add(poly([[-0.3, -0.12], [0.28, -0.12], [0.28, 0.12], [-0.3, 0.12]], c, true))
-      addInkCrates(root, salt)
+      root.add(wreckCrateCluster(salt, () => c))
       root.add(inkBattery(c))
       break
     case 'WRECK_TRANSPORT':
       root.add(poly([[-0.18, -0.28], [0.18, -0.28], [0.18, 0.22], [-0.18, 0.22]], c, true))
       root.add(square(0, -0.08, 0.08, c))
-      addInkCrates(root, salt)
+      root.add(wreckCrateCluster(salt, () => c))
       break
     case 'BLACK_HOLE':
       root.add(square(0, 0, 0.18, c))
@@ -771,35 +771,6 @@ function inkBattery(color: number): THREE.Group {
   return g
 }
 
-function addInkCrates(g: THREE.Group, salt: string): void {
-  const rng = new RNG(`wreck-cargo:${salt}`)
-  const count = 2 + rng.nextInt(2)
-  const kinds = rng.shuffle(CARGO_KINDS).slice(0, count)
-  const slots: Array<[number, number]> = [
-    [-0.28, -0.28],
-    [0.22, -0.26],
-    [0.02, 0.3],
-  ]
-  kinds.forEach((kind, index) => {
-    const size = 0.08
-    const box = new THREE.Group()
-    box.add(square(0, 0, size * 0.5, 0xffffff))
-    box.userData.cargoCube = kind
-    box.userData.crateRadius = size * 0.62
-    const [x, z] = slots[index] ?? slots[0]
-    box.position.set(x, Y, z)
-    box.userData.animate = 'crate'
-    const speed = 0.12 + rng.next() * 0.1
-    const axis = rng.next() < 0.5
-    box.userData.vx = axis ? speed : 0
-    box.userData.vz = axis ? 0 : speed
-    box.userData.spinX = 0
-    box.userData.spinY = 0
-    box.userData.spinZ = 0
-    g.add(box)
-  })
-}
-
 function inkStrait(edges: TileDefinition['edges'], color: number): THREE.Group {
   const g = new THREE.Group()
   g.userData.straitGlyph = true
@@ -823,13 +794,6 @@ function inkStrait(edges: TileDefinition['edges'], color: number): THREE.Group {
   return g
 }
 
-function pointInFlatHex(x: number, z: number, radius: number): boolean {
-  const q = ((2 / 3) * x) / radius
-  const r = ((-1 / 3) * x + (Math.sqrt(3) / 3) * z) / radius
-  const s = -q - r
-  return Math.max(Math.abs(q), Math.abs(r), Math.abs(s)) <= 1
-}
-
 function bounceInHex(
   x: number,
   z: number,
@@ -841,7 +805,7 @@ function bounceInHex(
   let nz = z
   let ovx = vx
   let ovz = vz
-  if (!pointInFlatHex(nx, nz, radius)) {
+  if (!pointInFlatTopHex(nx, nz, radius)) {
     const len = Math.hypot(nx, nz) || 1
     const hx = nx / len
     const hz = nz / len
@@ -850,8 +814,9 @@ function bounceInHex(
       ovx -= 2 * dot * hx
       ovz -= 2 * dot * hz
     }
-    nx -= hx * 0.02
-    nz -= hz * 0.02
+    const clamped = clampToFlatTopHex(nx, nz, radius)
+    nx = clamped.x
+    nz = clamped.z
   }
   return { x: nx, z: nz, vx: ovx, vz: ovz }
 }
@@ -865,23 +830,18 @@ function hasInkAncestor(obj: THREE.Object3D): boolean {
   return false
 }
 
-function tickCrates(root: THREE.Object3D, time: number): void {
-  const last = Number(root.userData.crateTime ?? time)
-  const dt = Math.min(0.05, Math.max(0, time - last))
-  root.userData.crateTime = time
-  const crates: THREE.Object3D[] = []
-  root.traverse((obj) => {
-    if (obj.userData.animate === 'crate') crates.push(obj)
-  })
-  const limit = HEX_SIZE * 0.72
+function tickCrateGroup(crates: THREE.Object3D[], time: number, dt: number): void {
+  const rim = HEX_SIZE * 0.9
   for (const crate of crates) {
+    const pad = Number(crate.userData.crateRadius || 0.05)
+    const limit = Math.max(0.2, rim - pad)
     if (crate.userData.spinX || crate.userData.spinY || crate.userData.spinZ) {
       crate.rotation.x = time * Number(crate.userData.spinX || 0)
       crate.rotation.y = time * Number(crate.userData.spinY || 0)
       crate.rotation.z = time * Number(crate.userData.spinZ || 0)
     }
-    let x = crate.position.x + Number(crate.userData.vx || 0) * dt
-    let z = crate.position.z + Number(crate.userData.vz || 0) * dt
+    const x = crate.position.x + Number(crate.userData.vx || 0) * dt
+    const z = crate.position.z + Number(crate.userData.vz || 0) * dt
     const bounced = bounceInHex(x, z, Number(crate.userData.vx || 0), Number(crate.userData.vz || 0), limit)
     crate.userData.vx = bounced.vx
     crate.userData.vz = bounced.vz
@@ -916,6 +876,28 @@ function tickCrates(root: THREE.Object3D, time: number): void {
       b.userData.vz = bvz + rel * nz
     }
   }
+  for (const crate of crates) {
+    const pad = Number(crate.userData.crateRadius || 0.05)
+    const limit = Math.max(0.2, HEX_SIZE * 0.9 - pad)
+    const held = clampToFlatTopHex(crate.position.x, crate.position.z, limit)
+    crate.position.x = held.x
+    crate.position.z = held.z
+  }
+}
+
+function tickCrates(root: THREE.Object3D, time: number): void {
+  const last = Number(root.userData.crateTime ?? time)
+  const dt = Math.min(0.05, Math.max(0, time - last))
+  root.userData.crateTime = time
+  const byParent = new Map<string, THREE.Object3D[]>()
+  root.traverse((obj) => {
+    if (obj.userData.animate !== 'crate') return
+    const key = obj.parent?.uuid ?? 'root'
+    const list = byParent.get(key) ?? []
+    list.push(obj)
+    byParent.set(key, list)
+  })
+  for (const crates of byParent.values()) tickCrateGroup(crates, time, dt)
 }
 
 export function tickTileGlyphs(
