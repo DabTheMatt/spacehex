@@ -205,4 +205,26 @@ describe('tile glyphs', () => {
       }
     })
   })
+
+  it('aligns ink asteroid squares to the marked hex edges', () => {
+    const glyph = createTileGlyph(
+      TILE_DEFINITIONS['asteroid-1'],
+      palette.paper,
+      'ink-asteroid',
+      false,
+      undefined,
+      true,
+    )
+    const yaws: number[] = []
+    const faces = new Set<number>()
+    glyph.traverse((obj) => {
+      if (obj.userData.edgeFace !== undefined) faces.add(Number(obj.userData.edgeFace))
+      if (!obj.userData.edgeAligned) return
+      yaws.push(Number(obj.userData.edgeYaw))
+      expect(obj.rotation.y).toBeCloseTo(Number(obj.userData.edgeYaw))
+    })
+    expect(faces).toEqual(new Set([0, 2, 4]))
+    expect(yaws).toHaveLength(15)
+    expect(new Set(yaws.map((y) => y.toFixed(4))).size).toBe(3)
+  })
 })
