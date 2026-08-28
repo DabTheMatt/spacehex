@@ -37,10 +37,11 @@ export function hexDistance(a: HexCoord, b: HexCoord): number {
 export const HEX_SIZE = 1
 
 /**
- * Vertices sit 30° off world axes so each face points at an axial neighbor.
- * Edge i (between corners i and i+1) faces world direction i.
+ * Flat-top: vertices on world ±X (phase 0). Face i then aims at axial neighbor i,
+ * whose world bearing is 30° + 60°·i — matching getWorldPosition.
+ * A −30° phase would make pointy-top meshes that overlap on this lattice.
  */
-export const HEX_CORNER_PHASE = -Math.PI / 6
+export const HEX_CORNER_PHASE = 0
 
 export function hexCornerAngle(index: number): number {
   return (Math.PI / 3) * index + HEX_CORNER_PHASE
@@ -49,6 +50,24 @@ export function hexCornerAngle(index: number): number {
 export function hexCorner(index: number, radius = HEX_SIZE): { x: number; z: number } {
   const a = hexCornerAngle(index)
   return { x: Math.cos(a) * radius, z: Math.sin(a) * radius }
+}
+
+/**
+ * The two outline vertices whose shared edge faces axial direction `dir`.
+ * Outline corners run CCW from +X; axial dirs run the other way after east,
+ * so dir 1 uses corners 5–0, not 1–2.
+ */
+export function hexEdgeCornerIndex(dir: number): number {
+  const d = ((dir % 6) + 6) % 6
+  return ((-d % 6) + 6) % 6
+}
+
+export function hexEdgeCorners(
+  dir: number,
+  radius = HEX_SIZE,
+): [{ x: number; z: number }, { x: number; z: number }] {
+  const i = hexEdgeCornerIndex(dir)
+  return [hexCorner(i, radius), hexCorner(i + 1, radius)]
 }
 
 /**

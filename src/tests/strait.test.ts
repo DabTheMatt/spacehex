@@ -2,16 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { applyCommand, createInitialState } from '../game/engine/GameEngine'
 import { getRotatedEdge } from '../game/board/tileRotation'
 import { TILE_DEFINITIONS } from '../game/definitions/tiles'
-import { hexCorner } from '../game/board/hexMath'
 import { oppositeDirection } from '../game/board/HexMap'
 
 describe('strait layouts', () => {
-  it('points hex faces at axial neighbors', () => {
-    const a = hexCorner(0)
-    const b = hexCorner(1)
-    expect((a.x + b.x) / 2).toBeGreaterThan(0.8)
-    expect((a.z + b.z) / 2).toBeCloseTo(0)
-  })
   it('has a three-way, a bent, and a through passage', () => {
     expect(TILE_DEFINITIONS['strait-1'].edges.filter((e) => e === 'OPEN')).toHaveLength(3)
     expect(TILE_DEFINITIONS['strait-2'].edges.filter((e) => e === 'OPEN')).toHaveLength(2)

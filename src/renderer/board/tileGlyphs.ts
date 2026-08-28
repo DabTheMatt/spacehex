@@ -4,7 +4,7 @@ import type { TileDefinition } from '../../game/board/tileRotation'
 import { palette } from '../theme'
 import { asteroidCollisionPercent } from '../../game/definitions/tiles'
 import type { EdgeNumbers } from '../../game/board/edgeNumbers'
-import { HEX_SIZE, hexCorner } from '../../game/board/hexMath'
+import { HEX_SIZE, hexCorner, hexEdgeCorners } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
@@ -390,8 +390,7 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
   let blocked = 0
   const r = HEX_SIZE * 0.82
   for (let i = 0; i < 6; i++) {
-    const p0 = hexCorner(i, r)
-    const p1 = hexCorner(i + 1, r)
+    const [p0, p1] = hexEdgeCorners(i, r)
     const x0 = p0.x
     const z0 = p0.z
     const x1 = p1.x
@@ -532,8 +531,7 @@ function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
   g.userData.edgeNumbers = true
   const r = HEX_SIZE * 0.96
   for (let i = 0; i < 6; i++) {
-    const p0 = hexCorner(i, r)
-    const p1 = hexCorner(i + 1, r)
+    const [p0, p1] = hexEdgeCorners(i, r)
     const mx = (p0.x + p1.x) / 2
     const mz = (p0.z + p1.z) / 2
     const len = Math.hypot(mx, mz) || 1
