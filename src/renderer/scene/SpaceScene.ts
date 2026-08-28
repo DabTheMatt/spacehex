@@ -337,8 +337,8 @@ export class SpaceScene {
       for (const flight of flights) {
         this.ships.fly(flight.shipId, flight.from, flight.to)
       }
-      if (this.revealWhenSettled.has(key)) {
-        this.revealWhenSettled.delete(key)
+      this.revealWhenSettled.delete(key)
+      if (!this.inflightProbeKeys.has(key)) {
         this.hideGlyphKeys.delete(key)
         revealed = true
       }
