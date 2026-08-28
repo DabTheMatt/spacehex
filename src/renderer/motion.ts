@@ -12,6 +12,9 @@ export const SHIP_APPROACH_MS = 1600
 export const CAMERA_FOCUS_MS = 1400
 export const VORTEX_CHASE_STEP_MS = 140
 export const VORTEX_CHASE_LAPS = 2
+export const VORTEX_THROW_TURN_MS = 480
+export const VORTEX_THROW_IGNITE_MS = 100
+export const VORTEX_THROW_FLIGHT_MS = 1500
 export const ENEMY_YIELD_CLEARANCE = 0.58
 /** Minimum center-to-center XZ distance so two hulls do not overlap. */
 export const SHIP_CLEARANCE = 0.38

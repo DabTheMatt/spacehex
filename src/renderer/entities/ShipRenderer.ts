@@ -21,12 +21,15 @@ import {
   SHIP_CLEARANCE,
   ENEMY_YIELD_CLEARANCE,
   shortestAngleDelta,
-  SHIP_BRAKE_MS,
+  SHIP_TURN_MS,
   SHIP_FLIGHT_MS,
   SHIP_MAIN_IGNITE_MS,
   SHIP_SLIDE_MS,
   SHIP_APPROACH_MS,
-  SHIP_TURN_MS,
+  SHIP_BRAKE_MS,
+  VORTEX_THROW_TURN_MS,
+  VORTEX_THROW_IGNITE_MS,
+  VORTEX_THROW_FLIGHT_MS,
 } from '../motion'
 
 type Parkable = Pick<ShipState, 'id' | 'class' | 'coord' | 'hull'> & { playerId?: string }
@@ -49,7 +52,7 @@ const DUEL_SEP = HEX_SIZE * 0.62
 const HULL_HEIGHT = 0.11
 export const BASE_HOVER = TILE_THICKNESS + 0.14
 
-type HoldMotion = { kind: 'hold'; coord: HexCoord }
+type HoldMotion = { kind: 'hold'; coord: HexCoord; center?: boolean }
 type FlyMotion = {
   kind: 'fly'
   from: HexCoord
@@ -67,6 +70,7 @@ type FlyMotion = {
   turnMs: number
   igniteMs: number
   moveMs: number
+  throwing?: boolean
 }
 type SlideMotion = {
   kind: 'slide'
@@ -167,8 +171,42 @@ export class ShipRenderer {
     return null
   }
 
-  hold(shipId: string, coord: HexCoord): void {
-    this.motion.set(shipId, { kind: 'hold', coord })
+  hold(shipId: string, coord: HexCoord, center = false): void {
+    const pos = getWorldPosition(coord)
+    this.motion.set(shipId, { kind: 'hold', coord, center })
+    if (center) {
+      this.lastXZ.set(shipId, { x: pos.x, z: pos.z })
+      this.visualPark.set(shipId, { ...coord })
+    }
+  }
+
+  fly(shipId: string, from: HexCoord, to: HexCoord, throwing = false): void {
+    const fromW = getWorldPosition(from)
+    const toW = getWorldPosition(to)
+    const last = throwing ? fromW : (this.lastXZ.get(shipId) ?? fromW)
+    const endYaw = Math.atan2(toW.x - last.x, toW.z - last.z)
+    const startYaw = this.facing.get(shipId) ?? lastMoveYaw([], shipId, from)
+    const yawDelta = shortestAngleDelta(startYaw, endYaw)
+    const instant = prefersReducedMotion()
+    this.motion.set(shipId, {
+      kind: 'fly',
+      from,
+      to,
+      fromX: last.x,
+      fromZ: last.z,
+      toX: toW.x,
+      toZ: toW.z,
+      startYaw,
+      endYaw,
+      yawDelta,
+      start: performance.now(),
+      pauseAccum: 0,
+      lastTick: performance.now(),
+      turnMs: instant ? 0 : throwing ? VORTEX_THROW_TURN_MS : SHIP_TURN_MS,
+      igniteMs: instant ? 0 : throwing ? VORTEX_THROW_IGNITE_MS : SHIP_MAIN_IGNITE_MS,
+      moveMs: instant ? 0 : throwing ? VORTEX_THROW_FLIGHT_MS : SHIP_FLIGHT_MS,
+      throwing,
+    })
   }
 
   isFlyingTo(shipId: string, coord: HexCoord): boolean {
@@ -179,37 +217,6 @@ export class ShipRenderer {
   isParkedAt(shipId: string, coord: HexCoord): boolean {
     const parked = this.visualPark.get(shipId)
     return parked ? coordKey(parked) === coordKey(coord) : false
-  }
-
-  fly(shipId: string, from: HexCoord, to: HexCoord): void {
-    const fromW = getWorldPosition(from)
-    const toW = getWorldPosition(to)
-    const last = this.lastXZ.get(shipId)
-    const endYaw = Math.atan2(
-      toW.x - (last?.x ?? fromW.x),
-      toW.z - (last?.z ?? fromW.z),
-    )
-    const startYaw = this.facing.get(shipId) ?? lastMoveYaw([], shipId, from)
-    const yawDelta = shortestAngleDelta(startYaw, endYaw)
-    const instant = prefersReducedMotion()
-    this.motion.set(shipId, {
-      kind: 'fly',
-      from,
-      to,
-      fromX: last?.x ?? fromW.x,
-      fromZ: last?.z ?? fromW.z,
-      toX: toW.x,
-      toZ: toW.z,
-      startYaw,
-      endYaw,
-      yawDelta,
-      start: performance.now(),
-      pauseAccum: 0,
-      lastTick: performance.now(),
-      turnMs: instant ? 0 : SHIP_TURN_MS,
-      igniteMs: instant ? 0 : SHIP_MAIN_IGNITE_MS,
-      moveMs: instant ? 0 : SHIP_FLIGHT_MS,
-    })
   }
 
   sync(state: GameState): void {
@@ -250,6 +257,12 @@ export class ShipRenderer {
           yaws.set(ship.id, duel.yaw)
           return
         }
+        const hold = this.motion.get(ship.id)
+        if (hold?.kind === 'hold' && hold.center) {
+          const c = getWorldPosition(group.coord)
+          targets.set(ship.id, c)
+          return
+        }
         const slot = parkWorld(group.coord, ship, group.ships, group.yaw, this.hubTime)
         targets.set(ship.id, slot)
       })
@@ -287,6 +300,7 @@ export class ShipRenderer {
       if (flying) {
         continue
       }
+      if (this.motion.get(ship.id)?.kind === 'hold') continue
       if (isEvaCoord(coord) && ship.playerId && !this.duel.has(ship.id)) {
         this.parkAtEva(ship.id, ship.playerId, last, target, yaw)
       } else {
@@ -534,6 +548,7 @@ export class ShipRenderer {
   }
 
   private blockedAt(shipId: string, x: number, z: number, flyer: FlyMotion): boolean {
+    if (flyer.throwing) return false
     for (const other of this.group.children) {
       const otherId = other.userData.shipId as string
       if (otherId === shipId) continue

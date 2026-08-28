@@ -24,13 +24,20 @@ describe('tile glyphs', () => {
     for (const id of ['wreck-tanker-1', 'wreck-transport-1'] as const) {
       const glyph = createTileGlyph(TILE_DEFINITIONS[id], palette.paper, `${id}-cargo`)
       const kinds: string[] = []
+      let filled = 0
       glyph.traverse((obj) => {
-        if (obj.userData.cargoCube) kinds.push(String(obj.userData.cargoCube))
+        if (obj.userData.cargoCube) {
+          kinds.push(String(obj.userData.cargoCube))
+          expect(obj.userData.vx).not.toBeUndefined()
+          expect(obj.userData.vz).not.toBeUndefined()
+        }
+        if (obj.userData.cargoCube && obj instanceof THREE.Mesh) filled += 1
       })
       expect(kinds.length).toBeGreaterThanOrEqual(2)
       expect(kinds.length).toBeLessThanOrEqual(3)
       expect(new Set(kinds).size).toBe(kinds.length)
       expect(kinds.every((kind) => CARGO.has(kind))).toBe(true)
+      expect(filled).toBe(0)
     }
   })
 

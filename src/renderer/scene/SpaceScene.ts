@@ -421,6 +421,7 @@ export class SpaceScene {
     const chaseMs = step * 6 * VORTEX_CHASE_LAPS
     if (fx.stage === 'inbound') {
       if (this.ships.isBusy(fx.shipId) && this.ships.isFlyingTo(fx.shipId, fx.coord)) return
+      this.ships.hold(fx.shipId, fx.coord, true)
       fx.stage = 'chase'
       fx.startedAt = now
     }
@@ -440,7 +441,7 @@ export class SpaceScene {
       this.board.setVortexFlash({ key, face: fx.face, hold: true })
       const same = coordKey(fx.coord) === coordKey(fx.dest)
       if (!same && !this.ships.isFlyingTo(fx.shipId, fx.dest) && !this.ships.isParkedAt(fx.shipId, fx.dest)) {
-        if (!this.ships.isBusy(fx.shipId)) this.ships.fly(fx.shipId, fx.coord, fx.dest)
+        this.ships.fly(fx.shipId, fx.coord, fx.dest, true)
         return
       }
       if (this.ships.isBusy(fx.shipId)) return

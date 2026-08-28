@@ -267,18 +267,9 @@ function cargoCube(kind: WreckCargoKind, size: number): THREE.Group {
   const g = new THREE.Group()
   const color = CARGO_COLOR[kind]
   const geom = new THREE.BoxGeometry(size, size, size)
-  const fill = new THREE.Mesh(
-    geom,
-    new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: 0.82,
-      depthWrite: false,
-    }),
-  )
-  g.add(fill)
   g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geom), lineMat(color)))
   g.userData.cargoCube = kind
+  g.userData.crateRadius = size * 0.62
   return g
 }
 
@@ -297,7 +288,13 @@ function addWreckContainers(g: THREE.Group, salt: string): void {
     const [x, z] = slots[index] ?? slots[0]
     box.position.set(x, Y + size * 0.5, z)
     box.userData.animate = 'crate'
-    box.userData.spinY = 0
+    const speed = 0.12 + rng.next() * 0.1
+    const a = rng.next() * Math.PI * 2
+    box.userData.vx = Math.cos(a) * speed
+    box.userData.vz = Math.sin(a) * speed
+    box.userData.spinX = (0.4 + rng.next() * 0.8) * (rng.next() < 0.5 ? -1 : 1)
+    box.userData.spinY = (0.5 + rng.next() * 0.9) * (rng.next() < 0.5 ? -1 : 1)
+    box.userData.spinZ = (0.3 + rng.next() * 0.7) * (rng.next() < 0.5 ? -1 : 1)
     g.add(box)
   })
 }
@@ -379,7 +376,7 @@ function fuelHexGlyph(color: number): THREE.Group {
 function vortexGlyph(color: number): THREE.Group {
   const g = new THREE.Group()
   g.userData.vortexGlyph = true
-  const ink = palette.engine
+  const ink = color
   g.add(poly(
     Array.from({ length: 6 }, (_, i) => {
       const { x, z } = hexCorner(i, 0.62)
@@ -417,7 +414,6 @@ function vortexGlyph(color: number): THREE.Group {
   inner.add(circle(0.16, ink, 6))
   inner.add(circle(0.28, ink, 6, 0.75))
   g.add(inner)
-  void color
   return g
 }
 
@@ -647,18 +643,98 @@ export function createTileGlyph(
   return root
 }
 
+function pointInFlatHex(x: number, z: number, radius: number): boolean {
+  const q = ((2 / 3) * x) / radius
+  const r = ((-1 / 3) * x + (Math.sqrt(3) / 3) * z) / radius
+  const s = -q - r
+  return Math.max(Math.abs(q), Math.abs(r), Math.abs(s)) <= 1
+}
+
+function bounceInHex(
+  x: number,
+  z: number,
+  vx: number,
+  vz: number,
+  radius: number,
+): { x: number; z: number; vx: number; vz: number } {
+  let nx = x
+  let nz = z
+  let ovx = vx
+  let ovz = vz
+  if (!pointInFlatHex(nx, nz, radius)) {
+    const len = Math.hypot(nx, nz) || 1
+    const hx = nx / len
+    const hz = nz / len
+    const dot = ovx * hx + ovz * hz
+    if (dot > 0) {
+      ovx -= 2 * dot * hx
+      ovz -= 2 * dot * hz
+    }
+    nx -= hx * 0.02
+    nz -= hz * 0.02
+  }
+  return { x: nx, z: nz, vx: ovx, vz: ovz }
+}
+
+function tickCrates(root: THREE.Object3D, time: number): void {
+  const last = Number(root.userData.crateTime ?? time)
+  const dt = Math.min(0.05, Math.max(0, time - last))
+  root.userData.crateTime = time
+  const crates: THREE.Object3D[] = []
+  root.traverse((obj) => {
+    if (obj.userData.animate === 'crate') crates.push(obj)
+  })
+  const limit = HEX_SIZE * 0.72
+  for (const crate of crates) {
+    crate.rotation.x = time * Number(crate.userData.spinX || 0)
+    crate.rotation.y = time * Number(crate.userData.spinY || 0)
+    crate.rotation.z = time * Number(crate.userData.spinZ || 0)
+    let x = crate.position.x + Number(crate.userData.vx || 0) * dt
+    let z = crate.position.z + Number(crate.userData.vz || 0) * dt
+    const bounced = bounceInHex(x, z, Number(crate.userData.vx || 0), Number(crate.userData.vz || 0), limit)
+    crate.userData.vx = bounced.vx
+    crate.userData.vz = bounced.vz
+    crate.position.x = bounced.x
+    crate.position.z = bounced.z
+  }
+  for (let i = 0; i < crates.length; i++) {
+    for (let j = i + 1; j < crates.length; j++) {
+      const a = crates[i]
+      const b = crates[j]
+      const dx = b.position.x - a.position.x
+      const dz = b.position.z - a.position.z
+      const dist = Math.hypot(dx, dz) || 0.0001
+      const min = Number(a.userData.crateRadius || 0.05) + Number(b.userData.crateRadius || 0.05)
+      if (dist >= min) continue
+      const nx = dx / dist
+      const nz = dz / dist
+      const overlap = min - dist
+      a.position.x -= nx * overlap * 0.5
+      a.position.z -= nz * overlap * 0.5
+      b.position.x += nx * overlap * 0.5
+      b.position.z += nz * overlap * 0.5
+      const avx = Number(a.userData.vx || 0)
+      const avz = Number(a.userData.vz || 0)
+      const bvx = Number(b.userData.vx || 0)
+      const bvz = Number(b.userData.vz || 0)
+      const rel = (avx - bvx) * nx + (avz - bvz) * nz
+      if (rel > 0) continue
+      a.userData.vx = avx - rel * nx
+      a.userData.vz = avz - rel * nz
+      b.userData.vx = bvx + rel * nx
+      b.userData.vz = bvz + rel * nz
+    }
+  }
+}
+
 export function tickTileGlyphs(
   root: THREE.Object3D,
   time: number,
   vortexFlash?: { face: number | null; hold: boolean } | null,
 ): void {
+  tickCrates(root, time)
   root.traverse((obj) => {
     if (obj.userData.animate === 'asteroid') {
-      obj.rotation.x = 0
-      obj.rotation.z = 0
-      obj.rotation.y = time * Number(obj.userData.spinY || 0)
-    }
-    if (obj.userData.animate === 'crate') {
       obj.rotation.x = 0
       obj.rotation.z = 0
       obj.rotation.y = time * Number(obj.userData.spinY || 0)
