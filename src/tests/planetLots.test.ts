@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { dicePips, EDGE_MARGIN, OVERLAY_HOVER, PRICE_TAG_WIDTH, PRICE_BELOW_Z } from '../renderer/board/planetLots'
+import {
+  dicePips,
+  EDGE_MARGIN,
+  LOT_Z,
+  overlayLotX,
+  OVERLAY_HOVER,
+  PRICE_TAG_WIDTH,
+  PRICE_BELOW_Z,
+  priceInwardOffset,
+  servicePadPosition,
+} from '../renderer/board/planetLots'
 import { BASE_HOVER } from '../renderer/entities/ShipRenderer'
 import { EVA_HUB_SPIN } from '../renderer/board/evaDocks'
 import { missileSidePoint, missileWorldPos, probeWorldPos } from '../renderer/fx/missilePath'
@@ -28,6 +38,24 @@ describe('dice pips', () => {
   it('enlarges resource prices and labels EVA as sell containers with fuel and repair', () => {
     expect(PRICE_TAG_WIDTH).toBeGreaterThan(0.28)
     expect(PRICE_BELOW_Z).toBeGreaterThan(0.072)
+  })
+
+  it('centers the resource row under the top flat and puts CR under the icons', () => {
+    expect(overlayLotX(0) + overlayLotX(1) + overlayLotX(2)).toBeCloseTo(0)
+    expect(overlayLotX(1)).toBeCloseTo(0)
+    const under = priceInwardOffset(0, LOT_Z)
+    expect(under.z).toBeGreaterThan(0)
+    expect(under.z).toBeCloseTo(PRICE_BELOW_Z)
+  })
+
+  it('parks fuel and repair on the south-east slant', () => {
+    const fuel = servicePadPosition(0, 2)
+    const repair = servicePadPosition(1, 2)
+    expect(fuel.x).toBeGreaterThan(0.4)
+    expect(fuel.z).toBeGreaterThan(0.2)
+    expect(repair.x).toBeGreaterThan(0.4)
+    expect(repair.z).toBeGreaterThan(0.2)
+    expect(fuel.z).toBeGreaterThan(LOT_Z + 0.5)
   })
 })
 

@@ -3,7 +3,7 @@ import type { PlanetMarket, ResourceId } from '../../game/definitions/resources'
 import { RESOURCE_IDS } from '../../game/definitions/resources'
 import { FUEL_BUY_PRICE, REPAIR_PRICE } from '../../game/definitions/constants'
 import { palette, css } from '../theme'
-import { HEX_SIZE } from '../../game/board/hexMath'
+import { HEX_SIZE, hexEdgeCorners } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { clamp01 } from '../motion'
 
@@ -27,11 +27,37 @@ const FLAT_EDGE = TILE_RADIUS * (Math.sqrt(3) / 2)
 /** Shared inset from the hex flat for names, resource lots, and EVA sell pads. */
 export const EDGE_MARGIN = 0.12
 const NAME_R = FLAT_EDGE - EDGE_MARGIN
-const LOT_Z = -(FLAT_EDGE - EDGE_MARGIN)
-/** Outward from the resource hex so the CR label sits below it, not on it. */
+export const LOT_Z = -(FLAT_EDGE - EDGE_MARGIN)
+/** Toward hex center from the icon — under the top-row lots, not past the rim. */
 export const PRICE_BELOW_Z = 0.13
 const HEX_SPACING = 0.18
 const SERVICE_GAP = 0.28
+/** SE slant (axial dir 0). Bottom-right on screen when the name sits on +Z. */
+export const SERVICE_EDGE_DIR = 0
+
+export function overlayLotX(index: number, count = RESOURCE_IDS.length): number {
+  return (index - (count - 1) / 2) * HEX_SPACING
+}
+
+export function servicePadPosition(slot: number, slots: number): { x: number; z: number } {
+  const [a, b] = hexEdgeCorners(SERVICE_EDGE_DIR, TILE_RADIUS)
+  const mx = (a.x + b.x) / 2
+  const mz = (a.z + b.z) / 2
+  const out = Math.hypot(mx, mz) || 1
+  const tx = b.x - a.x
+  const tz = b.z - a.z
+  const tlen = Math.hypot(tx, tz) || 1
+  const along = slots <= 1 ? 0 : (slot - (slots - 1) / 2) * SERVICE_GAP
+  return {
+    x: mx - (mx / out) * EDGE_MARGIN - (tx / tlen) * along,
+    z: mz - (mz / out) * EDGE_MARGIN - (tz / tlen) * along,
+  }
+}
+
+export function priceInwardOffset(fromX: number, fromZ: number): { x: number; z: number } {
+  const len = Math.hypot(fromX, fromZ) || 1
+  return { x: (-fromX / len) * PRICE_BELOW_Z, z: (-fromZ / len) * PRICE_BELOW_Z }
+}
 const CLOSE_DIST = 4.2
 const FAR_DIST = 6.0
 /** Quarter of ship hover: 50% closer to the tile than the previous mid-height overlays. */
@@ -87,12 +113,13 @@ export function createPlanetOverlay(
   RESOURCE_IDS.forEach((id, index) => {
     const lot = market.lots.find((item) => item.id === id)
     const amount = lot?.amount ?? 0
-    const x = (index - 1.5) * HEX_SPACING
+    const x = overlayLotX(index)
     const cluster = new THREE.Group()
     cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
     cluster.add(stockHex(id, amount))
     const tag = priceTag(`${buyPrice[id]}CR`, css.priceYellow)
-    tag.position.set(0, 0.01, -PRICE_BELOW_Z)
+    const inward = priceInwardOffset(x, LOT_Z)
+    tag.position.set(inward.x, 0.01, inward.z)
     cluster.add(tag)
     if (amount > 0) {
       const hit = new THREE.Mesh(
@@ -114,12 +141,13 @@ export function createPlanetOverlay(
     far.add(diceCluster(id, amount, x))
   })
 
-  const fuelX = 3.5 * HEX_SPACING
+  const fuelPad = servicePadPosition(0, 1)
   const fuelCluster = new THREE.Group()
-  fuelCluster.position.set(fuelX, OVERLAY_HOVER, LOT_Z)
+  fuelCluster.position.set(fuelPad.x, OVERLAY_HOVER, fuelPad.z)
   fuelCluster.add(stockHexFuel())
   const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, css.ochre)
-  fuelTag.position.set(0, 0.01, -PRICE_BELOW_Z)
+  const fuelIn = priceInwardOffset(fuelPad.x, fuelPad.z)
+  fuelTag.position.set(fuelIn.x, 0.01, fuelIn.z)
   fuelCluster.add(fuelTag)
   const fuelHit = new THREE.Mesh(
     new THREE.CircleGeometry(0.12, 12),
@@ -136,7 +164,7 @@ export function createPlanetOverlay(
   fuelHit.userData.pickOnly = true
   fuelCluster.add(fuelHit)
   close.add(fuelCluster)
-  far.add(diceClusterFuel(fuelX))
+  far.add(diceClusterFuel(fuelPad.x, fuelPad.z))
 
   g.add(close, far)
   g.userData.closeLod = close
@@ -157,7 +185,7 @@ export function createEvaOverlay(
   const far = new THREE.Group()
   far.userData.lod = 'far'
   RESOURCE_IDS.forEach((id, index) => {
-    const x = (index - 2) * HEX_SPACING
+    const x = overlayLotX(index)
     const cluster = new THREE.Group()
     cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
     const qty = cargo[id] ?? 0
@@ -182,15 +210,17 @@ export function createEvaOverlay(
     far.add(diceCluster(id, qty, x))
   })
   const exchange = caption('SELL CONTAINERS', css.priceYellow, 0.72, 0.055)
-  exchange.position.set(0, OVERLAY_HOVER + 0.01, LOT_Z - PRICE_BELOW_Z)
+  const sellIn = priceInwardOffset(0, LOT_Z)
+  exchange.position.set(sellIn.x, OVERLAY_HOVER + 0.01, LOT_Z + sellIn.z)
   close.add(exchange)
 
-  const fuelX = 0.55
+  const fuelPad = servicePadPosition(0, 2)
   const fuelCluster = new THREE.Group()
-  fuelCluster.position.set(fuelX, OVERLAY_HOVER, LOT_Z)
+  fuelCluster.position.set(fuelPad.x, OVERLAY_HOVER, fuelPad.z)
   fuelCluster.add(stockHexFuel())
   const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, css.ochre)
-  fuelTag.position.set(0, 0.01, -PRICE_BELOW_Z)
+  const fuelIn = priceInwardOffset(fuelPad.x, fuelPad.z)
+  fuelTag.position.set(fuelIn.x, 0.01, fuelIn.z)
   fuelCluster.add(fuelTag)
   const fuelHit = new THREE.Mesh(
     new THREE.CircleGeometry(0.12, 12),
@@ -208,11 +238,13 @@ export function createEvaOverlay(
   fuelCluster.add(fuelHit)
   close.add(fuelCluster)
 
+  const repairPad = servicePadPosition(1, 2)
   const repairCluster = new THREE.Group()
-  repairCluster.position.set(fuelX + SERVICE_GAP, OVERLAY_HOVER, LOT_Z)
+  repairCluster.position.set(repairPad.x, OVERLAY_HOVER, repairPad.z)
   repairCluster.add(stockRepair())
   const repairTag = priceTag(`${REPAIR_PRICE}CR`, css.ivory)
-  repairTag.position.set(0, 0.01, -PRICE_BELOW_Z)
+  const repairIn = priceInwardOffset(repairPad.x, repairPad.z)
+  repairTag.position.set(repairIn.x, 0.01, repairIn.z)
   repairCluster.add(repairTag)
   const repairHit = new THREE.Mesh(
     new THREE.CircleGeometry(0.12, 12),
@@ -534,9 +566,9 @@ function stockRepair(): THREE.Group {
   return g
 }
 
-function diceClusterFuel(x: number): THREE.Group {
+function diceClusterFuel(x: number, z = LOT_Z): THREE.Group {
   const g = new THREE.Group()
-  g.position.set(x, OVERLAY_HOVER, LOT_Z)
+  g.position.set(x, OVERLAY_HOVER, z)
   const dot = new THREE.Mesh(
     new THREE.CircleGeometry(0.014, 10),
     new THREE.MeshBasicMaterial({
