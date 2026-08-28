@@ -154,6 +154,7 @@ describe('tile glyphs', () => {
     const digitR: number[] = []
     const rockR: number[] = []
     threeWay.updateMatrixWorld(true)
+    const spins: number[] = []
     threeWay.traverse((obj) => {
       if (obj.userData.straitBlocked) blockedFaces += 1
       if (obj.userData.edgeDigit) {
@@ -161,7 +162,10 @@ describe('tile glyphs', () => {
         obj.getWorldPosition(w)
         digitR.push(Math.hypot(w.x, w.z))
       }
-      if (obj.userData.animate === 'asteroid') rockR.push(Math.hypot(obj.position.x, obj.position.z))
+      if (obj.userData.animate === 'asteroid') {
+        rockR.push(Math.hypot(obj.position.x, obj.position.z))
+        spins.push(Number(obj.userData.spinY))
+      }
       if (obj.userData.openChannels) {
         expect(obj.userData.openChannels).toBe(3)
         expect(obj.userData.blockedWalls).toBe(3)
@@ -169,9 +173,11 @@ describe('tile glyphs', () => {
     })
     expect(blockedFaces).toBe(3)
     expect(digitR).toHaveLength(6)
-    expect(rockR.length).toBeGreaterThan(30)
-    expect(Math.min(...rockR)).toBeGreaterThan(0.62)
+    expect(rockR.length).toBeGreaterThan(60)
+    expect(Math.min(...rockR)).toBeGreaterThan(0.32)
     expect(Math.max(...rockR)).toBeLessThan(0.98)
+    expect(spins.some((speed) => speed > 0)).toBe(true)
+    expect(spins.some((speed) => speed < 0)).toBe(true)
     const bent = createTileGlyph(TILE_DEFINITIONS['strait-2'])
     bent.traverse((obj) => {
       if (obj.userData.openChannels) {

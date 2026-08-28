@@ -412,13 +412,9 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
   const rng = new RNG(`strait-rocks:${salt}`)
   let open = 0
   let blocked = 0
-    const r = HEX_SIZE * 0.94
-    for (let i = 0; i < 6; i++) {
+  const r = HEX_SIZE * 0.93
+  for (let i = 0; i < 6; i++) {
     const [p0, p1] = hexEdgeCorners(i, r)
-    const x0 = p0.x
-    const z0 = p0.z
-    const x1 = p1.x
-    const z1 = p1.z
     if (edges[i] !== 'BLOCKED') {
       open += 1
       continue
@@ -427,31 +423,33 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
     const cluster = new THREE.Group()
     cluster.userData.straitBlocked = true
     cluster.userData.blockedFace = i
-    const mx = (x0 + x1) / 2
-    const mz = (z0 + z1) / 2
-    const edgeLen = Math.hypot(x1 - x0, z1 - z0) || 1
-    const tx = (x1 - x0) / edgeLen
-    const tz = (z1 - z0) / edgeLen
+    const mx = (p0.x + p1.x) / 2
+    const mz = (p0.z + p1.z) / 2
+    const edgeLen = Math.hypot(p1.x - p0.x, p1.z - p0.z) || 1
+    const tx = (p1.x - p0.x) / edgeLen
+    const tz = (p1.z - p0.z) / edgeLen
     const inward = Math.hypot(mx, mz) || 1
     const ix = -mx / inward
     const iz = -mz / inward
-    const pebbles = 11 + rng.nextInt(4)
+    const pebbles = 26 + rng.nextInt(8)
     for (let p = 0; p < pebbles; p++) {
-      const slot = pebbles === 1 ? 0 : p / (pebbles - 1)
-      const along = (slot - 0.5) * edgeLen * 0.88
-      const inset = 0.035 + rng.next() * 0.055
-      const jitter = (rng.next() - 0.5) * 0.028
+      const u = rng.next()
+      const along = (u - 0.5) * edgeLen * 0.9
+      const mid = 1 - Math.abs(u - 0.5) * 2
+      const inset = 0.05 + rng.next() * (0.1 + mid * 0.34)
+      const jitter = (rng.next() - 0.5) * 0.04
       const cx = mx + tx * (along + jitter) + ix * inset
       const cz = mz + tz * (along + jitter) + iz * inset
-      const rad = 0.016 + rng.next() * 0.014
+      const rad = 0.012 + rng.next() * 0.016
       const pts: Array<[number, number]> = []
       const sides = 5 + rng.nextInt(3)
       for (let s = 0; s < sides; s++) {
-        const a = (Math.PI * 2 * s) / sides + rng.next() * 0.45
-        const rr = rad * (0.65 + rng.next() * 0.5)
+        const a = (Math.PI * 2 * s) / sides + rng.next() * 0.5
+        const rr = rad * (0.6 + rng.next() * 0.55)
         pts.push([cx + Math.cos(a) * rr, cz + Math.sin(a) * rr])
       }
-      cluster.add(spinningRock(pts, color, (0.2 + rng.next() * 0.5) * (rng.next() < 0.5 ? -1 : 1)))
+      const spinY = (0.16 + p * 0.031 + rng.next() * 0.22) * (p % 2 === 0 ? 1 : -1)
+      cluster.add(spinningRock(pts, color, spinY))
     }
     g.add(cluster)
   }
