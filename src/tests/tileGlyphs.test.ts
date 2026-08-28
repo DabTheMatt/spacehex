@@ -119,7 +119,11 @@ describe('tile glyphs', () => {
       expect(obj.userData.edgeTop).toBe(true)
       expect(obj.userData.edgeWall).toBeUndefined()
       expect(obj.position.y).toBeGreaterThan(0)
-      expect(obj.rotation.x).toBeCloseTo(-Math.PI / 2)
+      const len = Math.hypot(obj.position.x, obj.position.z) || 1
+      const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(obj.quaternion)
+      expect(localY.x).toBeCloseTo(-obj.position.x / len, 5)
+      expect(localY.z).toBeCloseTo(-obj.position.z / len, 5)
+      expect(localY.y).toBeCloseTo(0, 5)
       expect(obj.userData.digitColor).toBe(palette.paper)
       expect(obj).not.toBeInstanceOf(THREE.Sprite)
     })

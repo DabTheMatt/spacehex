@@ -550,7 +550,12 @@ function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
     const mz = ((r * Math.sin(a0) + r * Math.sin(a1)) / 2) * EDGE_DIGIT_INSET
     const mark = edgeDigitPlane(numbers[i], color)
     mark.position.set(mx, Y + 0.018, mz)
-    mark.rotation.set(-Math.PI / 2, Math.atan2(-mx, -mz), 0)
+    const normal = new THREE.Vector3(0, 1, 0)
+    const textUp = new THREE.Vector3(-mx, 0, -mz)
+    if (textUp.lengthSq() < 1e-8) textUp.set(0, 0, -1)
+    textUp.normalize()
+    const textRight = new THREE.Vector3().crossVectors(textUp, normal).normalize()
+    mark.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(textRight, textUp, normal))
     mark.userData.digitColor = color
     g.add(mark)
   }
