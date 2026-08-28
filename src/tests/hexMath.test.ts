@@ -8,6 +8,7 @@ import {
   hexCorner,
   hexDistance,
   hexEdgeCorners,
+  hexEdgeFrame,
   pointInFlatTopHex,
 } from '../game/board/hexMath'
 import { coordKey } from '../game/board/HexCoord'
@@ -39,6 +40,16 @@ describe('hexMath (flat-top axial)', () => {
       const w = getWorldPosition(getNeighbor({ q: 0, r: 0 }, i))
       const [a, b] = hexEdgeCorners(i)
       expect(Math.atan2((a.z + b.z) / 2, (a.x + b.x) / 2)).toBeCloseTo(Math.atan2(w.z, w.x))
+    }
+  })
+
+  it('maps local +X onto each hex edge tangent', () => {
+    for (let i = 0; i < 6; i++) {
+      const e = hexEdgeFrame(i)
+      const x = Math.cos(e.yaw)
+      const z = -Math.sin(e.yaw)
+      expect(x).toBeCloseTo(e.tx)
+      expect(z).toBeCloseTo(e.tz)
     }
   })
 

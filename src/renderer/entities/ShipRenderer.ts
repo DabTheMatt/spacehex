@@ -305,7 +305,11 @@ export class ShipRenderer {
       wrapper.userData.beacon = marker.userData.beacon
       wrapper.userData.beacon2 = marker.userData.beacon2
       const shownYaw = this.facing.get(ship.id) ?? yaw
-      wrapper.quaternion.setFromAxisAngle(Y_AXIS, shownYaw)
+      const drawYaw =
+        isInk(this.graphicMode) && !(isEvaCoord(coord) && ship.playerId && !this.duel.has(ship.id))
+          ? hexAlignedYaw(shownYaw)
+          : shownYaw
+      wrapper.quaternion.setFromAxisAngle(Y_AXIS, drawYaw)
       wrapper.position.set(last.x, BASE_HOVER, last.z)
       wrapper.userData.shipId = ship.id
       wrapper.userData.playerId = ship.playerId
@@ -725,6 +729,12 @@ function hullExtents(shipClass: keyof typeof SHIP_DEFINITIONS): { length: number
   const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
   const half = shipClass === 'DRZAZGA' ? 0.1 : 0.12
   return { length, half }
+}
+
+/** Snap heading onto a hex edge (0°/60°) so INK rectangles sit parallel to the outline. */
+function hexAlignedYaw(yaw: number): number {
+  const step = Math.PI / 3
+  return Math.round(yaw / step) * step
 }
 
 function createInkNavMarker(

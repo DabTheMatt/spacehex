@@ -6,7 +6,7 @@ import { createCargoFigure, attachCrateMotion, CARGO_COLOR } from './cargoMesh'
 import { CARGO_KINDS, type CargoKind } from '../../game/definitions/cargoFigures'
 import { asteroidCollisionPercent } from '../../game/definitions/tiles'
 import type { EdgeNumbers } from '../../game/board/edgeNumbers'
-import { HEX_SIZE, hexCorner, hexEdgeCorners, pointInFlatTopHex, clampToFlatTopHex } from '../../game/board/hexMath'
+import { HEX_SIZE, hexCorner, hexEdgeCorners, hexEdgeFrame, pointInFlatTopHex, clampToFlatTopHex } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
@@ -171,58 +171,39 @@ function ellipse(rx: number, rz: number, color: number, segments = 48): THREE.Li
   return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat(color))
 }
 
-function asteroidGlyph(color: number): THREE.Group {
+function asteroidGlyph(color: number, edges: TileDefinition['edges'], salt: string): THREE.Group {
   const g = new THREE.Group()
-  const rocks: Array<Array<[number, number]>> = [
-    [
-      [0.38, 0.02],
-      [0.55, 0.14],
-      [0.42, 0.32],
-      [0.22, 0.22],
-      [0.2, 0.06],
-    ],
-    [
-      [0.08, 0.28],
-      [0.22, 0.42],
-      [0.02, 0.52],
-      [-0.16, 0.4],
-      [-0.1, 0.24],
-    ],
-    [
-      [-0.28, 0.08],
-      [-0.12, 0.18],
-      [-0.22, 0.32],
-      [-0.42, 0.2],
-      [-0.4, 0.04],
-    ],
-    [
-      [-0.48, -0.22],
-      [-0.28, -0.12],
-      [-0.32, 0.02],
-      [-0.55, -0.08],
-    ],
-    [
-      [-0.08, -0.38],
-      [0.14, -0.32],
-      [0.18, -0.14],
-      [-0.02, -0.18],
-      [-0.16, -0.28],
-    ],
-    [
-      [0.28, -0.28],
-      [0.42, -0.22],
-      [0.36, -0.08],
-      [0.18, -0.16],
-    ],
-  ]
-  const spins = [0.37, -0.22, -0.41, 0.53, -0.29, 0.18]
-  rocks.forEach((rock, index) => {
-    g.add(spinningRock(rock, color, spins[index] ?? 0.2))
-  })
+  const rng = new RNG(`asteroid-rim:${salt}`)
+  for (let i = 0; i < 6; i++) {
+    if (edges[i] !== 'ASTEROID') continue
+    const e = hexEdgeFrame(i, HEX_SIZE * 0.72)
+    const count = 5
+    for (let p = 0; p < count; p++) {
+      const u = p / (count - 1)
+      const along = (u - 0.5) * e.edgeLen * 0.82
+      const cx = e.mx + e.tx * along
+      const cz = e.mz + e.tz * along
+      const rad = 0.038 + rng.next() * 0.028
+      const pts: Array<[number, number]> = []
+      const sides = 5 + rng.nextInt(3)
+      for (let s = 0; s < sides; s++) {
+        const a = (Math.PI * 2 * s) / sides + rng.next() * 0.4
+        const rr = rad * (0.55 + rng.next() * 0.55)
+        pts.push([cx + Math.cos(a) * rr, cz + Math.sin(a) * rr])
+      }
+      const spinY = (0.18 + i * 0.11 + p * 0.07 + rng.next() * 0.2) * (p % 2 === 0 ? 1 : -1)
+      g.add(spinningRock(pts, color, spinY, e.yaw))
+    }
+  }
   return g
 }
 
-function spinningRock(points: Array<[number, number]>, color: number, spinY: number): THREE.Group {
+function spinningRock(
+  points: Array<[number, number]>,
+  color: number,
+  spinY: number,
+  spinBase = 0,
+): THREE.Group {
   let cx = 0
   let cz = 0
   for (const [x, z] of points) {
@@ -234,9 +215,11 @@ function spinningRock(points: Array<[number, number]>, color: number, spinY: num
   const local = points.map(([x, z]) => [x - cx, z - cz] as [number, number])
   const g = new THREE.Group()
   g.position.set(cx, 0, cz)
+  g.rotation.y = spinBase
   g.add(poly(local, color, true))
   g.userData.animate = 'asteroid'
   g.userData.spinY = spinY
+  g.userData.spinBase = spinBase
   return g
 }
 
@@ -476,7 +459,7 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
         pts.push([cx + Math.cos(a) * rr, cz + Math.sin(a) * rr])
       }
       const spinY = (0.16 + p * 0.031 + rng.next() * 0.22) * (p % 2 === 0 ? 1 : -1)
-      cluster.add(spinningRock(pts, color, spinY))
+      cluster.add(spinningRock(pts, color, spinY, Math.atan2(-tz, tx)))
     }
     g.add(cluster)
   }
@@ -613,7 +596,7 @@ export function createTileGlyph(
       root.add(planetGlyph(planetColor, 'S', salt))
       break
     case 'ASTEROID':
-      root.add(asteroidGlyph(color))
+      root.add(asteroidGlyph(color, def.edges, salt))
       root.add(chanceLabel(`${asteroidCollisionPercent(def.edges)}%`, color))
       break
     case 'SHADOW_BASE':
@@ -710,19 +693,10 @@ function createInkTileGlyph(
       root.add(square(0, 0, 0.2, c))
       root.add(square(0, 0, 0.06, c))
       break
-    case 'ASTEROID': {
-      const boxes: Array<[number, number, number]> = [
-        [0.32, 0.12, 0.08],
-        [-0.22, 0.28, 0.07],
-        [-0.34, -0.08, 0.09],
-        [0.08, -0.3, 0.06],
-        [0.28, -0.18, 0.05],
-        [-0.06, 0.02, 0.04],
-      ]
-      for (const [x, z, h] of boxes) root.add(square(x, z, h, c))
+    case 'ASTEROID':
+      root.add(inkEdgeRocks(def.edges, 'ASTEROID', c))
       root.add(chanceLabel(`${asteroidCollisionPercent(def.edges)}%`, c))
       break
-    }
     case 'SHADOW_BASE':
       root.add(square(-0.08, 0, 0.32, c))
       root.add(square(-0.08, 0, 0.16, c))
@@ -771,27 +745,53 @@ function inkBattery(color: number): THREE.Group {
   return g
 }
 
-function inkStrait(edges: TileDefinition['edges'], color: number): THREE.Group {
+function inkEdgeRocks(
+  edges: TileDefinition['edges'],
+  mark: 'ASTEROID' | 'BLOCKED',
+  color: number,
+): THREE.Group {
   const g = new THREE.Group()
-  g.userData.straitGlyph = true
+  g.userData.straitGlyph = mark === 'BLOCKED'
   const r = HEX_SIZE * 0.78
   for (let i = 0; i < 6; i++) {
-    if (edges[i] !== 'BLOCKED') continue
-    const [p0, p1] = hexEdgeCorners(i, r)
-    const mx = (p0.x + p1.x) / 2
-    const mz = (p0.z + p1.z) / 2
-    const alongX = Math.abs(p1.x - p0.x) >= Math.abs(p1.z - p0.z)
+    if (edges[i] !== mark) continue
+    const e = hexEdgeFrame(i, r)
     const cluster = new THREE.Group()
-    cluster.userData.straitBlocked = true
+    cluster.userData.straitBlocked = mark === 'BLOCKED'
     cluster.userData.blockedFace = i
-    for (let n = -2; n <= 2; n++) {
-      const x = alongX ? mx + n * 0.12 : mx
-      const z = alongX ? mz : mz + n * 0.12
-      cluster.add(square(x, z, 0.04, color))
+    cluster.userData.edgeRocks = true
+    cluster.userData.edgeFace = i
+    const count = 5
+    const n0 = (count - 1) / 2
+    const spacing = (e.edgeLen * 0.72) / Math.max(1, count - 1)
+    for (let n = 0; n < count; n++) {
+      const along = (n - n0) * spacing
+      const tile = new THREE.Group()
+      tile.position.set(e.mx + e.tx * along, 0, e.mz + e.tz * along)
+      tile.rotation.y = e.yaw
+      tile.userData.edgeAligned = true
+      tile.userData.edgeYaw = e.yaw
+      tile.add(
+        poly(
+          [
+            [-0.055, -0.018],
+            [0.055, -0.018],
+            [0.055, 0.018],
+            [-0.055, 0.018],
+          ],
+          color,
+          true,
+        ),
+      )
+      cluster.add(tile)
     }
     g.add(cluster)
   }
   return g
+}
+
+function inkStrait(edges: TileDefinition['edges'], color: number): THREE.Group {
+  return inkEdgeRocks(edges, 'BLOCKED', color)
 }
 
 function bounceInHex(
@@ -911,7 +911,7 @@ export function tickTileGlyphs(
     if (obj.userData.animate === 'asteroid') {
       obj.rotation.x = 0
       obj.rotation.z = 0
-      obj.rotation.y = time * Number(obj.userData.spinY || 0)
+      obj.rotation.y = Number(obj.userData.spinBase || 0) + time * Number(obj.userData.spinY || 0)
     }
     if (obj.userData.animate === 'spin') {
       const rate = Number(obj.userData.spinRate ?? 0.12)

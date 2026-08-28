@@ -110,6 +110,39 @@ export function clampToFlatTopHex(
   return { x: 0, z: 0 }
 }
 
+/** Midpoint, unit tangent, inward normal, and Yaw that maps local +X onto the edge. */
+export function hexEdgeFrame(
+  dir: number,
+  radius = HEX_SIZE,
+): {
+  mx: number
+  mz: number
+  tx: number
+  tz: number
+  ix: number
+  iz: number
+  edgeLen: number
+  yaw: number
+} {
+  const [p0, p1] = hexEdgeCorners(dir, radius)
+  const edgeLen = Math.hypot(p1.x - p0.x, p1.z - p0.z) || 1
+  const tx = (p1.x - p0.x) / edgeLen
+  const tz = (p1.z - p0.z) / edgeLen
+  const mx = (p0.x + p1.x) / 2
+  const mz = (p0.z + p1.z) / 2
+  const inward = Math.hypot(mx, mz) || 1
+  return {
+    mx,
+    mz,
+    tx,
+    tz,
+    ix: -mx / inward,
+    iz: -mz / inward,
+    edgeLen,
+    yaw: Math.atan2(-tz, tx),
+  }
+}
+
 export function directionFromTo(origin: HexCoord, target: HexCoord): number | null {
   const dq = target.q - origin.q
   const dr = target.r - origin.r
