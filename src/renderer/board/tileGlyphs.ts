@@ -8,8 +8,8 @@ import { HEX_SIZE } from '../../game/board/hexMath'
 import { EVA_DOCK_COUNT, EVA_DOCK_RADIUS, EVA_HUB_SPIN, EVA_PULSE_STEP_S, evaDockAngle } from './evaDocks'
 import { RNG } from '../../game/random/RNG'
 
-/** Midpoint of each top-face edge, scaled toward the hex center. */
-export const EDGE_DIGIT_INSET = 0.78
+/** Midpoint of each top-face edge, scaled toward the hex center. Stays outside the strait rock belt. */
+export const EDGE_DIGIT_INSET = 0.9
 
 const CARGO_KINDS = ['ORE', 'BIOMASS', 'ICE', 'FUEL'] as const
 export type WreckCargoKind = (typeof CARGO_KINDS)[number]
@@ -402,7 +402,7 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
   const rng = new RNG(`strait-rocks:${salt}`)
   let open = 0
   let blocked = 0
-  const r = HEX_SIZE * 0.88
+  const r = HEX_SIZE * 0.82
   for (let i = 0; i < 6; i++) {
     const a0 = (Math.PI / 3) * i
     const a1 = (Math.PI / 3) * (i + 1)
@@ -428,12 +428,14 @@ function straitGlyph(edges: TileDefinition['edges'], color: number, salt: string
     const iz = -mz / inward
     const pebbles = 5 + rng.nextInt(2)
     for (let p = 0; p < pebbles; p++) {
-      const along = (p / Math.max(1, pebbles - 1) - 0.5) * edgeLen * 0.7
-      const inset = 0.08 + rng.next() * 0.07
-      const jitter = (rng.next() - 0.5) * 0.05
+      const slot = pebbles === 1 ? 0 : p / (pebbles - 1)
+      const along = (slot - 0.5) * edgeLen * 0.78
+      if (Math.abs(along) < edgeLen * 0.12) continue
+      const inset = 0.16 + rng.next() * 0.08
+      const jitter = (rng.next() - 0.5) * 0.04
       const cx = mx + tx * (along + jitter) + ix * inset
       const cz = mz + tz * (along + jitter) + iz * inset
-      const rad = 0.05 + rng.next() * 0.035
+      const rad = 0.048 + rng.next() * 0.03
       const fill = new THREE.Mesh(
         new THREE.CircleGeometry(rad * 0.92, 10),
         new THREE.MeshBasicMaterial({
@@ -523,14 +525,16 @@ function edgeDigitPlane(n: number, color: number): THREE.Object3D {
     ctx.fillText(String(n), 32, 34)
   }
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.09, 0.09),
+    new THREE.PlaneGeometry(0.11, 0.11),
     new THREE.MeshBasicMaterial({
       map: new THREE.CanvasTexture(canvas),
       transparent: true,
+      depthTest: false,
       depthWrite: false,
       side: THREE.DoubleSide,
     }),
   )
+  mesh.renderOrder = 8
   Object.assign(mesh.userData, userData)
   return mesh
 }
@@ -545,7 +549,7 @@ function edgeNumberMarks(numbers: EdgeNumbers, color: number): THREE.Group {
     const mx = ((r * Math.cos(a0) + r * Math.cos(a1)) / 2) * EDGE_DIGIT_INSET
     const mz = ((r * Math.sin(a0) + r * Math.sin(a1)) / 2) * EDGE_DIGIT_INSET
     const mark = edgeDigitPlane(numbers[i], color)
-    mark.position.set(mx, Y + 0.002, mz)
+    mark.position.set(mx, Y + 0.018, mz)
     mark.rotation.set(-Math.PI / 2, Math.atan2(-mx, -mz), 0)
     mark.userData.digitColor = color
     g.add(mark)

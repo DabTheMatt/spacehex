@@ -113,7 +113,7 @@ describe('tile glyphs', () => {
     expect(fuel).toBe(0)
     expect(repair).toBe(1)
     expect(digits).toBe(6)
-    expect(EDGE_DIGIT_INSET).toBeCloseTo(0.78)
+    expect(EDGE_DIGIT_INSET).toBeCloseTo(0.9)
     eva.traverse((obj) => {
       if (!obj.userData.edgeDigit) return
       expect(obj.userData.edgeTop).toBe(true)
@@ -134,16 +134,29 @@ describe('tile glyphs', () => {
   })
 
   it('piles asteroid clusters on blocked strait edges', () => {
-    const threeWay = createTileGlyph(TILE_DEFINITIONS['strait-1'])
+    const threeWay = createTileGlyph(
+      TILE_DEFINITIONS['strait-1'],
+      palette.paper,
+      'strait-vis',
+      false,
+      [1, 2, 3, 4, 5, 6],
+    )
     let blockedFaces = 0
+    const digitR: number[] = []
+    const rockR: number[] = []
     threeWay.traverse((obj) => {
       if (obj.userData.straitBlocked) blockedFaces += 1
+      if (obj.userData.edgeDigit) digitR.push(Math.hypot(obj.position.x, obj.position.z))
+      if (obj.userData.animate === 'asteroid') rockR.push(Math.hypot(obj.position.x, obj.position.z))
       if (obj.userData.openChannels) {
         expect(obj.userData.openChannels).toBe(3)
         expect(obj.userData.blockedWalls).toBe(3)
       }
     })
     expect(blockedFaces).toBe(3)
+    expect(digitR).toHaveLength(6)
+    expect(rockR.length).toBeGreaterThan(0)
+    expect(Math.min(...digitR)).toBeGreaterThan(Math.max(...rockR))
     const bent = createTileGlyph(TILE_DEFINITIONS['strait-2'])
     bent.traverse((obj) => {
       if (obj.userData.openChannels) {
