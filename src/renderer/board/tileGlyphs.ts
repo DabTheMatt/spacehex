@@ -590,7 +590,9 @@ export function createTileGlyph(
   salt = def.id,
   scan = false,
   edgeNumbers?: EdgeNumbers,
+  ink = false,
 ): THREE.Group {
+  if (ink) return createInkTileGlyph(def, color, salt, scan, edgeNumbers)
   const root = new THREE.Group()
   const type: TileType = def.type
   const planetColor = scan ? color : planetTintForId(salt)
@@ -643,6 +645,184 @@ export function createTileGlyph(
   return root
 }
 
+function square(cx: number, cz: number, half: number, color: number): THREE.Line {
+  return poly(
+    [
+      [cx - half, cz - half],
+      [cx + half, cz - half],
+      [cx + half, cz + half],
+      [cx - half, cz + half],
+    ],
+    color,
+    true,
+  )
+}
+
+function plusMark(size: number, color: number): THREE.Group {
+  const g = new THREE.Group()
+  g.add(poly([[-size, 0], [size, 0]], color))
+  g.add(poly([[0, -size], [0, size]], color))
+  return g
+}
+
+function createInkTileGlyph(
+  def: TileDefinition,
+  color: number,
+  salt: string,
+  _scan: boolean,
+  edgeNumbers?: EdgeNumbers,
+): THREE.Group {
+  const root = new THREE.Group()
+  root.userData.ink = true
+  const c = color
+  const type: TileType = def.type
+  switch (type) {
+    case 'EVA_1': {
+      const g = new THREE.Group()
+      g.add(square(0, 0, 0.12, c))
+      g.add(plusMark(0.07, c))
+      g.add(square(0, 0, 0.36, c))
+      g.add(square(0, 0, 0.5, c))
+      for (let k = 0; k < EVA_DOCK_COUNT; k++) {
+        const a = evaDockAngle(k)
+        const x = Math.round(Math.cos(a)) * EVA_DOCK_RADIUS
+        const z = Math.round(Math.sin(a)) * EVA_DOCK_RADIUS
+        g.add(square(x, z, 0.04, c))
+      }
+      root.add(g)
+      break
+    }
+    case 'VOID':
+      root.add(plusMark(0.32, c))
+      root.add(square(0, 0, 0.08, c))
+      break
+    case 'PLANET_LARGE':
+      root.add(square(0, 0, 0.42, c))
+      root.add(square(0, 0, 0.28, c))
+      root.add(square(0, 0, 0.1, c))
+      break
+    case 'PLANET_MEDIUM':
+      root.add(square(0, 0, 0.3, c))
+      root.add(square(0, 0, 0.12, c))
+      root.add(square(0.38, 0, 0.05, c))
+      break
+    case 'PLANET_SMALL':
+      root.add(square(0, 0, 0.2, c))
+      root.add(square(0, 0, 0.06, c))
+      break
+    case 'ASTEROID': {
+      const boxes: Array<[number, number, number]> = [
+        [0.32, 0.12, 0.08],
+        [-0.22, 0.28, 0.07],
+        [-0.34, -0.08, 0.09],
+        [0.08, -0.3, 0.06],
+        [0.28, -0.18, 0.05],
+        [-0.06, 0.02, 0.04],
+      ]
+      for (const [x, z, h] of boxes) root.add(square(x, z, h, c))
+      root.add(chanceLabel(`${asteroidCollisionPercent(def.edges)}%`, c))
+      break
+    }
+    case 'SHADOW_BASE':
+      root.add(square(-0.08, 0, 0.32, c))
+      root.add(square(-0.08, 0, 0.16, c))
+      root.add(poly([[0.24, -0.1], [0.5, 0], [0.24, 0.1], [0.24, -0.1]], c, true))
+      break
+    case 'WRECK_TANKER':
+      root.add(poly([[-0.3, -0.12], [0.28, -0.12], [0.28, 0.12], [-0.3, 0.12]], c, true))
+      addInkCrates(root, salt)
+      root.add(inkBattery(c))
+      break
+    case 'WRECK_TRANSPORT':
+      root.add(poly([[-0.18, -0.28], [0.18, -0.28], [0.18, 0.22], [-0.18, 0.22]], c, true))
+      root.add(square(0, -0.08, 0.08, c))
+      addInkCrates(root, salt)
+      break
+    case 'BLACK_HOLE':
+      root.add(square(0, 0, 0.18, c))
+      root.add(square(0, 0, 0.34, c))
+      root.add(plusMark(0.42, c))
+      break
+    case 'VORTEX':
+      root.add(square(0, 0, 0.16, c))
+      root.add(square(0, 0, 0.28, c))
+      root.add(square(0, 0, 0.42, c))
+      root.add(plusMark(0.1, c))
+      break
+    case 'SPACE_GATE':
+      root.add(square(0, 0, 0.42, c))
+      root.add(square(0, 0, 0.24, c))
+      root.add(poly([[-0.12, 0], [0.12, 0]], c))
+      break
+    case 'STRAIT':
+      root.add(inkStrait(def.edges, c))
+      break
+    default:
+      root.add(plusMark(0.32, c))
+  }
+  if (edgeNumbers) root.add(edgeNumberMarks(edgeNumbers, c))
+  return root
+}
+
+function inkBattery(color: number): THREE.Group {
+  const g = new THREE.Group()
+  g.add(square(0.52, 0.48, 0.06, color))
+  g.add(poly([[0.56, 0.47], [0.6, 0.47], [0.6, 0.49], [0.56, 0.49]], color, true))
+  return g
+}
+
+function addInkCrates(g: THREE.Group, salt: string): void {
+  const rng = new RNG(`wreck-cargo:${salt}`)
+  const count = 2 + rng.nextInt(2)
+  const kinds = rng.shuffle(CARGO_KINDS).slice(0, count)
+  const slots: Array<[number, number]> = [
+    [-0.28, -0.28],
+    [0.22, -0.26],
+    [0.02, 0.3],
+  ]
+  kinds.forEach((kind, index) => {
+    const size = 0.08
+    const box = new THREE.Group()
+    box.add(square(0, 0, size * 0.5, 0xffffff))
+    box.userData.cargoCube = kind
+    box.userData.crateRadius = size * 0.62
+    const [x, z] = slots[index] ?? slots[0]
+    box.position.set(x, Y, z)
+    box.userData.animate = 'crate'
+    const speed = 0.12 + rng.next() * 0.1
+    const axis = rng.next() < 0.5
+    box.userData.vx = axis ? speed : 0
+    box.userData.vz = axis ? 0 : speed
+    box.userData.spinX = 0
+    box.userData.spinY = 0
+    box.userData.spinZ = 0
+    g.add(box)
+  })
+}
+
+function inkStrait(edges: TileDefinition['edges'], color: number): THREE.Group {
+  const g = new THREE.Group()
+  g.userData.straitGlyph = true
+  const r = HEX_SIZE * 0.78
+  for (let i = 0; i < 6; i++) {
+    if (edges[i] !== 'BLOCKED') continue
+    const [p0, p1] = hexEdgeCorners(i, r)
+    const mx = (p0.x + p1.x) / 2
+    const mz = (p0.z + p1.z) / 2
+    const alongX = Math.abs(p1.x - p0.x) >= Math.abs(p1.z - p0.z)
+    const cluster = new THREE.Group()
+    cluster.userData.straitBlocked = true
+    cluster.userData.blockedFace = i
+    for (let n = -2; n <= 2; n++) {
+      const x = alongX ? mx + n * 0.12 : mx
+      const z = alongX ? mz : mz + n * 0.12
+      cluster.add(square(x, z, 0.04, color))
+    }
+    g.add(cluster)
+  }
+  return g
+}
+
 function pointInFlatHex(x: number, z: number, radius: number): boolean {
   const q = ((2 / 3) * x) / radius
   const r = ((-1 / 3) * x + (Math.sqrt(3) / 3) * z) / radius
@@ -676,6 +856,15 @@ function bounceInHex(
   return { x: nx, z: nz, vx: ovx, vz: ovz }
 }
 
+function hasInkAncestor(obj: THREE.Object3D): boolean {
+  let node: THREE.Object3D | null = obj
+  while (node) {
+    if (node.userData.ink) return true
+    node = node.parent
+  }
+  return false
+}
+
 function tickCrates(root: THREE.Object3D, time: number): void {
   const last = Number(root.userData.crateTime ?? time)
   const dt = Math.min(0.05, Math.max(0, time - last))
@@ -686,9 +875,11 @@ function tickCrates(root: THREE.Object3D, time: number): void {
   })
   const limit = HEX_SIZE * 0.72
   for (const crate of crates) {
-    crate.rotation.x = time * Number(crate.userData.spinX || 0)
-    crate.rotation.y = time * Number(crate.userData.spinY || 0)
-    crate.rotation.z = time * Number(crate.userData.spinZ || 0)
+    if (crate.userData.spinX || crate.userData.spinY || crate.userData.spinZ) {
+      crate.rotation.x = time * Number(crate.userData.spinX || 0)
+      crate.rotation.y = time * Number(crate.userData.spinY || 0)
+      crate.rotation.z = time * Number(crate.userData.spinZ || 0)
+    }
     let x = crate.position.x + Number(crate.userData.vx || 0) * dt
     let z = crate.position.z + Number(crate.userData.vz || 0) * dt
     const bounced = bounceInHex(x, z, Number(crate.userData.vx || 0), Number(crate.userData.vz || 0), limit)
@@ -734,6 +925,7 @@ export function tickTileGlyphs(
 ): void {
   tickCrates(root, time)
   root.traverse((obj) => {
+    if (hasInkAncestor(obj)) return
     if (obj.userData.animate === 'asteroid') {
       obj.rotation.x = 0
       obj.rotation.z = 0

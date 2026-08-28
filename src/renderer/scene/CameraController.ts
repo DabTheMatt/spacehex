@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { getWorldPosition, HEX_SIZE } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
-import { palette } from '../theme'
+import { scenePalette } from '../theme'
+import type { GraphicMode } from '../graphicMode'
 import { isTypingTarget } from '../../ui/actionHotkeys'
 import { pinchDollyRadius, pinchPairAngle } from '../../ui/pointerInput'
 import { clamp01, easeInOutSmooth, lerp, prefersReducedMotion, CAMERA_FOCUS_MS, shortestAngleDelta } from '../motion'
@@ -17,8 +18,13 @@ const MIN_POLAR = 0.08
 const MAX_POLAR = Math.PI / 2 - 0.12
 
 export class CameraController {
-  readonly camera: THREE.PerspectiveCamera
+  readonly persp: THREE.PerspectiveCamera
+  readonly ortho: THREE.OrthographicCamera
   readonly controls: OrbitControls
+  private mode: GraphicMode = 'space'
+  private readonly inkUp = new THREE.Vector3(0, 0, -1)
+  private viewW = 1
+  private viewH = 1
   private readonly canvas: HTMLCanvasElement
   private panX = 0
   private panY = 0
@@ -26,6 +32,7 @@ export class CameraController {
   private pinch: {
     span: number
     radius: number
+    zoom: number
     angle: number
     phi: number
     theta: number
@@ -66,11 +73,23 @@ export class CameraController {
   private keys = { w: false, a: false, s: false, d: false, q: false, e: false }
   private lastTick = performance.now()
 
+  get camera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
+    return this.mode === 'ink' ? this.ortho : this.persp
+  }
+
+  get graphicMode(): GraphicMode {
+    return this.mode
+  }
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.08, 500)
-    this.camera.position.set(0, 8, 10)
-    this.controls = new OrbitControls(this.camera, canvas)
+    this.persp = new THREE.PerspectiveCamera(45, 1, 0.08, 500)
+    this.persp.position.set(0, 8, 10)
+    this.ortho = new THREE.OrthographicCamera(-8, 8, 8, -8, 0.08, 500)
+    this.ortho.position.set(0, 28, 0)
+    this.ortho.up.copy(this.inkUp)
+    this.ortho.lookAt(0, 0, 0)
+    this.controls = new OrbitControls(this.persp, canvas)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.08
     this.controls.minDistance = 2.4
@@ -92,8 +111,62 @@ export class CameraController {
   }
 
   resize(width: number, height: number): void {
-    this.camera.aspect = width / Math.max(1, height)
-    this.camera.updateProjectionMatrix()
+    this.viewW = width
+    this.viewH = height
+    this.persp.aspect = width / Math.max(1, height)
+    this.persp.updateProjectionMatrix()
+    this.updateOrthoFrustum()
+  }
+
+  setGraphicMode(mode: GraphicMode): void {
+    if (this.mode === mode) return
+    this.mode = mode
+    this.orbitAnim = null
+    this.panAnim = null
+    this.pinch = null
+    this.followReleased = true
+    const target = this.controls.target
+    if (mode === 'ink') {
+      this.controls.object = this.ortho
+      this.controls.enableRotate = false
+      this.controls.mouseButtons.RIGHT = null
+      this.snapInk(target.x, target.z)
+    } else {
+      this.controls.object = this.persp
+      this.controls.enableRotate = !this.grabbing
+      this.controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE
+      if (this.persp.position.y < 1) this.persp.position.set(target.x, 8, target.z + 10)
+      this.persp.up.set(0, 1, 0)
+      this.persp.lookAt(target)
+    }
+    this.updateOrthoFrustum()
+  }
+
+  private updateOrthoFrustum(): void {
+    const aspect = this.viewW / Math.max(1, this.viewH)
+    const half = 8
+    this.ortho.left = -half * aspect
+    this.ortho.right = half * aspect
+    this.ortho.top = half
+    this.ortho.bottom = -half
+    this.ortho.updateProjectionMatrix()
+  }
+
+  private snapInk(x: number, z: number): void {
+    this.controls.target.set(x, 0, z)
+    this.ortho.position.set(x, 28, z)
+    this.ortho.up.copy(this.inkUp)
+    this.ortho.lookAt(this.controls.target)
+  }
+
+  private worldPerPixel(): number {
+    const height = Math.max(1, this.canvas.clientHeight)
+    if (this.mode === 'ink') {
+      return (this.ortho.top - this.ortho.bottom) / Math.max(0.05, this.ortho.zoom) / height
+    }
+    const dist = this.persp.position.distanceTo(this.controls.target)
+    const vFov = (this.persp.fov * Math.PI) / 180
+    return (2 * dist * Math.tan(vFov / 2)) / height
   }
 
   focus(coord: HexCoord): void {
@@ -121,6 +194,10 @@ export class CameraController {
 
   /** Frame the active ship at a 30° polar angle and the current distance. */
   focusShip(coord: HexCoord): void {
+    if (this.mode === 'ink') {
+      this.panTo(coord)
+      return
+    }
     this.overview = false
     this.overviewRestore = null
     this.clearInspectLimits()
@@ -159,6 +236,12 @@ export class CameraController {
   }
 
   private beginInspect(coord: HexCoord, theta: number, toPhi: number): void {
+    if (this.mode === 'ink') {
+      this.panTo(coord)
+      this.ortho.zoom = Math.min(4.2, Math.max(1.6, this.ortho.zoom * 1.35))
+      this.ortho.updateProjectionMatrix()
+      return
+    }
     this.overview = false
     this.overviewRestore = null
     const { x, z } = getWorldPosition(coord)
@@ -231,8 +314,20 @@ export class CameraController {
     }
     const width = Math.max(2.4, maxX - minX)
     const depth = Math.max(2.4, maxZ - minZ)
-    const vFov = (this.camera.fov * Math.PI) / 180
-    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * Math.max(0.35, this.camera.aspect))
+    const cx = (minX + maxX) / 2
+    const cz = (minZ + maxZ) / 2
+    if (this.mode === 'ink') {
+      const aspect = this.viewW / Math.max(1, this.viewH)
+      const halfH = 8
+      const needH = Math.max(depth / 2, width / 2 / aspect) * 1.22
+      this.ortho.zoom = Math.max(0.12, Math.min(6, halfH / needH))
+      this.ortho.updateProjectionMatrix()
+      this.snapInk(cx, cz)
+      this.orbitAnim = null
+      return
+    }
+    const vFov = (this.persp.fov * Math.PI) / 180
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * Math.max(0.35, this.persp.aspect))
     const dist = Math.max(depth / 2 / Math.tan(vFov / 2), width / 2 / Math.tan(hFov / 2)) * 1.22
     const phi = 0.07
     const instant = prefersReducedMotion()
@@ -282,9 +377,9 @@ export class CameraController {
   }
 
   private inspectDistance(): number {
-    const vFov = (this.camera.fov * Math.PI) / 180
+    const vFov = (this.persp.fov * Math.PI) / 180
     const diameter = HEX_SIZE * 2
-    const visibleMinFactor = Math.min(1, this.camera.aspect)
+    const visibleMinFactor = Math.min(1, this.persp.aspect)
     const visibleHeight = diameter / CAMERA_INSPECT_FILL / visibleMinFactor
     return visibleHeight / (2 * Math.tan(vFov / 2))
   }
@@ -329,14 +424,18 @@ export class CameraController {
     const dy = clientY - this.panY
     this.panX = clientX
     this.panY = clientY
-    const dist = this.camera.position.distanceTo(this.controls.target)
-    const vFov = (this.camera.fov * Math.PI) / 180
-    const worldPerPx = (2 * dist * Math.tan(vFov / 2)) / Math.max(1, this.canvas.clientHeight)
+    const worldPerPx = this.worldPerPixel()
     const forward = new THREE.Vector3()
-    this.camera.getWorldDirection(forward)
-    forward.y = 0
-    if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1)
-    else forward.normalize()
+    if (this.mode === 'ink') {
+      forward.copy(this.inkUp).setY(0)
+      if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1)
+      else forward.normalize()
+    } else {
+      this.camera.getWorldDirection(forward)
+      forward.y = 0
+      if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1)
+      else forward.normalize()
+    }
     const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize()
     const move = right.multiplyScalar(-dx * worldPerPx).addScaledVector(forward, dy * worldPerPx)
     this.camera.position.add(move)
@@ -345,7 +444,7 @@ export class CameraController {
 
   endPan(): void {
     this.grabbing = false
-    this.controls.enableRotate = true
+    this.controls.enableRotate = this.mode !== 'ink'
     this.canvas.style.cursor = 'grab'
   }
 
@@ -358,6 +457,7 @@ export class CameraController {
     this.pinch = {
       span: Math.hypot(a.x - b.x, a.y - b.y),
       radius: sph.radius,
+      zoom: this.ortho.zoom,
       angle: pinchPairAngle(a, b),
       phi: sph.phi,
       theta: sph.theta,
@@ -367,6 +467,12 @@ export class CameraController {
 
   updatePinch(a: { x: number; y: number }, b: { x: number; y: number }): void {
     if (!this.pinch) return
+    if (this.mode === 'ink') {
+      const span = Math.hypot(a.x - b.x, a.y - b.y)
+      this.ortho.zoom = Math.min(8, Math.max(0.12, this.pinch.zoom * (span / Math.max(1, this.pinch.span))))
+      this.ortho.updateProjectionMatrix()
+      return
+    }
     const span = Math.hypot(a.x - b.x, a.y - b.y)
     const radius = pinchDollyRadius(
       this.pinch.radius,
@@ -398,7 +504,7 @@ export class CameraController {
   }
 
   setOrbitEnabled(enabled: boolean): void {
-    this.controls.enableRotate = enabled
+    this.controls.enableRotate = this.mode === 'ink' ? false : enabled
   }
 
   tick(): void {
@@ -426,6 +532,10 @@ export class CameraController {
   }
 
   private sanitizeOrbit(): void {
+    if (this.mode === 'ink') {
+      this.snapInk(this.controls.target.x, this.controls.target.z)
+      return
+    }
     this.camera.up.set(0, 1, 0)
     const offset = this.camera.position.clone().sub(this.controls.target)
     if (!Number.isFinite(offset.x) || offset.lengthSq() < 1e-6) {
@@ -470,7 +580,8 @@ export class CameraController {
     target.x += dx * k
     target.z += dz * k
     target.y = 0
-    this.camera.position.copy(target).add(offset)
+    if (this.mode === 'ink') this.snapInk(target.x, target.z)
+    else this.camera.position.copy(target).add(offset)
   }
 
   private applyFocusPan(now: number): void {
@@ -483,17 +594,30 @@ export class CameraController {
       lerp(anim.fromTarget.y, anim.toTarget.y, e),
       lerp(anim.fromTarget.z, anim.toTarget.z, e),
     )
-    this.camera.position.set(
-      lerp(anim.fromPos.x, anim.toPos.x, e),
-      lerp(anim.fromPos.y, anim.toPos.y, e),
-      lerp(anim.fromPos.z, anim.toPos.z, e),
-    )
+    if (this.mode === 'ink') {
+      this.snapInk(this.controls.target.x, this.controls.target.z)
+    } else {
+      this.camera.position.set(
+        lerp(anim.fromPos.x, anim.toPos.x, e),
+        lerp(anim.fromPos.y, anim.toPos.y, e),
+        lerp(anim.fromPos.z, anim.toPos.z, e),
+      )
+    }
     if (t >= 1) this.panAnim = null
   }
 
   private applyOrbit(now: number): void {
     const anim = this.orbitAnim
     if (!anim || this.grabbing) return
+    if (this.mode === 'ink') {
+      const t = anim.duration <= 0 ? 1 : clamp01((now - anim.start) / anim.duration)
+      const e = easeInOutSmooth(t)
+      const x = lerp(anim.fromTarget.x, anim.toTarget.x, e)
+      const z = lerp(anim.fromTarget.z, anim.toTarget.z, e)
+      this.snapInk(x, z)
+      if (t >= 1) this.orbitAnim = null
+      return
+    }
     const t = anim.duration <= 0 ? 1 : clamp01((now - anim.start) / anim.duration)
     const e = easeInOutSmooth(t)
     const target = new THREE.Vector3(
@@ -518,12 +642,18 @@ export class CameraController {
     const z = (this.keys.w ? 1 : 0) - (this.keys.s ? 1 : 0)
     if (!x && !z) return
     const forward = new THREE.Vector3()
-    this.camera.getWorldDirection(forward)
-    forward.y = 0
-    if (forward.lengthSq() < 1e-6) {
-      forward.set(0, 0, -1)
+    if (this.mode === 'ink') {
+      forward.copy(this.inkUp).setY(0)
+      if (forward.lengthSq() < 1e-6) forward.set(0, 0, -1)
+      else forward.normalize()
     } else {
-      forward.normalize()
+      this.camera.getWorldDirection(forward)
+      forward.y = 0
+      if (forward.lengthSq() < 1e-6) {
+        forward.set(0, 0, -1)
+      } else {
+        forward.normalize()
+      }
     }
     const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize()
     const move = right
@@ -540,6 +670,11 @@ export class CameraController {
     const dir = (this.keys.q ? 1 : 0) - (this.keys.e ? 1 : 0)
     if (!dir) return
     const angle = dir * MAP_ROTATE_SPEED * dt
+    if (this.mode === 'ink') {
+      this.inkUp.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
+      this.snapInk(this.controls.target.x, this.controls.target.z)
+      return
+    }
     const eye = this.camera.position
     const offset = this.controls.target.clone().sub(eye)
     offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle)
@@ -574,9 +709,22 @@ export class CameraController {
   }
 }
 
-export function makeLights(scene: THREE.Scene): void {
-  scene.add(new THREE.AmbientLight(palette.ivory, 0.55))
-  const dir = new THREE.DirectionalLight(palette.paper, 0.55)
+export function makeLights(scene: THREE.Scene, mode: GraphicMode = 'space'): void {
+  for (const child of [...scene.children]) {
+    if (child.userData.sceneLight) scene.remove(child)
+  }
+  const colors = scenePalette(mode)
+  if (mode === 'ink') {
+    const ambient = new THREE.AmbientLight(0xffffff, 1)
+    ambient.userData.sceneLight = true
+    scene.add(ambient)
+    return
+  }
+  const ambient = new THREE.AmbientLight(colors.ivory, 0.55)
+  ambient.userData.sceneLight = true
+  scene.add(ambient)
+  const dir = new THREE.DirectionalLight(colors.paper, 0.55)
   dir.position.set(4, 10, 6)
+  dir.userData.sceneLight = true
   scene.add(dir)
 }

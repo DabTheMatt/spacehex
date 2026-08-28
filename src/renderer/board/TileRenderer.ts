@@ -26,33 +26,52 @@ export function createHexMesh(options: {
   y?: number
   radius?: number
   dashed?: boolean
+  flat?: boolean
 }): THREE.Group {
   const group = new THREE.Group()
   const radius = options.radius ?? HEX_SIZE * 0.96
   const opacity = options.opacity ?? 1
   const translucent = opacity < 1 || Boolean(options.dashed)
   const skipFill = opacity <= 0 && !options.dashed
+  const thickness = options.flat ? 0.012 : TILE_THICKNESS
   if (!skipFill) {
     const shape = hexShape(radius)
-    const geom = new THREE.ExtrudeGeometry(shape, {
-      depth: TILE_THICKNESS,
-      bevelEnabled: false,
-      steps: 1,
-    })
-    const mat = new THREE.MeshBasicMaterial({
-      color: options.fill,
-      transparent: translucent,
-      opacity: options.dashed ? Math.min(opacity, 0.2) : opacity,
-      side: THREE.DoubleSide,
-      depthWrite: !translucent,
-      polygonOffset: true,
-      polygonOffsetFactor: 1,
-      polygonOffsetUnits: 1,
-    })
-    const mesh = new THREE.Mesh(geom, mat)
-    mesh.rotation.x = -Math.PI / 2
-    mesh.position.y = options.y ?? 0
-    group.add(mesh)
+    if (options.flat) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: options.fill,
+        transparent: translucent,
+        opacity: options.dashed ? Math.min(opacity, 0.2) : opacity,
+        side: THREE.DoubleSide,
+        depthWrite: !translucent,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1,
+      })
+      const mesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat)
+      mesh.rotation.x = -Math.PI / 2
+      mesh.position.y = (options.y ?? 0) + thickness
+      group.add(mesh)
+    } else {
+      const geom = new THREE.ExtrudeGeometry(shape, {
+        depth: TILE_THICKNESS,
+        bevelEnabled: false,
+        steps: 1,
+      })
+      const mat = new THREE.MeshBasicMaterial({
+        color: options.fill,
+        transparent: translucent,
+        opacity: options.dashed ? Math.min(opacity, 0.2) : opacity,
+        side: THREE.DoubleSide,
+        depthWrite: !translucent,
+        polygonOffset: true,
+        polygonOffsetFactor: 1,
+        polygonOffsetUnits: 1,
+      })
+      const mesh = new THREE.Mesh(geom, mat)
+      mesh.rotation.x = -Math.PI / 2
+      mesh.position.y = options.y ?? 0
+      group.add(mesh)
+    }
   } else {
     const hit = new THREE.Mesh(
       new THREE.ShapeGeometry(hexShape(radius)),
@@ -66,27 +85,29 @@ export function createHexMesh(options: {
       }),
     )
     hit.rotation.x = -Math.PI / 2
-    hit.position.y = (options.y ?? 0) + TILE_THICKNESS
+    hit.position.y = (options.y ?? 0) + thickness
     group.add(hit)
   }
 
-  const topY = (options.y ?? 0) + TILE_THICKNESS + 0.002
+  const topY = (options.y ?? 0) + thickness + 0.002
   const botY = options.y ?? 0
   const strokeOpacity =
     options.strokeOpacity ?? (options.dashed ? 0.95 : Math.min(1, opacity + 0.2))
   const postOpacity = options.dashed ? 0.85 : Math.min(strokeOpacity, Math.max(opacity, strokeOpacity * 0.85))
   group.add(hexRing(radius, topY, options.stroke, strokeOpacity, options.dashed))
-  group.add(hexRing(radius, botY, options.stroke, strokeOpacity, options.dashed))
-  for (let i = 0; i < 6; i++) {
-    const { x, z } = hexCorner(i, radius)
-    group.add(
-      hexLine(
-        [new THREE.Vector3(x, botY, z), new THREE.Vector3(x, topY, z)],
-        options.stroke,
-        postOpacity,
-        options.dashed,
-      ),
-    )
+  if (!options.flat) {
+    group.add(hexRing(radius, botY, options.stroke, strokeOpacity, options.dashed))
+    for (let i = 0; i < 6; i++) {
+      const { x, z } = hexCorner(i, radius)
+      group.add(
+        hexLine(
+          [new THREE.Vector3(x, botY, z), new THREE.Vector3(x, topY, z)],
+          options.stroke,
+          postOpacity,
+          options.dashed,
+        ),
+      )
+    }
   }
   return group
 }
@@ -211,11 +232,11 @@ export function makeEdgeChevron(options: {
 }
 
 /** Cartographic corner ticks — does not alter hex geometry. */
-export function makeSelectionMarks(radius = HEX_SIZE * 0.96): THREE.Group {
+export function makeSelectionMarks(radius = HEX_SIZE * 0.96, color = palette.ochre): THREE.Group {
   const g = new THREE.Group()
   const y = TILE_THICKNESS + 0.012
   const tick = 0.11
-  const mat = new THREE.LineBasicMaterial({ color: palette.ochre })
+  const mat = new THREE.LineBasicMaterial({ color })
   for (let i = 0; i < 6; i++) {
     const { x: vx, z: vz } = hexCorner(i, radius)
     const n1 = hexCorner((i + 1) % 6, radius)
@@ -275,8 +296,8 @@ export function makeDashedHexGhost(
   return g
 }
 
-export function makeHoverHighlight(radius = HEX_SIZE * 0.96): THREE.Group {
-  const g = makeSelectionMarks(radius)
+export function makeHoverHighlight(radius = HEX_SIZE * 0.96, color = palette.ochre): THREE.Group {
+  const g = makeSelectionMarks(radius, color)
   g.traverse((obj) => {
     obj.userData.pulse = true
     const mesh = obj as THREE.Line
@@ -295,8 +316,46 @@ export function makeHoverArrow(
   origin: { x: number; z: number },
   target: { x: number; z: number },
   color = palette.ochre,
+  manhattan = false,
 ): THREE.Group {
   const g = new THREE.Group()
+  const y = TILE_THICKNESS + 0.05
+  const lineMat = new THREE.LineBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+  })
+  if (manhattan) {
+    const ax = origin.x
+    const az = origin.z
+    const bx = target.x
+    const bz = target.z
+    const elbow = new THREE.Vector3(bx, y, az)
+    const start = new THREE.Vector3(ax, y, az)
+    const end = new THREE.Vector3(bx, y, bz)
+    const shaft = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([start, elbow, end]),
+      lineMat,
+    )
+    shaft.userData.pulse = true
+    g.add(shaft)
+    const headSize = 0.1
+    const towardX = Math.abs(bx - ax) >= Math.abs(bz - az)
+    const hx = towardX ? (bx > ax ? -headSize : headSize) : 0
+    const hz = towardX ? 0 : bz > az ? -headSize : headSize
+    const tip = end
+    const left = new THREE.Vector3(bx + hx + (towardX ? 0 : -headSize), y, bz + hz + (towardX ? -headSize : 0))
+    const right = new THREE.Vector3(bx + hx + (towardX ? 0 : headSize), y, bz + hz + (towardX ? headSize : 0))
+    g.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([left, tip, right]),
+        lineMat,
+      ),
+    )
+    g.userData.pulse = true
+    return g
+  }
   const dx = target.x - origin.x
   const dz = target.z - origin.z
   const len = Math.hypot(dx, dz) || 1
@@ -304,19 +363,12 @@ export function makeHoverArrow(
   const uz = dz / len
   const px = -uz
   const pz = ux
-  const y = TILE_THICKNESS + 0.05
   const start = HEX_SIZE * 0.42
   const end = len - HEX_SIZE * 0.38
   const ax = origin.x + ux * start
   const az = origin.z + uz * start
   const bx = origin.x + ux * end
   const bz = origin.z + uz * end
-  const lineMat = new THREE.LineBasicMaterial({
-    color,
-    transparent: true,
-    opacity: 0.85,
-    depthWrite: false,
-  })
   const shaft = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(ax, y, az),

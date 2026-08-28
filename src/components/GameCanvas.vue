@@ -46,6 +46,7 @@ function sync(): void {
     showMarketIcons: ui.showMarketIcons,
     threatShipId: ui.threatShipId,
     probeAim: ui.probeAiming,
+    graphicMode: ui.graphicMode,
   })
 }
 
@@ -435,6 +436,7 @@ watch(
     ui.showTileNames,
     ui.showMarketIcons,
     ui.probeAiming,
+    ui.graphicMode,
   ],
   () => sync(),
   { deep: true },

@@ -2,6 +2,11 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { HexCoord } from '@/game/board/HexCoord'
 import type { BoardHover } from '@/ui/boardHover'
+import {
+  type GraphicMode,
+  readStoredGraphicMode,
+  writeStoredGraphicMode,
+} from '@/renderer/graphicMode'
 
 export const useUiStore = defineStore('ui', () => {
   const showDebug = ref(false)
@@ -22,6 +27,7 @@ export const useUiStore = defineStore('ui', () => {
   const showMarketIcons = ref(true)
   const notice = ref<string | null>(null)
   const probeAiming = ref(false)
+  const graphicMode = ref<GraphicMode>(readStoredGraphicMode())
   let noticeTimer: ReturnType<typeof setTimeout> | null = null
 
   function flashNotice(text: string, ms = 2800): void {
@@ -31,6 +37,11 @@ export const useUiStore = defineStore('ui', () => {
       notice.value = null
       noticeTimer = null
     }, ms)
+  }
+
+  function setGraphicMode(mode: GraphicMode): void {
+    graphicMode.value = mode
+    writeStoredGraphicMode(mode)
   }
 
   return {
@@ -51,6 +62,8 @@ export const useUiStore = defineStore('ui', () => {
     showMarketIcons,
     notice,
     probeAiming,
+    graphicMode,
     flashNotice,
+    setGraphicMode,
   }
 })

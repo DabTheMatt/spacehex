@@ -96,6 +96,59 @@ body,
   font-weight: 500;
 }
 
+.global-status__start {
+  display: flex;
+  align-items: center;
+  gap: 0.95rem;
+  pointer-events: auto;
+  min-width: 0;
+}
+
+.graphic-toggle {
+  display: flex;
+  gap: 0.55rem;
+  flex-shrink: 0;
+}
+
+.graphic-toggle button {
+  font: inherit;
+  font-size: var(--font-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  border: 0;
+  border-bottom: var(--line-width) solid transparent;
+  padding: 0.12rem 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.graphic-toggle button.on {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.app-shell.ink {
+  --color-background: #000000;
+  --color-primary: #ffffff;
+  --color-muted: #ffffff;
+  --color-accent: #ffffff;
+  --font-display: var(--font-ui);
+}
+
+.app-shell.ink .cargo--ore,
+.app-shell.ink .cargo--biomass,
+.app-shell.ink .cargo--ice,
+.app-shell.ink .cargo--fuel,
+.app-shell.ink .action-strip__item.probe.on,
+.app-shell.ink .action-strip__item.probe.aiming {
+  color: #ffffff;
+}
+
+.app-shell.ink .action-strip__item.probe.aiming {
+  border-bottom-color: #ffffff;
+}
+
 .global-status__new {
   pointer-events: auto;
   font-size: var(--font-xs);

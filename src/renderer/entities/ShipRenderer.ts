@@ -6,6 +6,8 @@ import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
 import { SHIP_DEFINITIONS } from '../../game/definitions/ships'
 import { palette, css } from '../theme'
+import type { GraphicMode } from '../graphicMode'
+import { isInk } from '../graphicMode'
 import { TILE_THICKNESS } from '../board/TileRenderer'
 import { evaDockIndexForPlayer, evaDockWorldOffset, evaHubAngleAt, isEvaCoord } from '../board/evaDocks'
 import {
@@ -96,6 +98,11 @@ export class ShipRenderer {
   private hubTime = 0
   private duel = new Map<string, { x: number; z: number; yaw: number }>()
   private threatShipId: string | null = null
+  private graphicMode: GraphicMode = 'space'
+
+  setGraphicMode(mode: GraphicMode): void {
+    this.graphicMode = mode
+  }
 
   isBusy(shipId: string): boolean {
     const motion = this.motion.get(shipId)
@@ -283,7 +290,9 @@ export class ShipRenderer {
       const active = Boolean(ship.playerId) && state.players[state.activePlayerId]?.shipId === ship.id
       const wreck = ship.hull <= 0
       const wrapper = new THREE.Group()
-      const marker = createNavMarker(ship.class, playerNo, active && !wreck, hullLabel(ship), wreck)
+      const marker = isInk(this.graphicMode)
+        ? createInkNavMarker(ship.class, playerNo, active && !wreck, hullLabel(ship), wreck)
+        : createNavMarker(ship.class, playerNo, active && !wreck, hullLabel(ship), wreck)
       wrapper.add(marker)
       wrapper.userData.engines = marker.userData.engines
       wrapper.userData.beacon = marker.userData.beacon
@@ -709,6 +718,68 @@ function hullExtents(shipClass: keyof typeof SHIP_DEFINITIONS): { length: number
   const length = shipClass === 'DRZAZGA' ? 0.34 : 0.42
   const half = shipClass === 'DRZAZGA' ? 0.1 : 0.12
   return { length, half }
+}
+
+function createInkNavMarker(
+  shipClass: keyof typeof SHIP_DEFINITIONS,
+  playerNo: number,
+  active: boolean,
+  _label: string,
+  wreck = false,
+): THREE.Group {
+  const { length, half } = hullExtents(shipClass)
+  const g = new THREE.Group()
+  const w = half * 2
+  const fill = playerNo > 0 && !wreck
+  const color = 0xffffff
+  if (fill) {
+    const plate = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, length),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, depthWrite: true }),
+    )
+    plate.rotation.x = -Math.PI / 2
+    plate.position.y = 0.02
+    plate.userData.hullPaint = color
+    plate.renderOrder = 3
+    g.add(plate)
+  }
+  const pts = [
+    new THREE.Vector3(-half, 0.025, -length * 0.5),
+    new THREE.Vector3(half, 0.025, -length * 0.5),
+    new THREE.Vector3(half, 0.025, length * 0.5),
+    new THREE.Vector3(-half, 0.025, length * 0.5),
+    new THREE.Vector3(-half, 0.025, -length * 0.5),
+  ]
+  const ring = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color }),
+  )
+  ring.userData.hullPaint = color
+  g.add(ring)
+  if (playerNo === 0) {
+    g.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-half * 0.45, 0.026, 0),
+          new THREE.Vector3(half * 0.45, 0.026, 0),
+        ]),
+        new THREE.LineBasicMaterial({ color }),
+      ),
+    )
+  }
+  if (active) {
+    const led = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.04, 0.04),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false }),
+    )
+    led.rotation.x = -Math.PI / 2
+    led.position.set(0, HULL_HEIGHT + 0.02, length * 0.22)
+    led.renderOrder = 10
+    g.add(led)
+    g.userData.beacon = led
+  }
+  g.userData.engines = undefined
+  return g
 }
 
 function createNavMarker(

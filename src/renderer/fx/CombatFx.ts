@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { missileSidePoint, missileWorldPos, probeWorldPos, type Vec3 } from './missilePath'
 import { clamp01, prefersReducedMotion } from '../motion'
 import { palette } from '../theme'
+import type { GraphicMode } from '../graphicMode'
 
 export const MISSILE_SIDE_MS = 280
 export const MISSILE_FLY_MS = 520
@@ -43,6 +44,11 @@ export class CombatFx {
   readonly group = new THREE.Group()
   private shots: Shot[] = []
   private floaters: Floater[] = []
+  private graphicMode: GraphicMode = 'space'
+
+  setGraphicMode(mode: GraphicMode): void {
+    this.graphicMode = mode
+  }
 
   get idle(): boolean {
     return this.shots.length === 0
@@ -83,7 +89,7 @@ export class CombatFx {
   }
 
   spawnDamage(target: Vec3, amount: number, now: number): void {
-    const sprite = damageSprite(amount)
+    const sprite = damageSprite(amount, this.graphicMode === 'ink')
     sprite.position.set(target.x, target.y + 0.08, target.z)
     this.group.add(sprite)
     this.floaters.push({ sprite, start: now, origin: { ...target, y: target.y + 0.08 } })
@@ -211,11 +217,11 @@ export class CombatFx {
       positions[i * 3 + 1] = origin.y
       positions[i * 3 + 2] = origin.z
     }
-    const rocket = kind === 'probe' ? makeProbeDart() : makeRocket()
+    const rocket = kind === 'probe' ? makeProbeDart(this.graphicMode === 'ink') : makeRocket(this.graphicMode === 'ink')
     rocket.position.set(origin.x, origin.y, origin.z)
     rocket.visible = false
     const trail = makeTrail(positions, colors)
-    const boom = makeBoom()
+    const boom = makeBoom(this.graphicMode === 'ink')
     this.group.add(rocket, trail, boom)
     return {
       kind,
@@ -277,14 +283,14 @@ export class CombatFx {
   }
 }
 
-function damageSprite(amount: number): THREE.Sprite {
+function damageSprite(amount: number, ink = false): THREE.Sprite {
   const canvas = document.createElement('canvas')
   canvas.width = 128
   canvas.height = 128
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, 128, 128)
-    ctx.fillStyle = '#C45C4A'
+    ctx.fillStyle = ink ? '#FFFFFF' : '#C45C4A'
     ctx.font = '700 72px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -304,7 +310,16 @@ function damageSprite(amount: number): THREE.Sprite {
   return sprite
 }
 
-function makeRocket(): THREE.Mesh {
+function makeRocket(ink = false): THREE.Mesh {
+  if (ink) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.04, 0.08),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false }),
+    )
+    mesh.rotation.x = -Math.PI / 2
+    mesh.renderOrder = 12
+    return mesh
+  }
   const mesh = new THREE.Mesh(
     new THREE.ConeGeometry(0.012, 0.046, 5),
     new THREE.MeshBasicMaterial({
@@ -318,7 +333,16 @@ function makeRocket(): THREE.Mesh {
   return mesh
 }
 
-function makeProbeDart(): THREE.Mesh {
+function makeProbeDart(ink = false): THREE.Mesh {
+  if (ink) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.03, 0.06),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, depthWrite: false }),
+    )
+    mesh.rotation.x = -Math.PI / 2
+    mesh.renderOrder = 12
+    return mesh
+  }
   const mesh = new THREE.Mesh(
     new THREE.ConeGeometry(0.01, 0.042, 5),
     new THREE.MeshBasicMaterial({
@@ -350,7 +374,23 @@ function makeTrail(positions: Float32Array, colors: Float32Array): THREE.Line {
   return line
 }
 
-function makeBoom(): THREE.Mesh {
+function makeBoom(ink = false): THREE.Mesh {
+  if (ink) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    )
+    mesh.rotation.x = -Math.PI / 2
+    mesh.visible = false
+    mesh.renderOrder = 13
+    return mesh
+  }
   const mesh = new THREE.Mesh(
     new THREE.SphereGeometry(1, 10, 8),
     new THREE.MeshBasicMaterial({

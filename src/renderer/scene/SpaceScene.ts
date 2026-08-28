@@ -8,7 +8,8 @@ import { ShipRenderer } from '../entities/ShipRenderer'
 import { HoverTargetRenderer } from '../entities/HoverTargetRenderer'
 import { ProbeRenderer } from '../entities/ProbeRenderer'
 import { CombatFx } from '../fx/CombatFx'
-import { palette } from '../theme'
+import { palette, scenePalette } from '../theme'
+import type { GraphicMode } from '../graphicMode'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { coordKey } from '../../game/board/HexCoord'
 import { getNeighbor, getWorldPosition } from '../../game/board/hexMath'
@@ -40,6 +41,7 @@ export interface SceneOptions {
   showMarketIcons?: boolean
   threatShipId?: string | null
   probeAim?: boolean
+  graphicMode?: GraphicMode
 }
 
 export class SpaceScene {
@@ -99,7 +101,7 @@ export class SpaceScene {
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color(palette.void)
     this.camera = new CameraController(canvas)
-    makeLights(this.scene)
+    makeLights(this.scene, 'space')
     this.board = new BoardRenderer()
     this.preview = new TilePreviewRenderer()
     this.ships = new ShipRenderer()
@@ -125,6 +127,19 @@ export class SpaceScene {
   sync(state: GameState, options: SceneOptions): void {
     this.lastState = state
     this.lastOptions = options
+    const mode = options.graphicMode ?? 'space'
+    if (this.camera.graphicMode !== mode) {
+      this.camera.setGraphicMode(mode)
+      const colors = scenePalette(mode)
+      this.renderer.setClearColor(colors.void)
+      this.scene.background = new THREE.Color(colors.void)
+      makeLights(this.scene, mode)
+      this.board.setGraphicMode(mode)
+      this.preview.setGraphicMode(mode)
+      this.ships.setGraphicMode(mode)
+      this.probes.setGraphicMode(mode)
+      this.combat.setGraphicMode(mode)
+    }
     this.camera.mapRotateEnabled = this.lastState.phase !== 'TILE_PLACEMENT'
     this.applySync()
   }

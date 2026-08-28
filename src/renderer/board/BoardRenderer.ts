@@ -20,7 +20,8 @@ import { PROBE_STROKE_OPACITY, PROBE_TILE_OPACITY } from '../entities/ProbeRende
 import { createPlanetOverlay, tickPlanetLod, createEdgeLabel, createEvaOverlay } from './planetLots'
 import { buyPrice, evaSellParts, isEvaHex } from '../../game/rules/planetMarket'
 import { RESOURCE_IDS, emptyCargo } from '../../game/definitions/resources'
-import { palette, css } from '../theme'
+import { scenePalette, sceneCss } from '../theme'
+import { isInk, type GraphicMode } from '../graphicMode'
 import { coordKey } from '../../game/board/HexCoord'
 import { probeAt } from '../../game/rules/probes'
 import { activeShip } from '../../game/rules/fuel'
@@ -34,10 +35,19 @@ export class BoardRenderer {
   private tileCache = new Map<string, { mesh: THREE.Group; sig: string }>()
   private glyphFade = new Map<string, { start: number; duration: number }>()
   private vortexFlash: { key: string; face: number | null; hold: boolean } | null = null
+  private graphicMode: GraphicMode = 'space'
 
   constructor() {
     this.group.add(this.tiles)
     this.group.add(this.markers)
+  }
+
+  setGraphicMode(mode: GraphicMode): void {
+    if (this.graphicMode === mode) return
+    this.graphicMode = mode
+    this.tiles.clear()
+    this.tileCache.clear()
+    this.glyphFade.clear()
   }
 
   sync(
@@ -140,6 +150,7 @@ export class BoardRenderer {
         options.showMarketIcons === false ? 'nm' : 'm',
         probed ? 'p' : '',
         tile.edgeNumbers.join(''),
+        this.graphicMode,
       ].join('|')
       const existing = this.tileCache.get(key)
       if (existing?.sig === sig) {
@@ -152,16 +163,20 @@ export class BoardRenderer {
         this.tiles.remove(existing.mesh)
       }
       const pos = getWorldPosition(tile.coord)
+      const colors = scenePalette(this.graphicMode)
+      const labels = sceneCss(this.graphicMode)
+      const ink = isInk(this.graphicMode)
       const mesh = createHexMesh(
         probed
           ? {
-              fill: palette.engine,
-              stroke: palette.engine,
+              fill: colors.engine,
+              stroke: colors.engine,
               opacity: PROBE_TILE_OPACITY,
               strokeOpacity: PROBE_STROKE_OPACITY,
               y: TILE_SETTLED_Y,
+              flat: ink,
             }
-          : { fill: palette.tileFill, stroke: palette.ivory, y: TILE_SETTLED_Y },
+          : { fill: colors.tileFill, stroke: colors.ivory, y: TILE_SETTLED_Y, flat: ink },
       )
       mesh.position.set(pos.x, options.tileY?.[key] ?? TILE_SETTLED_Y, pos.z)
       mesh.rotation.y = tile.rotation * (Math.PI / 3)
@@ -169,10 +184,11 @@ export class BoardRenderer {
       mesh.userData.tileKey = key
       const glyph = createTileGlyph(
         def,
-        probed ? palette.engine : palette.paper,
+        probed ? colors.engine : colors.paper,
         tile.id,
         probed,
         tile.edgeNumbers,
+        ink,
       )
       glyph.position.y = TILE_THICKNESS
       if (options.showTileNames !== false) {
@@ -181,7 +197,7 @@ export class BoardRenderer {
             coord: tile.coord,
             clickable: true,
             width: def.type === 'EVA_1' ? 0.92 : 0.72,
-            color: probed ? css.engine : css.ivory,
+            color: probed ? labels.engine : labels.ivory,
           }),
         )
       }
@@ -189,15 +205,15 @@ export class BoardRenderer {
         const prices = Object.fromEntries(
           RESOURCE_IDS.map((id) => [id, buyPrice(state, id)]),
         ) as Record<(typeof RESOURCE_IDS)[number], number>
-        glyph.add(createPlanetOverlay(market, tile.coord, prices))
+        glyph.add(createPlanetOverlay(market, tile.coord, prices, ink))
       }
       if (def.type === 'EVA_1' && options.showMarketIcons !== false && !probed) {
-        glyph.add(createEvaOverlay(tile.coord, ship?.cargo ?? emptyCargo(), atEva))
+        glyph.add(createEvaOverlay(tile.coord, ship?.cargo ?? emptyCargo(), atEva, ink))
       }
       mesh.userData.glyph = glyph
       mesh.add(glyph)
       this.syncGlyphFade(key, mesh, hideGlyph, true)
-      if (selected) mesh.add(makeSelectionMarks())
+      if (selected) mesh.add(makeSelectionMarks(undefined, scenePalette(this.graphicMode).ochre))
       if (options.showDebug || options.showCoords || options.showEdges) {
         const edges = getRotatedEdges(def, tile.rotation)
         const lines = [
@@ -275,7 +291,7 @@ export class BoardRenderer {
         makeEdgeChevron({
           origin: getWorldPosition(origin),
           target: getWorldPosition(target),
-          color: palette.dusk,
+          color: scenePalette(this.graphicMode).dusk,
           kind: 'MOVE',
           direction: dir,
         }),
@@ -291,12 +307,13 @@ export class BoardRenderer {
     if (!hover || state.phase !== 'PLAYER_TURN') return
     const origin = getWorldPosition(activeShip(state).coord)
     const dest = getWorldPosition(hover.coord)
-    const highlight = makeHoverHighlight()
+    const highlight = makeHoverHighlight(undefined, scenePalette(this.graphicMode).ivory)
     highlight.position.set(dest.x, 0, dest.z)
     this.markers.add(highlight)
     if (hover.kind === 'STAY') return
-    const color = probeAim && hover.kind === 'EXPLORE' ? palette.engine : palette.ochre
-    this.markers.add(makeHoverArrow(origin, dest, color))
+    const colors = scenePalette(this.graphicMode)
+    const color = probeAim && hover.kind === 'EXPLORE' ? colors.engine : colors.ochre
+    this.markers.add(makeHoverArrow(origin, dest, color, isInk(this.graphicMode)))
   }
 
   pickables(): THREE.Object3D[] {

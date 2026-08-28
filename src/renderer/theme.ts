@@ -1,3 +1,5 @@
+import type { GraphicMode } from './graphicMode'
+
 export const palette = {
   void: 0x0b0c0c,
   graphite: 0x1c1c19,
@@ -40,4 +42,56 @@ export const css = {
   repairPink: '#C48A96',
   hullMark: '#141412',
   priceYellow: '#E2D06A',
+}
+
+/** Strict black/white skin — no ochre, cyan, or resource tints. */
+export const inkPalette = {
+  void: 0x000000,
+  graphite: 0x000000,
+  tileFill: 0x000000,
+  ivory: 0xffffff,
+  paper: 0xffffff,
+  blood: 0xffffff,
+  dusk: 0xffffff,
+  ochre: 0xffffff,
+  preview: 0xffffff,
+  ink: 0x000000,
+  engine: 0xffffff,
+  player1: 0xffffff,
+  player2: 0xffffff,
+  planetViolet: 0xffffff,
+  planetRose: 0xffffff,
+  planetSage: 0xffffff,
+  resourceRed: 0xffffff,
+  resourceGreen: 0xffffff,
+  resourceBlue: 0xffffff,
+  repairPink: 0xffffff,
+}
+
+export const inkCss = {
+  void: '#000000',
+  ivory: '#FFFFFF',
+  paper: '#FFFFFF',
+  blood: '#FFFFFF',
+  dusk: '#FFFFFF',
+  ochre: '#FFFFFF',
+  graphite: '#000000',
+  ink: '#000000',
+  engine: '#FFFFFF',
+  player1: '#FFFFFF',
+  player2: '#FFFFFF',
+  resourceRed: '#FFFFFF',
+  resourceGreen: '#FFFFFF',
+  resourceBlue: '#FFFFFF',
+  repairPink: '#FFFFFF',
+  hullMark: '#000000',
+  priceYellow: '#FFFFFF',
+}
+
+export function scenePalette(mode: GraphicMode) {
+  return mode === 'ink' ? inkPalette : palette
+}
+
+export function sceneCss(mode: GraphicMode) {
+  return mode === 'ink' ? inkCss : css
 }

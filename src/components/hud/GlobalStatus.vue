@@ -1,6 +1,24 @@
 <template>
   <header class="global-status">
-    <span>{{ left }}</span>
+    <div class="global-status__start">
+      <div class="graphic-toggle" role="group" aria-label="Graphic version">
+        <button
+          type="button"
+          :class="{ on: ui.graphicMode === 'space' }"
+          @click="ui.setGraphicMode('space')"
+        >
+          SPACE
+        </button>
+        <button
+          type="button"
+          :class="{ on: ui.graphicMode === 'ink' }"
+          @click="ui.setGraphicMode('ink')"
+        >
+          INK
+        </button>
+      </div>
+      <span>{{ left }}</span>
+    </div>
     <button type="button" class="action global-status__new" @click="newGame">NEW GAME</button>
     <span class="muted">v{{ APP_VERSION }} · DECK {{ pad(game.state.explorationDeck.drawPile.length) }}</span>
   </header>

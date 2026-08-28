@@ -1,5 +1,5 @@
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ ink: ui.graphicMode === 'ink' }">
     <GameCanvas />
     <GameHUD />
     <DeveloperPanel v-if="ui.showDev" />

@@ -3,7 +3,8 @@ import type { GameState } from '../../game/state/GameState'
 import { getWorldPosition } from '../../game/board/hexMath'
 import { createHexMesh, TILE_SLOT_Y, TILE_THICKNESS } from './TileRenderer'
 import { createTileGlyph, tickTileGlyphs } from './tileGlyphs'
-import { palette } from '../theme'
+import { scenePalette } from '../theme'
+import type { GraphicMode } from '../graphicMode'
 import { clamp01, easeOutCubic, prefersReducedMotion, TILE_REVEAL_MS } from '../motion'
 import { coordKey } from '../../game/board/HexCoord'
 import { getTileDefinition } from '../../game/definitions/tiles'
@@ -14,6 +15,13 @@ export class TilePreviewRenderer {
   private fadeStart = 0
   private fadeDuration = TILE_REVEAL_MS
   private revealed = false
+  private graphicMode: GraphicMode = 'space'
+
+  setGraphicMode(mode: GraphicMode): void {
+    this.graphicMode = mode
+    this.placedKey = null
+    this.group.clear()
+  }
 
   onRevealed: (() => void) | null = null
 
@@ -40,12 +48,15 @@ export class TilePreviewRenderer {
     this.fadeStart = performance.now()
     this.fadeDuration = prefersReducedMotion() ? 0 : TILE_REVEAL_MS
     const pos = getWorldPosition(exp.target)
+    const colors = scenePalette(this.graphicMode)
+    const ink = this.graphicMode === 'ink'
     const mesh = createHexMesh({
-      fill: palette.tileFill,
-      stroke: palette.ochre,
+      fill: colors.tileFill,
+      stroke: colors.ochre,
       dashed: true,
       y: 0,
       opacity: 0.04,
+      flat: ink,
     })
     mesh.position.set(pos.x, TILE_SLOT_Y, pos.z)
     mesh.rotation.y = (exp.rotation ?? 0) * (Math.PI / 3)
@@ -54,10 +65,11 @@ export class TilePreviewRenderer {
     const def = getTileDefinition(exp.pendingTileId)
     const glyph = createTileGlyph(
       def,
-      palette.ochre,
+      colors.ochre,
       exp.pendingTileId,
       false,
       exp.pendingEdgeNumbers,
+      ink,
     )
     glyph.position.y = TILE_THICKNESS
     mesh.add(glyph)
