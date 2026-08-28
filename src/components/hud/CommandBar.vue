@@ -9,8 +9,8 @@
         <span
           v-for="lot in planetLots"
           :key="lot.id"
-          :class="['cargo', `cargo--${lot.id.toLowerCase()}`, { clickable: canSellLot(lot.id) }]"
-          @click="sellIfPossible(lot.id)"
+          :class="['cargo', `cargo--${lot.id.toLowerCase()}`, { clickable: canTradeLot(lot.id) }]"
+          @click="tradeIfPossible(lot.id)"
         >
           <CargoIcon v-if="isCargoKind(lot.id)" :kind="lot.id" />
           {{ lot.text }}
@@ -44,7 +44,7 @@
           v-for="row in cargoRows"
           :key="row.id"
           :class="['cargo', `cargo--${row.id.toLowerCase()}`, { clickable: canSellLot(row.id) }]"
-          @click="sellIfPossible(row.id)"
+          @click="tradeIfPossible(row.id)"
         >
           <CargoIcon :kind="row.id" />
           {{ row.text }}
@@ -224,14 +224,39 @@ function isCargoKind(id: string): boolean {
   return (CARGO_KINDS as readonly string[]).includes(id)
 }
 
-function canSellLot(id: string): boolean {
-  if (!isEvaHex(game.ship.coord)) return false
-  if (!(RESOURCE_IDS as readonly string[]).includes(id)) return false
-  return (game.ship.cargo[id as (typeof RESOURCE_IDS)[number]] ?? 0) > 0
+function isResourceLot(id: string): id is (typeof RESOURCE_IDS)[number] {
+  return (RESOURCE_IDS as readonly string[]).includes(id)
 }
 
-function sellIfPossible(id: string): void {
-  if (!canSellLot(id)) return
-  game.dispatch({ type: 'SELL_RESOURCE', resource: id as (typeof RESOURCE_IDS)[number] })
+function canSellLot(id: string): boolean {
+  if (!isEvaHex(game.ship.coord)) return false
+  if (!isResourceLot(id)) return false
+  return (game.ship.cargo[id] ?? 0) > 0
+}
+
+function canBuyLot(id: string): boolean {
+  if (!isResourceLot(id)) return false
+  const ship = game.ship
+  const market = game.state.planetMarkets[coordKey(ship.coord)]
+  if (!market) return false
+  if ((game.player.buysThisTurn ?? 0) >= MAX_BUYS_PER_TURN) return false
+  const lot = market.lots.find((item) => item.id === id)
+  if (!lot || lot.amount <= 0) return false
+  if (game.player.credits < buyPrice(game.state, id)) return false
+  return cargoUsed(ship.cargo) < CARGO_CAPACITY[ship.class]
+}
+
+function canTradeLot(id: string): boolean {
+  return canSellLot(id) || canBuyLot(id)
+}
+
+function tradeIfPossible(id: string): void {
+  if (canSellLot(id)) {
+    game.dispatch({ type: 'SELL_RESOURCE', resource: id })
+    return
+  }
+  if (canBuyLot(id)) {
+    game.dispatch({ type: 'BUY_RESOURCE', coord: game.ship.coord, resource: id })
+  }
 }
 </script>

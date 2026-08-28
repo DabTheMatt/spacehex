@@ -124,24 +124,11 @@ export function createPlanetOverlay(
     const inward = priceInwardOffset(x, LOT_Z)
     tag.position.set(inward.x, 0.01, inward.z)
     cluster.add(tag)
-    if (amount > 0) {
-      const hit = new THREE.Mesh(
-        new THREE.CircleGeometry(0.12, 12),
-        new THREE.MeshBasicMaterial({
-          transparent: true,
-          opacity: 0,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        }),
-      )
-      hit.rotation.x = -Math.PI / 2
-      hit.position.y = 0.02
-      hit.userData.buyLot = { coord, resource: id }
-      hit.userData.pickOnly = true
-      cluster.add(hit)
-    }
+    if (amount > 0) cluster.add(buyHit(coord, id))
     close.add(cluster)
-    far.add(diceCluster(id, amount, x, ink))
+    const farCluster = diceCluster(id, amount, x, ink)
+    if (amount > 0) farCluster.add(buyHit(coord, id))
+    far.add(farCluster)
   })
 
   const fuelPad = servicePadPosition(0, 1)
@@ -493,6 +480,23 @@ function sellFarMark(id: ResourceId, amount: number, x: number, ink = false, mar
   fig.rotation.set(0.4, 0.5, 0.12)
   g.add(fig)
   return g
+}
+
+function buyHit(coord: HexCoord, id: ResourceId): THREE.Mesh {
+  const hit = new THREE.Mesh(
+    new THREE.CircleGeometry(0.16, 12),
+    new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    }),
+  )
+  hit.rotation.x = -Math.PI / 2
+  hit.position.y = 0.02
+  hit.userData.buyLot = { coord, resource: id }
+  hit.userData.pickOnly = true
+  return hit
 }
 
 function stockSquare(id: ResourceId, amount: number, ink = false): THREE.Group {
