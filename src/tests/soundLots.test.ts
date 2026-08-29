@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { CARGO_KINDS } from '../game/definitions/cargoFigures'
 import { createFlatCargoMark } from '../renderer/board/cargoMesh'
-import { cueForEvent, parseSoundEnabled, playGameEvents, setSoundEnabled } from '../ui/sound'
+import {
+  cueForEvent,
+  parseSoundEnabled,
+  pcmWavDataUri,
+  playGameEvents,
+  renderCueSamples,
+  setSoundEnabled,
+} from '../ui/sound'
 
 describe('flat cargo marks', () => {
   it('lies on the hex face with no tilt and the same kind box', () => {
@@ -44,5 +51,16 @@ describe('sound cues', () => {
     setSoundEnabled(false)
     playGameEvents([{ type: 'SHIP_MOVED', shipId: 'x', from: { q: 0, r: 0 }, to: { q: 1, r: 0 } }])
     setSoundEnabled(true)
+  })
+
+  it('encodes a PCM beep that HTMLAudio can play', () => {
+    const samples = renderCueSamples({ freq: 440, dur: 0.05, type: 'sine', gain: 0.2 })
+    expect(samples.length).toBeGreaterThan(16)
+    expect(Math.max(...samples.map(Math.abs))).toBeGreaterThan(0.05)
+    const uri = pcmWavDataUri(samples)
+    expect(uri.startsWith('data:audio/wav;base64,')).toBe(true)
+    const raw = atob(uri.slice('data:audio/wav;base64,'.length))
+    expect(raw.slice(0, 4)).toBe('RIFF')
+    expect(raw.slice(8, 12)).toBe('WAVE')
   })
 })

@@ -33,12 +33,23 @@ function onDevKey(ev: KeyboardEvent): void {
   }
 }
 
+const unlockOpts: AddEventListenerOptions = { capture: true }
+
+function bindUnlock(on: boolean): void {
+  const method = on ? window.addEventListener : window.removeEventListener
+  method('pointerdown', unlockSound, unlockOpts)
+  method('pointerup', unlockSound, unlockOpts)
+  method('touchstart', unlockSound, unlockOpts)
+  method('click', unlockSound, unlockOpts)
+  method('keydown', unlockSound, unlockOpts)
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onDevKey, true)
-  window.addEventListener('pointerdown', unlockSound, { capture: true })
+  bindUnlock(true)
 })
 onUnmounted(() => {
   window.removeEventListener('keydown', onDevKey, true)
-  window.removeEventListener('pointerdown', unlockSound, { capture: true })
+  bindUnlock(false)
 })
 </script>
