@@ -746,9 +746,9 @@ function diceCluster(id: ResourceId, amount: number, x: number, ink = false, mar
   g.position.set(x, OVERLAY_HOVER, LOT_Z)
   if (ink) {
     if (amount <= 0) return g
-    const fig = createCargoFigure(id, 0.072, mark)
-    fig.position.y = 0.03
-    fig.rotation.set(0.4, 0.5, 0.12)
+    const fig = createCargoFigure(id, 0.12, mark)
+    fig.position.y = 0.04
+    fig.rotation.set(0.55, 0.7, 0.12)
     g.add(fig)
     g.userData.cargoFigure = CARGO_FIGURE[id]
     g.userData.inkMark = mark
