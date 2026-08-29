@@ -21,6 +21,16 @@ const RESOURCE_CSS: Record<ResourceId, string> = {
   ICE: css.resourceBlue,
 }
 
+/** Stroke/text on INK overlays — paper color, so INK REV stays black on white. */
+export function inkMarkCss(mark: number): string {
+  return mark === 0 ? '#000000' : '#FFFFFF'
+}
+
+/** Pad fill opposite the ink stroke. */
+export function inkPadFill(mark: number): number {
+  return mark === 0 ? 0xffffff : 0x000000
+}
+
 /** Name sits on +Z so inspect can put that edge at screen-bottom. */
 const NAME_ANGLE = Math.PI / 2
 const NAME_PLANE_H = 0.08
@@ -103,6 +113,7 @@ export function createPlanetOverlay(
   coord: HexCoord,
   buyPrice: Record<ResourceId, number>,
   ink = false,
+  mark = 0xffffff,
 ): THREE.Group {
   const g = new THREE.Group()
   g.userData.planetOverlay = true
@@ -119,14 +130,14 @@ export function createPlanetOverlay(
     const x = overlayLotX(index)
     const cluster = new THREE.Group()
     cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
-    cluster.add(ink ? stockSquare(id, amount, true) : stockHex(id, amount))
-    const tag = priceTag(`${buyPrice[id]}CR`, ink ? '#FFFFFF' : css.priceYellow)
+    cluster.add(ink ? stockSquare(id, amount, true, mark) : stockHex(id, amount))
+    const tag = priceTag(`${buyPrice[id]}CR`, ink ? inkMarkCss(mark) : css.priceYellow)
     const inward = priceInwardOffset(x, LOT_Z)
     tag.position.set(inward.x, 0.01, inward.z)
     cluster.add(tag)
     if (amount > 0) cluster.add(buyHit(coord, id))
     close.add(cluster)
-    const farCluster = diceCluster(id, amount, x, ink)
+    const farCluster = diceCluster(id, amount, x, ink, mark)
     if (amount > 0) farCluster.add(buyHit(coord, id))
     far.add(farCluster)
   })
@@ -134,8 +145,8 @@ export function createPlanetOverlay(
   const fuelPad = servicePadPosition(0, 1)
   const fuelCluster = new THREE.Group()
   fuelCluster.position.set(fuelPad.x, OVERLAY_HOVER, fuelPad.z)
-  fuelCluster.add(stockHexFuel(ink))
-  const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, ink ? '#FFFFFF' : css.ochre)
+  fuelCluster.add(stockHexFuel(ink, mark))
+  const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, ink ? inkMarkCss(mark) : css.ochre)
   const fuelIn = priceInwardOffset(fuelPad.x, fuelPad.z)
   fuelTag.position.set(fuelIn.x, 0.01, fuelIn.z)
   fuelCluster.add(fuelTag)
@@ -154,7 +165,7 @@ export function createPlanetOverlay(
   fuelHit.userData.pickOnly = true
   fuelCluster.add(fuelHit)
   close.add(fuelCluster)
-  far.add(diceClusterFuel(fuelPad.x, fuelPad.z, ink))
+  far.add(diceClusterFuel(fuelPad.x, fuelPad.z, ink, mark))
 
   g.add(close, far)
   g.userData.closeLod = close
@@ -201,7 +212,7 @@ export function createEvaOverlay(
     close.add(cluster)
     far.add(sellFarMark(id, qty, x, ink, mark))
   })
-  const exchange = caption('SELL CONTAINERS', ink ? '#FFFFFF' : css.priceYellow, 0.72, 0.055)
+  const exchange = caption('SELL CONTAINERS', ink ? inkMarkCss(mark) : css.priceYellow, 0.72, 0.055)
   const sellIn = priceInwardOffset(0, LOT_Z)
   exchange.position.set(sellIn.x, OVERLAY_HOVER + 0.01, LOT_Z + sellIn.z)
   close.add(exchange)
@@ -209,8 +220,8 @@ export function createEvaOverlay(
   const fuelPad = servicePadPosition(0, 2)
   const fuelCluster = new THREE.Group()
   fuelCluster.position.set(fuelPad.x, OVERLAY_HOVER, fuelPad.z)
-  fuelCluster.add(stockHexFuel(ink))
-  const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, ink ? '#FFFFFF' : css.ochre)
+  fuelCluster.add(stockHexFuel(ink, mark))
+  const fuelTag = priceTag(`${FUEL_BUY_PRICE}CR`, ink ? inkMarkCss(mark) : css.ochre)
   const fuelIn = priceInwardOffset(fuelPad.x, fuelPad.z)
   fuelTag.position.set(fuelIn.x, 0.01, fuelIn.z)
   fuelCluster.add(fuelTag)
@@ -233,8 +244,8 @@ export function createEvaOverlay(
   const repairPad = servicePadPosition(1, 2)
   const repairCluster = new THREE.Group()
   repairCluster.position.set(repairPad.x, OVERLAY_HOVER, repairPad.z)
-  repairCluster.add(stockRepair(ink))
-  const repairTag = priceTag(`${REPAIR_PRICE}CR`, ink ? '#FFFFFF' : css.ivory)
+  repairCluster.add(stockRepair(ink, mark))
+  const repairTag = priceTag(`${REPAIR_PRICE}CR`, ink ? inkMarkCss(mark) : css.ivory)
   const repairIn = priceInwardOffset(repairPad.x, repairPad.z)
   repairTag.position.set(repairIn.x, 0.01, repairIn.z)
   repairCluster.add(repairTag)
@@ -446,7 +457,7 @@ function stockSellIcon(id: ResourceId, amount: number, ink = false, mark = 0xfff
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, 128, 128)
-    ctx.fillStyle = ink ? (mark === 0 ? '#000000' : '#FFFFFF') : RESOURCE_CSS[id]
+    ctx.fillStyle = ink ? inkMarkCss(mark) : RESOURCE_CSS[id]
     ctx.font = '500 56px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -499,14 +510,14 @@ function buyHit(coord: HexCoord, id: ResourceId): THREE.Mesh {
   return hit
 }
 
-function stockSquare(id: ResourceId, amount: number, ink = false): THREE.Group {
+function stockSquare(id: ResourceId, amount: number, ink = false, mark = 0xffffff): THREE.Group {
   const g = new THREE.Group()
-  const color = ink ? 0xffffff : RESOURCE_COLOR[id]
+  const color = ink ? mark : RESOURCE_COLOR[id]
   const half = 0.055
   const fill = new THREE.Mesh(
     new THREE.PlaneGeometry(half * 2, half * 2),
     new THREE.MeshBasicMaterial({
-      color: ink ? 0x000000 : palette.graphite,
+      color: ink ? inkPadFill(mark) : palette.graphite,
       side: THREE.DoubleSide,
       depthWrite: false,
       transparent: true,
@@ -533,7 +544,7 @@ function stockSquare(id: ResourceId, amount: number, ink = false): THREE.Group {
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, 128, 128)
-    ctx.fillStyle = ink ? '#FFFFFF' : RESOURCE_CSS[id]
+    ctx.fillStyle = ink ? inkMarkCss(mark) : RESOURCE_CSS[id]
     ctx.font = '500 72px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -563,7 +574,7 @@ function overlaySquarePad(ring: number, half = 0.07): THREE.Group {
   const fill = new THREE.Mesh(
     new THREE.PlaneGeometry(half * 2, half * 2),
     new THREE.MeshBasicMaterial({
-      color: 0x000000,
+      color: inkPadFill(ring),
       side: THREE.DoubleSide,
       depthWrite: false,
       transparent: true,
@@ -634,8 +645,8 @@ function overlayLine(points: Array<[number, number]>, color: number, y = 0.008):
   )
 }
 
-function stockHexFuel(ink = false): THREE.Group {
-  const c = ink ? 0xffffff : palette.ochre
+function stockHexFuel(ink = false, mark = 0xffffff): THREE.Group {
+  const c = ink ? mark : palette.ochre
   const g = ink ? overlaySquarePad(c) : overlayHexPad(c)
   g.userData.fuelHex = true
   g.add(
@@ -668,8 +679,8 @@ function stockHexFuel(ink = false): THREE.Group {
   return g
 }
 
-function stockRepair(ink = false): THREE.Group {
-  const c = ink ? 0xffffff : palette.repairPink
+function stockRepair(ink = false, mark = 0xffffff): THREE.Group {
+  const c = ink ? mark : palette.repairPink
   const g = ink ? overlaySquarePad(c) : overlayHexPad(c)
   g.userData.repairMark = true
   g.userData.repairHex = true
@@ -697,7 +708,7 @@ function stockRepair(ink = false): THREE.Group {
   return g
 }
 
-function diceClusterFuel(x: number, z = LOT_Z, ink = false): THREE.Group {
+function diceClusterFuel(x: number, z = LOT_Z, ink = false, mark = 0xffffff): THREE.Group {
   const g = new THREE.Group()
   g.position.set(x, OVERLAY_HOVER, z)
   const half = 0.014
@@ -705,7 +716,7 @@ function diceClusterFuel(x: number, z = LOT_Z, ink = false): THREE.Group {
     const fill = new THREE.Mesh(
       new THREE.PlaneGeometry(half * 2, half * 2),
       new THREE.MeshBasicMaterial({
-        color: 0xffffff,
+        color: mark,
         side: THREE.DoubleSide,
         depthWrite: false,
       }),
@@ -730,26 +741,21 @@ function diceClusterFuel(x: number, z = LOT_Z, ink = false): THREE.Group {
   return g
 }
 
-function diceCluster(id: ResourceId, amount: number, x: number, ink = false): THREE.Group {
+function diceCluster(id: ResourceId, amount: number, x: number, ink = false, mark = 0xffffff): THREE.Group {
   const g = new THREE.Group()
   g.position.set(x, OVERLAY_HOVER, LOT_Z)
-  const color = ink ? 0xffffff : RESOURCE_COLOR[id]
+  if (ink) {
+    if (amount <= 0) return g
+    const fig = createCargoFigure(id, 0.072, mark)
+    fig.position.y = 0.03
+    fig.rotation.set(0.4, 0.5, 0.12)
+    g.add(fig)
+    g.userData.cargoFigure = CARGO_FIGURE[id]
+    g.userData.inkMark = mark
+    return g
+  }
+  const color = RESOURCE_COLOR[id]
   for (const pip of dicePips(amount)) {
-    if (ink) {
-      const dot = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.02, 0.02),
-        new THREE.MeshBasicMaterial({
-          color,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-          transparent: true,
-        }),
-      )
-      dot.rotation.x = -Math.PI / 2
-      dot.position.set(pip.x, 0.004, pip.z)
-      g.add(dot)
-      continue
-    }
     const dot = new THREE.Mesh(
       new THREE.CircleGeometry(0.012, 10),
       new THREE.MeshBasicMaterial({

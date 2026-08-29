@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   dicePips,
   EDGE_MARGIN,
+  inkMarkCss,
+  inkPadFill,
   LOT_Z,
   overlayLotX,
   OVERLAY_HOVER,
@@ -58,6 +60,13 @@ describe('dice pips', () => {
     expect(repair.z).toBeGreaterThan(0.2)
     expect(fuel.z).toBeGreaterThan(LOT_Z + 0.5)
     expect(palette.repairPink).toBe(0xc48a96)
+  })
+
+  it('paints INK REV lots in paper black, not white', () => {
+    expect(inkMarkCss(0)).toBe('#000000')
+    expect(inkMarkCss(0xffffff)).toBe('#FFFFFF')
+    expect(inkPadFill(0)).toBe(0xffffff)
+    expect(inkPadFill(0xffffff)).toBe(0x000000)
   })
 })
 

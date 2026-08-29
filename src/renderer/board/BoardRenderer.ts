@@ -205,7 +205,7 @@ export class BoardRenderer {
         const prices = Object.fromEntries(
           RESOURCE_IDS.map((id) => [id, buyPrice(state, id)]),
         ) as Record<(typeof RESOURCE_IDS)[number], number>
-        glyph.add(createPlanetOverlay(market, tile.coord, prices, ink))
+        glyph.add(createPlanetOverlay(market, tile.coord, prices, ink, colors.paper))
       }
       if (def.type === 'EVA_1' && options.showMarketIcons !== false && !probed) {
         glyph.add(createEvaOverlay(tile.coord, ship?.cargo ?? emptyCargo(), atEva, ink, colors.paper))
