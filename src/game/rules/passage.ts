@@ -6,7 +6,7 @@ import { getTileDefinition } from '../definitions/tiles'
 import type { GameState } from '../state/GameState'
 
 export function isPassableEdge(type: EdgeType): boolean {
-  return type !== 'BLOCKED'
+  return type !== 'BLOCKED' && type !== 'ASTEROID'
 }
 
 export function leavingEdge(state: GameState, from: HexCoord, direction: number): EdgeType | null {

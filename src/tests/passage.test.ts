@@ -35,4 +35,24 @@ describe('passage', () => {
     expect(canTraverse(state, { q: 1, r: 0 }, { q: 2, r: 0 })).toBe(true)
     expect(canTraverse(state, { q: 1, r: 0 }, { q: 1, r: 1 })).toBe(false)
   })
+
+  it('blocks flying through an asteroid rim, and allows the open face', () => {
+    const blocked = applyCommand(createInitialState('pass-rocks'), {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'asteroid-3',
+      coord: { q: 1, r: 0 },
+      rotation: 3,
+    }).state
+    expect(canTraverse(blocked, { q: 0, r: 0 }, { q: 1, r: 0 })).toBe(false)
+    const refused = applyCommand(blocked, { type: 'DECLARE_MOVE', target: { q: 1, r: 0 } })
+    expect(refused.events.some((e) => e.type === 'COMMAND_REJECTED')).toBe(true)
+
+    const open = applyCommand(createInitialState('pass-rocks-open'), {
+      type: 'DEV_PLACE_TILE',
+      tileId: 'asteroid-3',
+      coord: { q: 1, r: 0 },
+      rotation: 0,
+    }).state
+    expect(canTraverse(open, { q: 0, r: 0 }, { q: 1, r: 0 })).toBe(true)
+  })
 })
