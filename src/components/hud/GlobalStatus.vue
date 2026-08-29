@@ -23,6 +23,45 @@
         >
           INK REV
         </button>
+        <button
+          type="button"
+          class="sound-toggle"
+          :class="{ on: ui.soundEnabled }"
+          :title="ui.soundEnabled ? 'Sound on' : 'Sound off'"
+          :aria-pressed="ui.soundEnabled"
+          aria-label="Sound"
+          @click="ui.toggleSound"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              d="M3.2 8.2 H6.2 L10.2 5.2 V14.8 L6.2 11.8 H3.2 Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+              stroke-linejoin="miter"
+            />
+            <path
+              d="M12.2 7.4 C13.4 8.2 13.4 11.8 12.2 12.6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+            />
+            <path
+              v-if="ui.soundEnabled"
+              d="M13.8 5.8 C16 7.2 16 12.8 13.8 14.2"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+            />
+            <path
+              v-else
+              d="M3 4 L17 16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.3"
+            />
+          </svg>
+        </button>
       </div>
       <span>{{ left }}</span>
     </div>

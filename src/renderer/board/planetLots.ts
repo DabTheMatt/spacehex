@@ -6,7 +6,7 @@ import { palette, css } from '../theme'
 import { HEX_SIZE, hexEdgeCorners } from '../../game/board/hexMath'
 import type { HexCoord } from '../../game/board/HexCoord'
 import { clamp01 } from '../motion'
-import { createCargoFigure } from './cargoMesh'
+import { createFlatCargoMark } from './cargoMesh'
 import { CARGO_FIGURE } from '../../game/definitions/cargoFigures'
 
 const RESOURCE_COLOR: Record<ResourceId, number> = {
@@ -42,7 +42,7 @@ const NAME_R = FLAT_EDGE - EDGE_MARGIN
 export const LOT_Z = -(FLAT_EDGE - EDGE_MARGIN)
 /** Toward hex center from the icon — under the top-row lots, not past the rim. */
 export const PRICE_BELOW_Z = 0.13
-const HEX_SPACING = 0.18
+const HEX_SPACING = 0.22
 const SERVICE_GAP = 0.28
 /** SE slant (axial dir 0). Bottom-right on screen when the name sits on +Z. */
 export const SERVICE_EDGE_DIR = 0
@@ -74,6 +74,7 @@ const CLOSE_DIST = 4.2
 const FAR_DIST = 6.0
 /** Quarter of ship hover: 50% closer to the tile than the previous mid-height overlays. */
 export const OVERLAY_HOVER = 0.06
+export const FLAT_LOT_SIZE = 0.1
 
 export function planetInspectTheta(tileRotation: number): number {
   return tileRotation * (Math.PI / 3)
@@ -130,14 +131,14 @@ export function createPlanetOverlay(
     const x = overlayLotX(index)
     const cluster = new THREE.Group()
     cluster.position.set(x, OVERLAY_HOVER, LOT_Z)
-    cluster.add(ink ? stockSquare(id, amount, true, mark) : stockHex(id, amount))
+    cluster.add(ink ? stockInkLot(id, amount, mark) : stockHex(id, amount))
     const tag = priceTag(`${buyPrice[id]}CR`, ink ? inkMarkCss(mark) : css.priceYellow)
     const inward = priceInwardOffset(x, LOT_Z)
     tag.position.set(inward.x, 0.01, inward.z)
     cluster.add(tag)
     if (amount > 0) cluster.add(buyHit(coord, id))
     close.add(cluster)
-    const farCluster = diceCluster(id, amount, x, ink, mark)
+    const farCluster = ink ? inkLotRow(id, amount, x, mark) : diceCluster(id, amount, x)
     if (amount > 0) farCluster.add(buyHit(coord, id))
     far.add(farCluster)
   })
@@ -442,31 +443,41 @@ function stockHex(id: ResourceId, amount: number): THREE.Group {
   return g
 }
 
-function stockSellIcon(id: ResourceId, amount: number, ink = false, mark = 0xffffff): THREE.Group {
+function inkLotRow(id: ResourceId, amount: number, x: number, mark: number): THREE.Group {
   const g = new THREE.Group()
-  const color = ink ? mark : RESOURCE_COLOR[id]
-  const fig = createCargoFigure(id, 0.1, color)
-  fig.position.y = 0.045
-  fig.rotation.set(0.42, 0.62, 0.18)
-  g.add(fig)
+  g.position.set(x, OVERLAY_HOVER, LOT_Z)
+  if (amount <= 0) return g
+  g.add(stockInkLot(id, 0, mark, false))
+  return g
+}
+
+function stockInkLot(id: ResourceId, amount: number, mark: number, withDigit = true): THREE.Group {
+  const g = new THREE.Group()
+  g.add(createFlatCargoMark(id, FLAT_LOT_SIZE, mark))
   g.userData.sellIcon = id
-  g.userData.cargoFigure = CARGO_FIGURE[id]
+  g.userData.flatCargo = id
+  if (!withDigit) return g
+  g.add(lotDigit(String(amount), inkMarkCss(mark), 0, 0.058))
+  return g
+}
+
+function lotDigit(text: string, fill: string, x: number, z: number): THREE.Mesh {
   const canvas = document.createElement('canvas')
   canvas.width = 128
   canvas.height = 128
   const ctx = canvas.getContext('2d')
   if (ctx) {
     ctx.clearRect(0, 0, 128, 128)
-    ctx.fillStyle = ink ? inkMarkCss(mark) : RESOURCE_CSS[id]
+    ctx.fillStyle = fill
     ctx.font = '500 56px "IBM Plex Mono", monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(String(amount), 64, 70)
+    ctx.fillText(text, 64, 70)
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.needsUpdate = true
   const digit = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.08, 0.08),
+    new THREE.PlaneGeometry(0.07, 0.07),
     new THREE.MeshBasicMaterial({
       map: tex,
       transparent: true,
@@ -476,9 +487,19 @@ function stockSellIcon(id: ResourceId, amount: number, ink = false, mark = 0xfff
     }),
   )
   digit.rotation.x = -Math.PI / 2
-  digit.position.set(0.07, 0.014, 0.06)
+  digit.position.set(x, 0.012, z)
   digit.renderOrder = 7
-  g.add(digit)
+  return digit
+}
+
+function stockSellIcon(id: ResourceId, amount: number, ink = false, mark = 0xffffff): THREE.Group {
+  const g = new THREE.Group()
+  const color = ink ? mark : RESOURCE_COLOR[id]
+  g.add(createFlatCargoMark(id, FLAT_LOT_SIZE, color))
+  g.userData.sellIcon = id
+  g.userData.flatCargo = id
+  g.userData.cargoFigure = CARGO_FIGURE[id]
+  g.add(lotDigit(String(amount), ink ? inkMarkCss(mark) : RESOURCE_CSS[id], 0, 0.058))
   return g
 }
 
@@ -486,10 +507,7 @@ function sellFarMark(id: ResourceId, amount: number, x: number, ink = false, mar
   const g = new THREE.Group()
   g.position.set(x, OVERLAY_HOVER, LOT_Z)
   if (amount <= 0) return g
-  const fig = createCargoFigure(id, 0.055, ink ? mark : RESOURCE_COLOR[id])
-  fig.position.y = 0.03
-  fig.rotation.set(0.4, 0.5, 0.12)
-  g.add(fig)
+  g.add(createFlatCargoMark(id, FLAT_LOT_SIZE, ink ? mark : RESOURCE_COLOR[id]))
   return g
 }
 
@@ -508,65 +526,6 @@ function buyHit(coord: HexCoord, id: ResourceId): THREE.Mesh {
   hit.userData.buyLot = { coord, resource: id }
   hit.userData.pickOnly = true
   return hit
-}
-
-function stockSquare(id: ResourceId, amount: number, ink = false, mark = 0xffffff): THREE.Group {
-  const g = new THREE.Group()
-  const color = ink ? mark : RESOURCE_COLOR[id]
-  const half = 0.055
-  const fill = new THREE.Mesh(
-    new THREE.PlaneGeometry(half * 2, half * 2),
-    new THREE.MeshBasicMaterial({
-      color: ink ? inkPadFill(mark) : palette.graphite,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      transparent: true,
-      opacity: amount > 0 ? 0.92 : 0.4,
-    }),
-  )
-  fill.rotation.x = -Math.PI / 2
-  g.add(fill)
-  const pts = [
-    new THREE.Vector3(-half, 0.002, -half),
-    new THREE.Vector3(half, 0.002, -half),
-    new THREE.Vector3(half, 0.002, half),
-    new THREE.Vector3(-half, 0.002, half),
-    new THREE.Vector3(-half, 0.002, -half),
-  ]
-  const ring = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({ color, transparent: true, depthWrite: false }),
-  )
-  g.add(ring)
-  const canvas = document.createElement('canvas')
-  canvas.width = 128
-  canvas.height = 128
-  const ctx = canvas.getContext('2d')
-  if (ctx) {
-    ctx.clearRect(0, 0, 128, 128)
-    ctx.fillStyle = ink ? inkMarkCss(mark) : RESOURCE_CSS[id]
-    ctx.font = '500 72px "IBM Plex Mono", monospace'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(String(amount), 64, 70)
-  }
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.needsUpdate = true
-  const digit = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.1, 0.1),
-    new THREE.MeshBasicMaterial({
-      map: tex,
-      transparent: true,
-      depthWrite: false,
-      depthTest: false,
-      side: THREE.DoubleSide,
-    }),
-  )
-  digit.rotation.x = -Math.PI / 2
-  digit.position.y = 0.012
-  digit.renderOrder = 7
-  g.add(digit)
-  return g
 }
 
 function overlaySquarePad(ring: number, half = 0.07): THREE.Group {
@@ -741,19 +700,9 @@ function diceClusterFuel(x: number, z = LOT_Z, ink = false, mark = 0xffffff): TH
   return g
 }
 
-function diceCluster(id: ResourceId, amount: number, x: number, ink = false, mark = 0xffffff): THREE.Group {
+function diceCluster(id: ResourceId, amount: number, x: number): THREE.Group {
   const g = new THREE.Group()
   g.position.set(x, OVERLAY_HOVER, LOT_Z)
-  if (ink) {
-    if (amount <= 0) return g
-    const fig = createCargoFigure(id, 0.12, mark)
-    fig.position.y = 0.04
-    fig.rotation.set(0.55, 0.7, 0.12)
-    g.add(fig)
-    g.userData.cargoFigure = CARGO_FIGURE[id]
-    g.userData.inkMark = mark
-    return g
-  }
   const color = RESOURCE_COLOR[id]
   for (const pip of dicePips(amount)) {
     const dot = new THREE.Mesh(
