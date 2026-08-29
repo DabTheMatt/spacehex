@@ -5,7 +5,6 @@ import { getNeighbor } from '../board/hexMath'
 import { getPlacedTile, isTilePlaced } from '../board/HexMap'
 import type { PlacedTile } from '../board/Tile'
 import { worldDirectionForFace, rollEdgeNumbers } from '../board/edgeNumbers'
-import { wrapRotation } from '../board/tileRotation'
 import { asteroidCollisionPercent, asteroidEdgeCount, getTileDefinition } from '../definitions/tiles'
 import { RNG } from '../random/RNG'
 import type { GameEvent } from '../engine/events'
@@ -118,10 +117,7 @@ function placeVortexDiscovery(
   const drawn = drawFromDeck(state.explorationDeck)
   if (!drawn) return null
   const dir = destDir(from, dest) ?? 0
-  let rotation = wrapRotation(0)
-  if (getTileDefinition(drawn.tileId).type === 'STRAIT') {
-    rotation = straitRotationForEntry(state, drawn.tileId, dest, dir)
-  }
+  const rotation = straitRotationForEntry(state, drawn.tileId, dest, dir)
   const definition = getTileDefinition(drawn.tileId)
   const placed: PlacedTile = {
     id: drawn.tileId,
