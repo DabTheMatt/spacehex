@@ -136,10 +136,23 @@ export function pcmWavDataUri(samples: Float32Array, sampleRate = 22050): string
     view.setInt16(o, Math.round(x * 32767), true)
     o += 2
   }
-  let bin = ''
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
-  const b64 = typeof btoa === 'function' ? btoa(bin) : Buffer.from(bin, 'binary').toString('base64')
-  return `data:audio/wav;base64,${b64}`
+  return `data:audio/wav;base64,${bytesToBase64(bytes)}`
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  const table = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  let out = ''
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i]
+    const b = i + 1 < bytes.length ? bytes[i + 1] : 0
+    const c = i + 2 < bytes.length ? bytes[i + 2] : 0
+    const triple = (a << 16) | (b << 8) | c
+    out += table[(triple >> 18) & 63]
+    out += table[(triple >> 12) & 63]
+    out += i + 1 < bytes.length ? table[(triple >> 6) & 63] : '='
+    out += i + 2 < bytes.length ? table[triple & 63] : '='
+  }
+  return out
 }
 
 function wavForCue(cue: ToneCue): string {
