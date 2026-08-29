@@ -446,8 +446,15 @@ function stockHex(id: ResourceId, amount: number): THREE.Group {
 function inkLotRow(id: ResourceId, amount: number, x: number, mark: number): THREE.Group {
   const g = new THREE.Group()
   g.position.set(x, OVERLAY_HOVER, LOT_Z)
-  if (amount <= 0) return g
-  g.add(stockInkLot(id, 0, mark, false))
+  const mark2d = stockInkLot(id, amount, mark, false)
+  if (amount <= 0) mark2d.traverse((obj) => {
+    const mat = (obj as THREE.Line).material
+    if (mat && !Array.isArray(mat) && 'opacity' in mat) {
+      mat.transparent = true
+      mat.opacity = 0.28
+    }
+  })
+  g.add(mark2d)
   return g
 }
 
@@ -506,8 +513,17 @@ function stockSellIcon(id: ResourceId, amount: number, ink = false, mark = 0xfff
 function sellFarMark(id: ResourceId, amount: number, x: number, ink = false, mark = 0xffffff): THREE.Group {
   const g = new THREE.Group()
   g.position.set(x, OVERLAY_HOVER, LOT_Z)
-  if (amount <= 0) return g
-  g.add(createFlatCargoMark(id, FLAT_LOT_SIZE, ink ? mark : RESOURCE_COLOR[id]))
+  const fig = createFlatCargoMark(id, FLAT_LOT_SIZE, ink ? mark : RESOURCE_COLOR[id])
+  if (amount <= 0) {
+    fig.traverse((obj) => {
+      const mat = (obj as THREE.Line).material
+      if (mat && !Array.isArray(mat) && 'opacity' in mat) {
+        mat.transparent = true
+        mat.opacity = 0.28
+      }
+    })
+  }
+  g.add(fig)
   return g
 }
 
