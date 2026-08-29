@@ -7,6 +7,7 @@ import {
   LOT_Z,
   overlayLotX,
   OVERLAY_HOVER,
+  FLAT_LOT_SIZE,
   PRICE_TAG_WIDTH,
   PRICE_BELOW_Z,
   priceInwardOffset,
@@ -46,6 +47,8 @@ describe('dice pips', () => {
   it('centers the resource row under the top flat and puts CR under the icons', () => {
     expect(overlayLotX(0) + overlayLotX(1) + overlayLotX(2)).toBeCloseTo(0)
     expect(overlayLotX(1)).toBeCloseTo(0)
+    expect(Math.abs(overlayLotX(0) - overlayLotX(1))).toBeCloseTo(Math.abs(overlayLotX(2) - overlayLotX(1)))
+    expect(Math.abs(overlayLotX(2) - overlayLotX(0))).toBeGreaterThan(FLAT_LOT_SIZE * 2)
     const under = priceInwardOffset(0, LOT_Z)
     expect(under.z).toBeGreaterThan(0)
     expect(under.z).toBeCloseTo(PRICE_BELOW_Z)

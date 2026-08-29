@@ -8,6 +8,7 @@ import { getNeighbor } from '@/game/board/hexMath'
 import { isTilePlaced } from '@/game/board/HexMap'
 import { activePlayer, activeShip } from '@/game/rules/fuel'
 import { getTileDefinition } from '@/game/definitions/tiles'
+import { playGameEvents } from '@/ui/sound'
 
 const engine = new GameEngine(`spacehex-${Date.now()}`)
 
@@ -19,6 +20,7 @@ export const useGameStore = defineStore('game', () => {
     const result = engine.dispatch(command)
     state.value = result.state
     lastEvents.value = result.events
+    playGameEvents(result.events)
     return result.events
   }
 

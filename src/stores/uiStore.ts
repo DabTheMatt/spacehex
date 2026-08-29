@@ -7,6 +7,7 @@ import {
   readStoredGraphicMode,
   writeStoredGraphicMode,
 } from '@/renderer/graphicMode'
+import { isSoundEnabled, playToggleCue, setSoundEnabled } from '@/ui/sound'
 
 export const useUiStore = defineStore('ui', () => {
   const showDebug = ref(false)
@@ -28,6 +29,7 @@ export const useUiStore = defineStore('ui', () => {
   const notice = ref<string | null>(null)
   const probeAiming = ref(false)
   const graphicMode = ref<GraphicMode>(readStoredGraphicMode())
+  const soundEnabled = ref(isSoundEnabled())
   let noticeTimer: ReturnType<typeof setTimeout> | null = null
 
   function flashNotice(text: string, ms = 2800): void {
@@ -42,6 +44,13 @@ export const useUiStore = defineStore('ui', () => {
   function setGraphicMode(mode: GraphicMode): void {
     graphicMode.value = mode
     writeStoredGraphicMode(mode)
+  }
+
+  function toggleSound(): void {
+    const next = !soundEnabled.value
+    soundEnabled.value = next
+    setSoundEnabled(next)
+    playToggleCue(next)
   }
 
   return {
@@ -63,7 +72,9 @@ export const useUiStore = defineStore('ui', () => {
     notice,
     probeAiming,
     graphicMode,
+    soundEnabled,
     flashNotice,
     setGraphicMode,
+    toggleSound,
   }
 })

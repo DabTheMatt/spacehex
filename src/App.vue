@@ -21,6 +21,7 @@ import { useUiStore } from './stores/uiStore'
 import { isInk } from './renderer/graphicMode'
 import { useGameHotkeys } from './ui/useGameHotkeys'
 import { isTypingTarget } from './ui/actionHotkeys'
+import { unlockSound } from './ui/sound'
 
 const ui = useUiStore()
 useGameHotkeys()
@@ -32,6 +33,12 @@ function onDevKey(ev: KeyboardEvent): void {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onDevKey, true))
-onUnmounted(() => window.removeEventListener('keydown', onDevKey, true))
+onMounted(() => {
+  window.addEventListener('keydown', onDevKey, true)
+  window.addEventListener('pointerdown', unlockSound, { capture: true })
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onDevKey, true)
+  window.removeEventListener('pointerdown', unlockSound, { capture: true })
+})
 </script>

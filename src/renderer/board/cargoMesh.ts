@@ -35,6 +35,46 @@ export function createCargoFigure(kind: CargoKind, size: number, color: number):
   return g
 }
 
+function svgToXz(px: number, py: number, size: number): THREE.Vector3 {
+  const s = size / 16
+  return new THREE.Vector3((px - 8) * s, 0.008, (py - 8) * s)
+}
+
+function addLoop(g: THREE.Group, color: number, pts: THREE.Vector3[], closed = true): void {
+  const ring = closed ? [...pts, pts[0]] : pts
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ring), lineMat(color)))
+}
+
+/** Top-down 2D silhouettes, axis-aligned on the hex face (same box for every kind). */
+export function createFlatCargoMark(kind: CargoKind, size: number, color: number): THREE.Group {
+  const g = new THREE.Group()
+  g.userData.flatCargo = kind
+  g.userData.cargoFigure = CARGO_FIGURE[kind]
+  const p = (x: number, y: number) => svgToXz(x, y, size)
+  if (kind === 'ORE') {
+    addLoop(g, color, [p(3.2, 6.2), p(8, 3.4), p(12.8, 6.2), p(12.8, 10.8), p(8, 13.6), p(3.2, 10.8)])
+    addLoop(g, color, [p(3.2, 6.2), p(8, 8.8), p(12.8, 6.2)], false)
+    addLoop(g, color, [p(8, 8.8), p(8, 13.6)], false)
+  } else if (kind === 'BIOMASS') {
+    addLoop(g, color, [p(8, 2.4), p(13.2, 13.2), p(2.8, 13.2)])
+    addLoop(g, color, [p(8, 6.2), p(8, 13.2)], false)
+  } else if (kind === 'ICE') {
+    const pts: THREE.Vector3[] = []
+    for (let i = 0; i <= 24; i++) {
+      const a = (i / 24) * Math.PI * 2
+      pts.push(p(8 + Math.cos(a) * 5.2, 8 + Math.sin(a) * 5.2))
+    }
+    addLoop(g, color, pts, false)
+    addLoop(g, color, [p(8, 3.4), p(8, 12.6)], false)
+    addLoop(g, color, [p(3.6, 8), p(12.4, 8)], false)
+  } else {
+    addLoop(g, color, [p(4.4, 4.2), p(11.6, 4.2), p(11.6, 11.8), p(4.4, 11.8)])
+    addLoop(g, color, [p(4.4, 4.2), p(8, 3.2), p(11.6, 4.2)], false)
+    addLoop(g, color, [p(4.4, 11.8), p(8, 12.8), p(11.6, 11.8)], false)
+  }
+  return g
+}
+
 export function attachCrateMotion(
   box: THREE.Object3D,
   x: number,
